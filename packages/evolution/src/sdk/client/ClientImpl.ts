@@ -9,10 +9,14 @@ import * as Transaction from "../../core/Transaction.js"
 import * as TransactionHash from "../../core/TransactionHash.js"
 import * as TransactionWitnessSet from "../../core/TransactionWitnessSet.js"
 import * as VKey from "../../core/VKey.js"
-import { runEffect } from "../../utils/effect-runtime.js"
+import { runEffectPromise } from "../../utils/effect-runtime.js"
 import { hashTransaction } from "../../utils/Hash.js"
 import type * as Address from "../Address.js"
-import { makeTxBuilder, type ReadOnlyTransactionBuilder, type SigningTransactionBuilder } from "../builders/TransactionBuilder.js"
+import {
+  makeTxBuilder,
+  type ReadOnlyTransactionBuilder,
+  type SigningTransactionBuilder
+} from "../builders/TransactionBuilder.js"
 import * as Blockfrost from "../provider/Blockfrost.js"
 import * as Koios from "../provider/Koios.js"
 import * as Kupmios from "../provider/Kupmios.js"
@@ -59,9 +63,9 @@ const createProvider = (config: ProviderConfig): Provider.Provider => {
 
 /**
  * Map NetworkId to its numeric representation.
- * 
+ *
  * "mainnet" → 1; "preprod" and "preview" → 0; numeric IDs pass through unchanged.
- * 
+ *
  * @since 2.0.0
  * @category transformation
  */
@@ -104,12 +108,11 @@ const toWalletNetwork = (networkId: NetworkId): WalletNew.Network => {
   }
 }
 
-
 /**
  * Construct a ReadOnlyWallet instance from network, payment address, and optional reward address.
- * 
+ *
  * Returns a wallet exposing address properties via both Promise and Effect APIs. No signing or transaction submission capability.
- * 
+ *
  * @since 2.0.0
  * @category constructors
  */
@@ -136,9 +139,9 @@ const createReadOnlyWallet = (
 
 /**
  * Construct a ReadOnlyWalletClient combining a read-only wallet with network metadata and combinator method.
- * 
+ *
  * Returns a client with address access and a method to attach a provider for blockchain queries.
- * 
+ *
  * @since 2.0.0
  * @category constructors
  */
@@ -164,9 +167,9 @@ const createReadOnlyWalletClient = (network: NetworkId, config: ReadOnlyWalletCo
 
 /**
  * Construct a ReadOnlyClient by composing a provider and read-only wallet.
- * 
+ *
  * Returns a client with blockchain query methods and address-based wallet convenience methods (getWalletUtxos, getWalletDelegation).
- * 
+ *
  * @since 2.0.0
  * @category constructors
  */
@@ -211,7 +214,8 @@ const createReadOnlyClient = (
       getWalletUtxos: () => provider.Effect.getUtxos(walletConfig.address),
       getWalletDelegation: () => {
         const rewardAddr = walletConfig.rewardAddress
-        if (!rewardAddr) return Effect.fail(new Provider.ProviderError({ message: "No reward address configured", cause: null }))
+        if (!rewardAddr)
+          return Effect.fail(new Provider.ProviderError({ message: "No reward address configured", cause: null }))
         return provider.Effect.getDelegation(rewardAddr)
       }
     }
@@ -222,10 +226,10 @@ const createReadOnlyClient = (
 
 /**
  * Determine key hashes that must sign a transaction based on inputs, withdrawals, and certificates.
- * 
+ *
  * Examines transaction body for required signers, owned inputs, reward account withdrawals, and stake credentials
  * in certificates. Returns the set of key hash hex strings that must provide signatures.
- * 
+ *
  * @since 2.0.0
  * @category predicates
  */
@@ -294,7 +298,7 @@ const computeRequiredKeyHashesSync = (params: {
 
 /**
  * Create a signing wallet from a seed phrase.
- * 
+ *
  * Wallet creation is synchronous - sodium initialization and key derivation
  * happen lazily on first crypto operation (signTx, signMessage).
  *
@@ -306,11 +310,7 @@ const createSigningWallet = (network: WalletNew.Network, config: SeedWalletConfi
     accountIndex: config.accountIndex ?? 0,
     password: config.password,
     network
-  }).pipe(
-    Effect.mapError(
-      (cause) => new WalletNew.WalletError({ message: cause.message, cause })
-    )
-  )
+  }).pipe(Effect.mapError((cause) => new WalletNew.WalletError({ message: cause.message, cause })))
 
   // Effect implementations are the source of truth
   const effectInterface: WalletNew.SigningWalletEffect = {
@@ -319,13 +319,11 @@ const createSigningWallet = (network: WalletNew.Network, config: SeedWalletConfi
     signTx: (txOrHex: Transaction.Transaction | string, context?: { utxos?: ReadonlyArray<UTxO.UTxO> }) =>
       Effect.gen(function* () {
         const derivation = yield* derivationEffect
-        
+
         const tx =
           typeof txOrHex === "string"
             ? yield* Transaction.Either.fromCBORHex(txOrHex).pipe(
-                Effect.mapError(
-                  (cause) => new WalletNew.WalletError({ message: cause.message, cause })
-                )
+                Effect.mapError((cause) => new WalletNew.WalletError({ message: cause.message, cause }))
               )
             : txOrHex
         const utxos = context?.utxos ?? []
@@ -383,7 +381,7 @@ const createSigningWallet = (network: WalletNew.Network, config: SeedWalletConfi
 
 /**
  * Create a signing wallet from private keys.
- * 
+ *
  * @category constructors
  */
 const createPrivateKeyWallet = (
@@ -395,9 +393,7 @@ const createPrivateKeyWallet = (
     stakeKeyBech32: config.stakeKey,
     addressType: config.addressType ?? (config.stakeKey ? "Base" : "Enterprise"),
     network
-  }).pipe(
-    Effect.mapError((cause) => new WalletNew.WalletError({ message: cause.message, cause }))
-  )
+  }).pipe(Effect.mapError((cause) => new WalletNew.WalletError({ message: cause.message, cause })))
 
   // Effect implementations are the source of truth
   const effectInterface: WalletNew.SigningWalletEffect = {
@@ -406,13 +402,11 @@ const createPrivateKeyWallet = (
     signTx: (txOrHex: Transaction.Transaction | string, context?: { utxos?: ReadonlyArray<UTxO.UTxO> }) =>
       Effect.gen(function* () {
         const derivation = yield* derivationEffect
-        
+
         const tx =
           typeof txOrHex === "string"
             ? yield* Transaction.Either.fromCBORHex(txOrHex).pipe(
-                Effect.mapError(
-                  (cause) => new WalletNew.WalletError({ message: cause.message, cause })
-                )
+                Effect.mapError((cause) => new WalletNew.WalletError({ message: cause.message, cause }))
               )
             : txOrHex
         const utxos = context?.utxos ?? []
@@ -460,20 +454,20 @@ const createPrivateKeyWallet = (
   // Promise API runs the Effect implementations
   return {
     type: "signing",
-    address: () => runEffect(effectInterface.address()),
-    rewardAddress: () => runEffect(effectInterface.rewardAddress()),
-    signTx: (txOrHex, context) => runEffect(effectInterface.signTx(txOrHex, context)),
-    signMessage: (address, payload) => runEffect(effectInterface.signMessage(address, payload)),
+    address: () => runEffectPromise(effectInterface.address()),
+    rewardAddress: () => runEffectPromise(effectInterface.rewardAddress()),
+    signTx: (txOrHex, context) => runEffectPromise(effectInterface.signTx(txOrHex, context)),
+    signMessage: (address, payload) => runEffectPromise(effectInterface.signMessage(address, payload)),
     Effect: effectInterface
   }
 }
 
 /**
  * Construct an ApiWallet wrapping a CIP-30 browser wallet API.
- * 
+ *
  * Caches addresses and reward addresses retrieved from the wallet. Returns a wallet with signing and message
  * authentication via the CIP-30 standard, plus transaction submission capability.
- * 
+ *
  * @since 2.0.0
  * @category constructors
  */
@@ -558,17 +552,19 @@ const createApiWallet = (_network: WalletNew.Network, config: ApiWalletConfig): 
 
 /**
  * Construct a SigningWalletClient combining a signing wallet with network metadata and combinator method.
- * 
+ *
  * Returns a client with transaction signing and address access, plus a method to attach a provider for blockchain queries.
- * 
+ *
  * @since 2.0.0
  * @category constructors
  */
-const createSigningWalletClient = (network: NetworkId, config: SeedWalletConfig | PrivateKeyWalletConfig): SigningWalletClient => {
+const createSigningWalletClient = (
+  network: NetworkId,
+  config: SeedWalletConfig | PrivateKeyWalletConfig
+): SigningWalletClient => {
   const walletNetwork = toWalletNetwork(network)
-  const wallet = config.type === "seed"
-    ? createSigningWallet(walletNetwork, config)
-    : createPrivateKeyWallet(walletNetwork, config)
+  const wallet =
+    config.type === "seed" ? createSigningWallet(walletNetwork, config) : createPrivateKeyWallet(walletNetwork, config)
   const networkId = normalizeNetworkId(network)
 
   return {
@@ -586,9 +582,9 @@ const createSigningWalletClient = (network: NetworkId, config: SeedWalletConfig 
 
 /**
  * Construct an ApiWalletClient combining a CIP-30 browser wallet with network metadata and combinator method.
- * 
+ *
  * Returns a client with signing and transaction submission via the browser wallet API, plus a method to attach a provider.
- * 
+ *
  * @since 2.0.0
  * @category constructors
  */
@@ -609,10 +605,10 @@ const createApiWalletClient = (network: NetworkId, config: ApiWalletConfig): Api
 
 /**
  * Construct a SigningClient by composing a provider and signing wallet.
- * 
+ *
  * Merges blockchain query capabilities with transaction signing, message authentication, and submission.
  * Supports both seed-derived and CIP-30 browser wallets as signing sources.
- * 
+ *
  * @since 2.0.0
  * @category constructors
  */
@@ -637,11 +633,11 @@ const createSigningClient = (
     ...wallet.Effect,
     ...provider.Effect, // Provider methods override wallet methods (e.g., submitTx uses ProviderError not WalletError)
     // Wallet-scoped convenience methods as Effects - expose union types (Effect-TS idiom)
-    getWalletUtxos: () =>
-      Effect.flatMap(wallet.Effect.address(), (addr) => provider.Effect.getUtxos(addr)),
+    getWalletUtxos: () => Effect.flatMap(wallet.Effect.address(), (addr) => provider.Effect.getUtxos(addr)),
     getWalletDelegation: () =>
       Effect.flatMap(wallet.Effect.rewardAddress(), (rewardAddr) => {
-        if (!rewardAddr) return Effect.fail(new Provider.ProviderError({ message: "No reward address configured", cause: null }))
+        if (!rewardAddr)
+          return Effect.fail(new Provider.ProviderError({ message: "No reward address configured", cause: null }))
         return provider.Effect.getDelegation(rewardAddr)
       })
   }
@@ -668,14 +664,14 @@ const createSigningClient = (
     },
     // Effect namespace
     Effect: effectInterface
-  } 
+  }
 }
 
 /**
  * Construct a ProviderOnlyClient by pairing a provider with network metadata and combinator method.
- * 
+ *
  * Returns a client with blockchain query and transaction submission capabilities, plus a method to attach a wallet for signing.
- * 
+ *
  * @since 2.0.0
  * @category constructors
  */
@@ -703,9 +699,9 @@ const createProviderOnlyClient = (network: NetworkId, config: ProviderConfig): P
 
 /**
  * Construct a MinimalClient holding network metadata and combinator methods.
- * 
+ *
  * Returns the simplest client form: a network context with methods to progressively attach provider and/or wallet to build richer clients.
- * 
+ *
  * @since 2.0.0
  * @category constructors
  */
@@ -754,11 +750,11 @@ const createMinimalClient = (network: NetworkId = "mainnet"): MinimalClient => {
 
 /**
  * Factory function producing a client instance from configuration parameters.
- * 
+ *
  * Returns different client types depending on what configuration is provided:
- * provider and wallet → full-featured client; provider only → query and submission; 
+ * provider and wallet → full-featured client; provider only → query and submission;
  * wallet only → signing with network metadata; network only → minimal context with combinators.
- * 
+ *
  * @since 2.0.0
  * @category constructors
  */
@@ -804,13 +800,11 @@ export function createClient(config: { network?: NetworkId; wallet: ApiWalletCon
 export function createClient(config?: { network?: NetworkId }): MinimalClient
 
 // Implementation signature - handles all cases (all synchronous now)
-export function createClient(
-  config?: {
-    network?: NetworkId
-    provider?: ProviderConfig
-    wallet?: WalletConfig
-  },
-):
+export function createClient(config?: {
+  network?: NetworkId
+  provider?: ProviderConfig
+  wallet?: WalletConfig
+}):
   | MinimalClient
   | ReadOnlyClient
   | SigningClient

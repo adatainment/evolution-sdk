@@ -1,0 +1,46 @@
+{
+  "preamble": {
+    "title": "evolution-sdk/spec",
+    "description": "Aiken contracts for project 'evolution-sdk/spec'",
+    "version": "0.0.0",
+    "plutusVersion": "v3",
+    "compiler": {
+      "name": "Aiken",
+      "version": "v1.1.19+e525483"
+    },
+    "license": "Apache-2.0"
+  },
+  "validators": [
+    {
+      "title": "always_succeed.always_succeed.spend",
+      "datum": {
+        "title": "_datum",
+        "schema": {
+          "$ref": "#/definitions/Data"
+        }
+      },
+      "redeemer": {
+        "title": "_redeemer",
+        "schema": {
+          "$ref": "#/definitions/Data"
+        }
+      },
+      "compiledCode": "585c01010029800aba2aba1aab9eaab9dab9a4888896600264653001300600198031803800cc0180092225980099b8748008c01cdd500144c8cc892898050009805180580098041baa0028a50401830060013003375400d149a26cac8009",
+      "hash": "a2492486ed656e3fb854a2c240cf16055216c38ec94d166a533c5820"
+    },
+    {
+      "title": "always_succeed.always_succeed.else",
+      "redeemer": {
+        "schema": {}
+      },
+      "compiledCode": "585c01010029800aba2aba1aab9eaab9dab9a4888896600264653001300600198031803800cc0180092225980099b8748008c01cdd500144c8cc892898050009805180580098041baa0028a50401830060013003375400d149a26cac8009",
+      "hash": "a2492486ed656e3fb854a2c240cf16055216c38ec94d166a533c5820"
+    }
+  ],
+  "definitions": {
+    "Data": {
+      "title": "Data",
+      "description": "Any Plutus data."
+    }
+  }
+}

@@ -59,16 +59,16 @@ export class KupmiosProvider implements Provider {
 
     // Initialize Effect property
     this.Effect = {
-      getProtocolParameters: () => KupmiosEffects.getProtocolParametersEffect(this.ogmiosUrl, this.headers?.ogmiosHeader),
-      getUtxos: KupmiosEffects.getUtxosEffect(this.kupoUrl, this.headers?.kupoHeader),
-      getUtxosWithUnit: KupmiosEffects.getUtxosWithUnitEffect(this.kupoUrl, this.headers?.kupoHeader),
-      getUtxoByUnit: KupmiosEffects.getUtxoByUnitEffect(this.kupoUrl, this.headers?.kupoHeader),
-      getUtxosByOutRef: KupmiosEffects.getUtxosByOutRefEffect(this.kupoUrl, this.headers?.kupoHeader),
-      getDelegation: KupmiosEffects.getDelegationEffect(this.ogmiosUrl, this.headers?.ogmiosHeader),
-      getDatum: KupmiosEffects.getDatumEffect(this.kupoUrl, this.headers?.kupoHeader),
-      awaitTx: KupmiosEffects.awaitTxEffect(this.kupoUrl, this.headers?.kupoHeader),
-      evaluateTx: KupmiosEffects.evaluateTxEffect(this.ogmiosUrl, this.headers?.ogmiosHeader),
-      submitTx: KupmiosEffects.submitTxEffect(this.ogmiosUrl, this.headers?.ogmiosHeader)
+      getProtocolParameters: () => KupmiosEffects.getProtocolParametersEffect(this.ogmiosUrl, this.headers),
+      getUtxos: KupmiosEffects.getUtxosEffect(this.kupoUrl, this.headers),
+      getUtxosWithUnit: KupmiosEffects.getUtxosWithUnitEffect(this.kupoUrl, this.headers),
+      getUtxoByUnit: KupmiosEffects.getUtxoByUnitEffect(this.kupoUrl, this.headers),
+      getUtxosByOutRef: KupmiosEffects.getUtxosByOutRefEffect(this.kupoUrl, this.headers),
+      getDelegation: KupmiosEffects.getDelegationEffect(this.ogmiosUrl, this.headers),
+      getDatum: KupmiosEffects.getDatumEffect(this.kupoUrl, this.headers),
+      awaitTx: KupmiosEffects.awaitTxEffect(this.kupoUrl, this.headers),
+      evaluateTx: KupmiosEffects.evaluateTxEffect(this.ogmiosUrl, this.headers),
+      submitTx: KupmiosEffects.submitTxEffect(this.ogmiosUrl, this.headers)
     }
   }
 

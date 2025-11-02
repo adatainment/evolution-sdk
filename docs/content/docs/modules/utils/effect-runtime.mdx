@@ -1,6 +1,6 @@
 ---
 title: utils/effect-runtime.ts
-nav_order: 168
+nav_order: 176
 parent: Modules
 ---
 
@@ -12,6 +12,7 @@ parent: Modules
 
 - [utilities](#utilities)
   - [runEffect](#runeffect)
+  - [runEffectPromise](#runeffectpromise)
 
 ---
 
@@ -19,17 +20,17 @@ parent: Modules
 
 ## runEffect
 
-Run an Effect and convert it to a Promise with clean error handling.
+Run an Effect synchronously with clean error handling.
 
-- Executes the Effect using Effect.runPromiseExit
+- Executes the Effect using Effect.runSyncExit
 - On failure, extracts the error from the Exit and cleans stack traces
 - Removes Effect.ts internal stack frames for cleaner error messages
-- Throws the cleaned error for standard Promise error handling
+- Throws the cleaned error for standard error handling
 
 **Signature**
 
 ```ts
-export async function runEffect<A, E>(effect: Effect.Effect<A, E>): Promise<A>
+export declare function runEffect<A, E>(effect: Effect.Effect<A, E>): A
 ```
 
 **Example**
@@ -40,9 +41,43 @@ import { runEffect } from "@evolution-sdk/evolution/utils/effect-runtime"
 
 const myEffect = Effect.succeed(42)
 
+try {
+  const result = runEffect(myEffect)
+  console.log(result)
+} catch (error) {
+  // Error with clean stack trace, no Effect.ts internals
+  console.error(error)
+}
+```
+
+Added in v2.0.0
+
+## runEffectPromise
+
+Run an Effect asynchronously and convert it to a Promise with clean error handling.
+
+- Executes the Effect using Effect.runPromiseExit
+- On failure, extracts the error from the Exit and cleans stack traces
+- Removes Effect.ts internal stack frames for cleaner error messages
+- Throws the cleaned error for standard Promise error handling
+
+**Signature**
+
+```ts
+export async function runEffectPromise<A, E>(effect: Effect.Effect<A, E>): Promise<A>
+```
+
+**Example**
+
+```typescript
+import { Effect } from "effect"
+import { runEffectPromise } from "@evolution-sdk/evolution/utils/effect-runtime"
+
+const myEffect = Effect.succeed(42)
+
 async function example() {
   try {
-    const result = await runEffect(myEffect)
+    const result = await runEffectPromise(myEffect)
     console.log(result)
   } catch (error) {
     // Error with clean stack trace, no Effect.ts internals

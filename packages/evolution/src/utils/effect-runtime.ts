@@ -68,7 +68,50 @@ function cleanErrorChain(error: any): any {
 }
 
 /**
- * Run an Effect and convert it to a Promise with clean error handling.
+ * Run an Effect synchronously with clean error handling.
+ * 
+ * - Executes the Effect using Effect.runSyncExit
+ * - On failure, extracts the error from the Exit and cleans stack traces
+ * - Removes Effect.ts internal stack frames for cleaner error messages
+ * - Throws the cleaned error for standard error handling
+ * 
+ * @example
+ * ```typescript
+ * import { Effect } from "effect"
+ * import { runEffect } from "@evolution-sdk/evolution/utils/effect-runtime"
+ * 
+ * const myEffect = Effect.succeed(42)
+ * 
+ * try {
+ *   const result = runEffect(myEffect)
+ *   console.log(result)
+ * } catch (error) {
+ *   // Error with clean stack trace, no Effect.ts internals
+ *   console.error(error)
+ * }
+ * ```
+ * 
+ * @since 2.0.0
+ * @category utilities
+ */
+export function runEffect<A, E>(effect: Effect.Effect<A, E>): A {
+  const exit = Effect.runSyncExit(effect)
+  
+  if (Exit.isFailure(exit)) {
+    // Extract the error from the failure
+    const error = Cause.squash(exit.cause)
+    
+    // Clean the error's stack trace
+    const cleanedError = cleanErrorChain(error)
+    
+    throw cleanedError
+  }
+  
+  return exit.value
+}
+
+/**
+ * Run an Effect asynchronously and convert it to a Promise with clean error handling.
  * 
  * - Executes the Effect using Effect.runPromiseExit
  * - On failure, extracts the error from the Exit and cleans stack traces
@@ -78,13 +121,13 @@ function cleanErrorChain(error: any): any {
  * @example
  * ```typescript
  * import { Effect } from "effect"
- * import { runEffect } from "@evolution-sdk/evolution/utils/effect-runtime"
+ * import { runEffectPromise } from "@evolution-sdk/evolution/utils/effect-runtime"
  * 
  * const myEffect = Effect.succeed(42)
  * 
  * async function example() {
  *   try {
- *     const result = await runEffect(myEffect)
+ *     const result = await runEffectPromise(myEffect)
  *     console.log(result)
  *   } catch (error) {
  *     // Error with clean stack trace, no Effect.ts internals
@@ -96,7 +139,7 @@ function cleanErrorChain(error: any): any {
  * @since 2.0.0
  * @category utilities
  */
-export async function runEffect<A, E>(effect: Effect.Effect<A, E>): Promise<A> {
+export async function runEffectPromise<A, E>(effect: Effect.Effect<A, E>): Promise<A> {
   const exit = await Effect.runPromiseExit(effect)
   
   if (Exit.isFailure(exit)) {

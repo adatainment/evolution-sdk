@@ -42,7 +42,7 @@ const createHeaders = (projectId?: string) => ({
  */
 const wrapError = (operation: string) => (error: unknown) =>
   new ProviderError({
-    message: `Blockfrost ${operation} failed`,
+    message: `Blockfrost ${operation} failed. ${(error as Error).message}`,
     cause: error
   })
 
@@ -270,18 +270,81 @@ export const submitTx = (baseUrl: string, projectId?: string) =>
  */
 export const evaluateTx = (baseUrl: string, projectId?: string) =>
   (tx: string, additionalUTxOs?: Array<UTxO>) => {
-    // Blockfrost evaluation API expects transaction CBOR
-    const requestBody = {
-      cbor: tx,
-      ...(additionalUTxOs ? { additional_utxo_set: additionalUTxOs } : {})
+    
+    // If additional UTxOs provided, use the /utils/txs/evaluate/utxos endpoint with JSON payload
+    if (additionalUTxOs && additionalUTxOs.length > 0) {
+      // Create headers with application/json content-type
+      const headers = {
+        ...(projectId ? { "project_id": projectId } : {}),
+        "Content-Type": "application/json"
+      }
+      
+      // Format additional UTxOs as Ogmios format: [[TxIn, TxOut], ...]
+      // See: https://ogmios.dev/mini-protocols/local-tx-submission/#additional-utxo-set
+      const additionalUtxoSet = additionalUTxOs.map(utxo => {
+        // TxIn format: { txId: string, index: number }
+        const txIn = {
+          txId: utxo.txHash,
+          index: utxo.outputIndex
+        }
+        
+        // TxOut format: { address: string, value: {...}, datum?: ..., script?: ... }
+        const txOut: Record<string, unknown> = {
+          address: utxo.address,
+          value: {
+            ada: { lovelace: Number(utxo.assets.lovelace) },
+            // Add other assets if present
+            ...(Object.keys(utxo.assets).length > 1 ? {
+              // Format multi-assets as Ogmios expects
+            } : {})
+          }
+        }
+        
+        // Add datum if present
+        if (utxo.datumOption) {
+          if (utxo.datumOption.type === "inlineDatum") {
+            txOut.datum = utxo.datumOption.inline
+          } else if (utxo.datumOption.type === "datumHash") {
+            txOut.datumHash = utxo.datumOption.hash
+          }
+        }
+        
+        return [txIn, txOut]
+      })
+      
+      const payload = {
+        cbor: tx, // Transaction CBOR (hex)
+        additionalUtxoSet
+      }
+      
+      return withRateLimit(
+        HttpUtils.postJson(
+          `${baseUrl}/utils/txs/evaluate/utxos`,
+          payload,
+          Blockfrost.JsonwspOgmiosEvaluationResponse,
+          headers
+        ).pipe(
+          Effect.map(Blockfrost.transformJsonwspOgmiosEvaluationResult),
+          Effect.mapError(wrapError("evaluateTx"))
+        )
+      )
+    }
+    
+    // Otherwise use the simpler /utils/txs/evaluate endpoint with CBOR body
+    const txBytes = Bytes.fromHex(tx)
+    
+    // Create headers with application/cbor content-type
+    const headers = {
+      ...(projectId ? { "project_id": projectId } : {}),
+      "Content-Type": "application/cbor"
     }
     
     return withRateLimit(
-      HttpUtils.postJson(
+      HttpUtils.postUint8Array(
         `${baseUrl}/utils/txs/evaluate`,
-        requestBody,
+        txBytes,
         Blockfrost.BlockfrostEvaluationResponse,
-        createHeaders(projectId)
+        headers
       ).pipe(
         Effect.map(Blockfrost.transformEvaluationResult),
         Effect.mapError(wrapError("evaluateTx"))

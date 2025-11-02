@@ -20,6 +20,10 @@ export interface CollectFromParams {
   readonly redeemer?: string
 }
 
+export interface ReadFromParams {
+  readonly referenceInputs: ReadonlyArray<UTxO.UTxO> // Mandatory: UTxOs to read as reference inputs
+}
+
 export interface MintTokensParams {
   readonly assets: Assets.Assets // Mandatory: Tokens to mint (excluding lovelace)
   readonly redeemer?: string // Optional: Redeemer for minting script

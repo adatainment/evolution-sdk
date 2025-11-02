@@ -11,7 +11,13 @@
 import { Effect, Ref } from "effect"
 
 import * as Assets from "../../Assets.js"
-import { BuildOptionsTag, PhaseContextTag, TransactionBuilderError, TxContext } from "../TransactionBuilder.js"
+import * as EvaluationStateManager from "../EvaluationStateManager.js"
+import {
+  BuildOptionsTag,
+  PhaseContextTag,
+  TransactionBuilderError,
+  TxContext
+} from "../TransactionBuilder.js"
 import type { PhaseResult } from "./Phases.js"
 
 /**
@@ -95,9 +101,20 @@ export const executeBalance = (): Effect.Effect<
         `Balanced: ${isBalanced}`
     )
 
-    // Step 3: Check if balanced (delta is empty) → complete
+    // Step 3: Check if balanced (delta is empty) → complete or evaluate
     if (isBalanced) {
       yield* Effect.logDebug("[Balance] Transaction balanced!")
+      
+      // Check if transaction has scripts that need evaluation
+      // Only route to evaluation if there are redeemers WITHOUT exUnits
+      if (EvaluationStateManager.hasUnevaluatedRedeemers(state.redeemers)) {
+        yield* Effect.logDebug("[Balance] Unevaluated redeemers detected - routing to Evaluation phase")
+        return { next: "evaluation" as const }
+      }
+      
+      // Balanced and evaluated - transaction is complete
+      // Note: Collateral already ran earlier (before ChangeCreation)
+      yield* Effect.logDebug("[Balance] Transaction balanced and evaluated - complete!")
       return { next: "complete" as const }
     }
 

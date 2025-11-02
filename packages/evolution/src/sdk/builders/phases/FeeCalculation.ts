@@ -13,7 +13,7 @@ import { Effect, Ref } from "effect"
 import * as Assets from "../../Assets.js"
 import type { TransactionBuilderError } from "../TransactionBuilder.js"
 import { PhaseContextTag, ProtocolParametersTag, TxContext } from "../TransactionBuilder.js"
-import { buildTransactionInputs, calculateFeeIteratively } from "../TxBuilderImpl.js"
+import { buildTransactionInputs, calculateFeeIteratively, calculateReferenceScriptFee } from "../TxBuilderImpl.js"
 import type { PhaseResult } from "./Phases.js"
 
 /**
@@ -76,19 +76,27 @@ export const executeFeeCalculation = (): Effect.Effect<
 
     const allOutputs = [...baseOutputs, ...buildCtx.changeOutputs]
 
-    // Step 4: Calculate fee WITH change outputs
+    // Step 4: Calculate base fee WITH change outputs
     const protocolParams = yield* ProtocolParametersTag
-    const calculatedFee = yield* calculateFeeIteratively(selectedUtxos, inputs, allOutputs, {
+    const baseFee = yield* calculateFeeIteratively(selectedUtxos, inputs, allOutputs, state.redeemers, {
       minFeeCoefficient: protocolParams.minFeeCoefficient,
-      minFeeConstant: protocolParams.minFeeConstant
+      minFeeConstant: protocolParams.minFeeConstant,
+      priceMem: protocolParams.priceMem,
+      priceStep: protocolParams.priceStep
     })
 
-    yield* Effect.logDebug(`[FeeCalculation] Calculated fee: ${calculatedFee}`)
+    yield* Effect.logDebug(`[FeeCalculation] Base fee: ${baseFee}`)
+
+    // Step 4a: Add reference script fee if reference inputs are present
+    const refScriptFee = yield* calculateReferenceScriptFee(state.referenceInputs)
+    yield* Effect.logDebug(`[FeeCalculation] Reference script fee: ${refScriptFee}`)
+
+    const calculatedFee = baseFee + refScriptFee
+    yield* Effect.logDebug(`[FeeCalculation] Total fee (base + refScript): ${calculatedFee}`)
 
     // Step 5: Calculate leftover after fee NOW (after fee is known)
-    const state2 = yield* Ref.get(ctx)
-    const inputAssets = state2.totalInputAssets
-    const outputAssets = state2.totalOutputAssets
+    const inputAssets = state.totalInputAssets
+    const outputAssets = state.totalOutputAssets
     const leftoverBeforeFee = Assets.subtract(inputAssets, outputAssets)
 
     const leftoverAfterFee: Assets.Assets = {

@@ -1,5 +1,6 @@
 import type * as Assets from "../../src/sdk/Assets.js"
 import type * as Datum from "../../src/sdk/Datum.js"
+import type * as Script from "../../src/sdk/Script.js"
 import type * as UTxO from "../../src/sdk/UTxO.js"
 
 /**
@@ -29,6 +30,10 @@ export type CreateTestUtxoOptions = {
    * @default 0
    */
   outputIndex?: number
+  /**
+   * Optional reference script to attach to the UTxO.
+   */
+  scriptRef?: Script.Script
   /**
    * The transaction hash. Defaults to 64 zeros.
    * @default "0".repeat(64)
@@ -84,6 +89,7 @@ export const createTestUtxo = (options: CreateTestUtxoOptions): UTxO.UTxO => {
     lovelace,
     nativeAssets,
     outputIndex = 0,
+    scriptRef,
     txHash = "0".repeat(64)
   } = options
 
@@ -106,6 +112,7 @@ export const createTestUtxo = (options: CreateTestUtxoOptions): UTxO.UTxO => {
     assets,
     datumOption,
     outputIndex,
+    scriptRef,
     txHash: paddedTxHash
   }
 }

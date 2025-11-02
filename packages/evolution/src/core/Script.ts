@@ -1,5 +1,6 @@
 import { Data, Effect as Eff, FastCheck, ParseResult, Schema } from "effect"
 
+import * as Bytes from "./Bytes.js"
 import * as CBOR from "./CBOR.js"
 import * as Function from "./Function.js"
 import * as NativeScripts from "./NativeScripts.js"
@@ -119,6 +120,15 @@ export const FromCDDL = Schema.transformOrFail(ScriptCDDL, Schema.typeSchema(Scr
   title: "Script from CDDL",
   description: "Transforms between CDDL tagged tuple and Script union"
 })
+
+export const FromCBORBytes = (options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTIONS) =>
+  Schema.compose(
+    CBOR.FromBytes(options), // Uint8Array → CDDL
+    FromCDDL // CDDL → Script
+  )
+
+export const FromCBORHex = (options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTIONS) =>
+  Schema.compose(Bytes.FromHex, FromCBORBytes(options))
 
 /**
  * Check if two Script instances are equal.

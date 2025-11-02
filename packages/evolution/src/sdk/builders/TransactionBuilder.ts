@@ -29,17 +29,27 @@ import { Context, Data, Effect, Layer, Logger, LogLevel, Ref } from "effect"
 import type { Either } from "effect/Either"
 
 import type * as Coin from "../../core/Coin.js"
+import type * as CoreScript from "../../core/Script.js"
 import * as Transaction from "../../core/Transaction.js"
-import { runEffect } from "../../utils/effect-runtime.js"
+import { runEffectPromise } from "../../utils/effect-runtime.js"
 import type * as Assets from "../Assets.js"
 import type { EvalRedeemer } from "../EvalRedeemer.js"
+import { type Network, SLOT_CONFIG_NETWORK, type SlotConfig } from "../Network.js"
+import type * as ProtocolParametersSDK from "../ProtocolParameters.js"
 import type * as Provider from "../provider/Provider.js"
+import type * as Script from "../Script.js"
 import type * as UTxO from "../UTxO.js"
 import type * as WalletNew from "../wallet/WalletNew.js"
 import type { CoinSelectionAlgorithm, CoinSelectionFunction } from "./CoinSelection.js"
-import type { CollectFromParams, PayToAddressParams } from "./operations/Operations.js"
+import { attachScriptToState } from "./operations/Attach.js"
+import { createCollectFromProgram } from "./operations/Collect.js"
+import type { CollectFromParams, PayToAddressParams, ReadFromParams } from "./operations/Operations.js"
+import { createPayToAddressProgram } from "./operations/Pay.js"
+import { createReadFromProgram } from "./operations/ReadFrom.js"
 import { executeBalance } from "./phases/Balance.js"
 import { executeChangeCreation } from "./phases/ChangeCreation.js"
+import { executeCollateral } from "./phases/Collateral.js"
+import { executeEvaluation } from "./phases/Evaluation.js"
 import { executeFallback } from "./phases/Fallback.js"
 import { executeFeeCalculation } from "./phases/FeeCalculation.js"
 import { executeSelection } from "./phases/Selection.js"
@@ -51,9 +61,7 @@ import {
   assembleTransaction,
   buildFakeWitnessSet,
   buildTransactionInputs,
-  calculateTransactionSize,
-  createCollectFromProgram,
-  createPayToAddressProgram
+  calculateTransactionSize
 } from "./TxBuilderImpl.js"
 
 /**
@@ -70,7 +78,7 @@ export class TransactionBuilderError extends Data.TaggedError("TransactionBuilde
 /**
  * Build phases
  */
-type Phase = "selection" | "changeCreation" | "feeCalculation" | "balance" | "fallback" | "complete"
+type Phase = "selection" | "changeCreation" | "feeCalculation" | "balance" | "evaluation" | "collateral" | "fallback" | "complete"
 
 /**
  * BuildContext - state machine context
@@ -96,7 +104,8 @@ const initialTxBuilderState: TxBuilderState = {
   scripts: new Map(),
   totalOutputAssets: { lovelace: 0n },
   totalInputAssets: { lovelace: 0n },
-  redeemers: new Map()
+  redeemers: new Map(),
+  referenceInputs: []
 }
 
 /**
@@ -185,6 +194,57 @@ const resolveAvailableUtxos = (
 }
 
 /**
+ * Resolve evaluator from options, provider, or return undefined.
+ * Priority: BuildOptions.evaluator > provider.evaluateTx (wrapped) > undefined
+ *
+ * When undefined is returned, the Evaluation phase will fail with an appropriate error
+ * if scripts are present in the transaction.
+ */
+const resolveEvaluator = (config: TxBuilderConfig, options?: BuildOptions): Evaluator | undefined => {
+  // Priority 1: Explicit evaluator from BuildOptions
+  if (options?.evaluator) {
+    return options.evaluator
+  }
+
+  // Priority 2: Wrap provider's evaluateTx as an Evaluator
+  if (config.provider) {
+    return {
+      evaluate: (tx: string, additionalUtxos: ReadonlyArray<UTxO.UTxO> | undefined, _context: EvaluationContext) =>
+        config.provider!.Effect.evaluateTx(tx, additionalUtxos ? [...additionalUtxos] : undefined).pipe(
+          Effect.mapError(
+            (providerError) =>
+              new EvaluationError({
+                message: "Provider evaluation failed",
+                cause: providerError
+              })
+          )
+        )
+    }
+  }
+
+  // No evaluator available - Evaluation phase will handle error if scripts present
+  return undefined
+}
+
+/**
+ * Resolve slot configuration from config network or BuildOptions override.
+ * Priority: BuildOptions.slotConfig > SLOT_CONFIG_NETWORK[config.network] > SLOT_CONFIG_NETWORK.Mainnet (default)
+ *
+ * Slot configuration defines the relationship between slots and Unix time,
+ * required for UPLC evaluation of time-based validators.
+ */
+const resolveSlotConfig = (config: TxBuilderConfig, options?: BuildOptions): SlotConfig => {
+  // Priority 1: Explicit slot config from BuildOptions (for custom networks)
+  if (options?.slotConfig) {
+    return options.slotConfig
+  }
+
+  // Priority 2: Network-specific slot config from TxBuilderConfig
+  const network: Network = config.network ?? "Mainnet"
+  return SLOT_CONFIG_NETWORK[network]
+}
+
+/**
  * Assemble final builder result based on wallet capabilities.
  * Accesses transaction data from context tags.
  */
@@ -229,6 +289,8 @@ const phaseMap = {
   changeCreation: executeChangeCreation,
   feeCalculation: executeFeeCalculation,
   balance: executeBalance,
+  evaluation: executeEvaluation,
+  collateral: executeCollateral,
   fallback: executeFallback
 }
 
@@ -340,7 +402,7 @@ const DEFAULT_BUILD_OPTIONS = {
   setCollateral: 5_000_000n
 } as const
 
-const buildEffectCore = (
+const makeBuild = (
   config: TxBuilderConfig,
   programs: Array<ProgramStep>,
   options: BuildOptions = DEFAULT_BUILD_OPTIONS
@@ -355,6 +417,7 @@ const buildEffectCore = (
     yield* Effect.all(programs, { concurrency: "unbounded" })
 
     // Run state machine with resolved services
+    // Note: FullProtocolParametersTag is provided lazily - evaluation phase will fetch when needed
     const { transaction, txWithFakeWitnesses } = yield* phaseStateMachine.pipe(
       Effect.provideService(ProtocolParametersTag, protocolParameters),
       Effect.provideService(ChangeAddressTag, changeAddress),
@@ -364,11 +427,13 @@ const buildEffectCore = (
     // Assemble and return final result
     return yield* assembleFinalResult(config, transaction, txWithFakeWitnesses)
   }).pipe(
-    Effect.provideServiceEffect(
-      TxContext,
-      Ref.make(initialTxBuilderState)
-    ),
-    Effect.provideService(BuildOptionsTag, options),
+    Effect.provideServiceEffect(TxContext, Ref.make(initialTxBuilderState)),
+    Effect.provideService(BuildOptionsTag, {
+      ...options,
+      evaluator: resolveEvaluator(config, options) ?? options.evaluator,
+      slotConfig: resolveSlotConfig(config, options)
+    }),
+    Effect.provideService(TxBuilderConfigTag, config),
     Effect.provideServiceEffect(
       PhaseContextTag,
       Ref.make<PhaseContext>({
@@ -393,10 +458,7 @@ const chainEffectCore = (
     // Chain logic: Execute programs and return intermediate state
     return {} as ChainResult
   }).pipe(
-    Effect.provideServiceEffect(
-      TxContext,
-      Ref.make(initialTxBuilderState)
-    ),
+    Effect.provideServiceEffect(TxContext, Ref.make(initialTxBuilderState)),
     Effect.mapError(
       (error) =>
         new TransactionBuilderError({
@@ -419,10 +481,7 @@ const buildPartialEffectCore = (
     // Return partial transaction (without evaluation)
     return {} as Transaction.Transaction
   }).pipe(
-    Effect.provideServiceEffect(
-      TxContext,
-      Ref.make(initialTxBuilderState)
-    ),
+    Effect.provideServiceEffect(TxContext, Ref.make(initialTxBuilderState)),
     Effect.mapError(
       (error) =>
         new TransactionBuilderError({
@@ -825,16 +884,56 @@ export interface BuildOptions {
    */
   readonly onInsufficientChange?: "error" | "burn"
 
-  // Script evaluator - if provided, replaces the default provider-based evaluation
-  // Use createUPLCEvaluator() for UPLC libraries, or implement Evaluator directly
+  /**
+   * Script evaluator for Plutus script execution costs.
+   *
+   * If provided, replaces the default provider-based evaluation.
+   * Use `createUPLCEvaluator()` for UPLC libraries, or implement `Evaluator` directly.
+   *
+   * @since 2.0.0
+   */
   readonly evaluator?: Evaluator
 
-  // Collateral handling
-  readonly collateral?: ReadonlyArray<UTxO.UTxO> // Manual collateral (max 3)
-  // Amount to set as collateral default 5_000_000n
+  /**
+   * Custom slot configuration for script evaluation.
+   *
+   * By default, slot config is determined from the network (mainnet/preview/preprod).
+   * Provide this to override for custom networks (emulator, devnet, etc.).
+   *
+   * The slot configuration defines the relationship between slots and Unix time,
+   * which is required for UPLC evaluation of time-based validators.
+   *
+   * Use cases:
+   * - Emulator with custom genesis time
+   * - Development network with different slot configuration
+   * - Testing with specific time scenarios
+   *
+   * Example:
+   * ```typescript
+   * // For custom emulator
+   * builder.build({
+   *   slotConfig: {
+   *     zeroTime: 1234567890000n,
+   *     zeroSlot: 0n,
+   *     slotLength: 1000
+   *   }
+   * })
+   * ```
+   *
+   * @since 2.0.0
+   */
+  readonly slotConfig?: SlotConfig
+
+  /**
+   * Amount to set as collateral return output (in lovelace).
+   *
+   * Used for Plutus script transactions to cover potential script execution failures.
+   * If not provided, defaults to 5 ADA (5_000_000 lovelace).
+   *
+   * @default 5_000_000n
+   * @since 2.0.0
+   */
   readonly setCollateral?: bigint
-  // Minimum fee
-  readonly minFee?: Coin.Coin
 
   /**
    * Unfrack: Optimize wallet UTxO structure
@@ -911,13 +1010,18 @@ export interface ProtocolParameters {
   /** Maximum transaction size in bytes */
   maxTxSize: number
 
+  /** Price per memory unit for script execution (optional, for ExUnits cost calculation) */
+  priceMem?: number
+
+  /** Price per CPU step for script execution (optional, for ExUnits cost calculation) */
+  priceStep?: number
+
   // Future fields for advanced features:
   // maxBlockHeaderSize?: number
   // maxTxExecutionUnits?: ExUnits
   // maxBlockExecutionUnits?: ExUnits
   // collateralPercentage?: number
   // maxCollateralInputs?: number
-  // prices?: Prices
 }
 
 /**
@@ -964,6 +1068,25 @@ export interface TxBuilderConfig {
    */
   readonly provider?: Provider.Provider
 
+  /**
+   * Network type for slot configuration in script evaluation.
+   *
+   * Used to determine the correct slot configuration when evaluating Plutus scripts.
+   * Each network has different genesis times and slot configurations.
+   *
+   * Options:
+   * - `"Mainnet"`: Production network
+   * - `"Preview"`: Preview testnet
+   * - `"Preprod"`: Pre-production testnet
+   * - `"Custom"`: Custom network (emulator/devnet) - requires slotConfig in BuildOptions
+   *
+   * When omitted, defaults to "Mainnet".
+   *
+   * @default "Mainnet"
+   * @since 2.0.0
+   */
+  readonly network?: Network
+
   // Future fields:
   // readonly costModels?: Uint8Array // Cost models for script evaluation
 }
@@ -1008,10 +1131,17 @@ export interface TxBuilderConfig {
 export interface TxBuilderState {
   readonly selectedUtxos: ReadonlyArray<UTxO.UTxO> // SDK type: Array for ordering, converted at build
   readonly outputs: ReadonlyArray<UTxO.TxOutput> // Transaction outputs (no txHash/outputIndex yet)
-  readonly scripts: Map<string, any> // Scripts attached to the transaction
+  readonly scripts: Map<string, CoreScript.Script> // Scripts attached to the transaction
   readonly totalOutputAssets: Assets.Assets // Asset totals for balancing
   readonly totalInputAssets: Assets.Assets // Asset totals for balancing
   readonly redeemers: Map<string, RedeemerData> // Redeemer data for script inputs
+  readonly referenceInputs: ReadonlyArray<UTxO.UTxO> // Reference inputs (UTxOs with reference scripts)
+  readonly collateral?: {
+    // Collateral data for script transactions
+    readonly inputs: ReadonlyArray<UTxO.UTxO>
+    readonly totalAmount: bigint
+    readonly returnOutput?: UTxO.TxOutput // Optional: only if there are leftover assets
+  }
 }
 
 /**
@@ -1080,6 +1210,30 @@ export class ProtocolParametersTag extends Context.Tag("ProtocolParameters")<
   ProtocolParametersTag,
   ProtocolParameters
 >() {}
+
+/**
+ * Full protocol parameters (including cost models, execution units, etc.) for script evaluation.
+ * This is resolved from provider.Effect.getProtocolParameters() and includes all fields
+ * needed for UPLC evaluation, unlike the minimal ProtocolParametersTag.
+ *
+ * Available to evaluation phase via Effect Context.
+ *
+ * @since 2.0.0
+ * @category context
+ */
+export class FullProtocolParametersTag extends Context.Tag("FullProtocolParameters")<
+  FullProtocolParametersTag,
+  ProtocolParametersSDK.ProtocolParameters
+>() {}
+
+/**
+ * Transaction builder configuration containing provider, wallet, and network information.
+ * Available to phases that need to access provider or wallet directly.
+ *
+ * @since 2.0.0
+ * @category context
+ */
+export class TxBuilderConfigTag extends Context.Tag("TxBuilderConfig")<TxBuilderConfigTag, TxBuilderConfig>() {}
 
 /**
  * Resolved available UTxOs for the current build.
@@ -1218,6 +1372,69 @@ export interface TransactionBuilderBase {
    * @category builder-methods
    */
   readonly collectFrom: (params: CollectFromParams) => this
+
+  /**
+   * Attach a Plutus script to the transaction.
+   *
+   * Scripts must be attached before being referenced by transaction inputs, minting policies,
+   * or certificate operations. The script is stored in the builder state and indexed by its hash
+   * for efficient lookup during transaction assembly.
+   *
+   * Queues a deferred operation that will be executed when build() is called.
+   * Returns the same builder for method chaining.
+   *
+   * @example
+   * ```typescript
+   * import * as Script from "./Script.js"
+   *
+   * const script = Script.makePlutusV2Script("590a42590a3f01000...")
+   *
+   * const tx = await builder
+   *   .attachScript(script)
+   *   .collectFrom({ inputs: [scriptUtxo], redeemer: myRedeemer })
+   *   .build()
+   * ```
+   *
+   * @since 2.0.0
+   * @category builder-methods
+   */
+  readonly attachScript: (script: Script.Script) => this
+
+  /**
+   * Add reference inputs to the transaction.
+   *
+   * Reference inputs allow reading UTxO data (datums, reference scripts) without consuming them.
+   * They are commonly used to:
+   * - Reference validators/scripts stored on-chain (reduces tx size and fees)
+   * - Read datum values without spending the UTxO
+   * - Share scripts across multiple transactions
+   *
+   * Reference scripts incur tiered fees based on size:
+   * - Tier 1 (0-25KB): 15 lovelace/byte
+   * - Tier 2 (25-50KB): 25 lovelace/byte
+   * - Tier 3 (50-200KB): 100 lovelace/byte
+   * - Maximum: 200KB total limit
+   *
+   * Queues a deferred operation that will be executed when build() is called.
+   * Returns the same builder for method chaining.
+   *
+   * @example
+   * ```typescript
+   * import * as UTxO from "./UTxO.js"
+   *
+   * // Use reference script stored on-chain instead of attaching to transaction
+   * const refScriptUtxo = await provider.getUtxoByTxHash("abc123...")
+   *
+   * const tx = await builder
+   *   .readFrom({ referenceInputs: [refScriptUtxo] })
+   *   .collectFrom({ inputs: [scriptUtxo], redeemer: myRedeemer })
+   *   .build()
+   * ```
+   *
+   * @since 2.0.0
+   * @category builder-methods
+   */
+  readonly readFrom: (params: ReadFromParams) => this
 }
 
 /**
@@ -1369,7 +1586,6 @@ export type TxBuilderResultType<
   W extends WalletNew.SigningWallet | WalletNew.ApiWallet | WalletNew.ReadOnlyWallet | undefined
 > = W extends WalletNew.SigningWallet | WalletNew.ApiWallet ? SigningTransactionBuilder : ReadOnlyTransactionBuilder
 
-
 /**
  * Construct a TransactionBuilder instance from protocol configuration.
  *
@@ -1416,24 +1632,38 @@ export function makeTxBuilder(config: TxBuilderConfig) {
       return txBuilder // Return same instance for chaining
     },
 
+    readFrom: (params: ReadFromParams) => {
+      // Create ProgramStep for deferred execution
+      const program = createReadFromProgram(params)
+      programs.push(program)
+      return txBuilder // Return same instance for chaining
+    },
+
+    attachScript: (script: Script.Script) => {
+      // Create ProgramStep for deferred execution
+      const program = attachScriptToState(script)
+      programs.push(program)
+      return txBuilder // Return same instance for chaining
+    },
+
     // ============================================================================
     // Hybrid completion methods - Execute with fresh state
     // ============================================================================
 
     buildEffect: (options?: BuildOptions) => {
-      return buildEffectCore(config, programs, options)
+      return makeBuild(config, programs, options)
     },
 
     build: (options?: BuildOptions) => {
-      return runEffect(
-        buildEffectCore(config, programs, options).pipe(
+      return runEffectPromise(
+        makeBuild(config, programs, options).pipe(
           Effect.provide(Layer.merge(Logger.pretty, Logger.minimumLogLevel(LogLevel.Debug)))
         )
       )
     },
     buildEither: (options?: BuildOptions) => {
-      return runEffect(
-        buildEffectCore(config, programs, options).pipe(
+      return runEffectPromise(
+        makeBuild(config, programs, options).pipe(
           Effect.either,
           Effect.provide(Layer.merge(Logger.pretty, Logger.minimumLogLevel(LogLevel.Debug)))
         )
@@ -1446,9 +1676,9 @@ export function makeTxBuilder(config: TxBuilderConfig) {
 
     chainEffect: (options?: BuildOptions) => chainEffectCore(config, programs, options),
 
-    chain: (options?: BuildOptions) => runEffect(chainEffectCore(config, programs, options)),
+    chain: (options?: BuildOptions) => runEffectPromise(chainEffectCore(config, programs, options)),
 
-    chainEither: (options?: BuildOptions) => runEffect(chainEffectCore(config, programs, options).pipe(Effect.either)),
+    chainEither: (options?: BuildOptions) => runEffectPromise(chainEffectCore(config, programs, options).pipe(Effect.either)),
 
     // ============================================================================
     // Debug methods - Execute with fresh state, return partial transaction
@@ -1456,7 +1686,7 @@ export function makeTxBuilder(config: TxBuilderConfig) {
 
     buildPartialEffect: (options?: BuildOptions) => buildPartialEffectCore(config, programs, options),
 
-    buildPartial: (options?: BuildOptions) => runEffect(buildPartialEffectCore(config, programs, options))
+    buildPartial: (options?: BuildOptions) => runEffectPromise(buildPartialEffectCore(config, programs, options))
   }
 
   return txBuilder

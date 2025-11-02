@@ -1,30 +1,20 @@
 import { NodeStream } from "@effect/platform-node"
+import { blake2b } from "@noble/hashes/blake2"
 import Docker from "dockerode"
 import { Data, Effect, Stream } from "effect"
 import * as fs from "fs"
 import * as os from "os"
 import * as path from "path"
+import { PassThrough } from "stream"
 
+import * as Address from "../../core/AddressEras.js"
+import * as TransactionHash from "../../core/TransactionHash.js"
+import * as Assets from "../Assets.js"
+import type * as UTxO from "../UTxO.js"
 import * as DevnetDefault from "./DevnetDefault.js"
 
 export class CardanoDevNetError extends Data.TaggedError("CardanoDevNetError")<{
-  reason:
-    | "container_not_found"
-    | "container_creation_failed"
-    | "container_start_failed"
-    | "container_stop_failed"
-    | "container_removal_failed"
-    | "container_inspection_failed"
-    | "temp_directory_creation_failed"
-    | "config_file_write_failed"
-    | "file_permissions_failed"
-    | "network_creation_failed"
-    | "kupo_container_creation_failed"
-    | "kupo_container_start_failed"
-    | "kupo_container_stop_failed"
-    | "ogmios_container_creation_failed"
-    | "ogmios_container_start_failed"
-    | "ogmios_container_stop_failed"
+  reason: string
   message: string
   cause?: unknown
 }> {}
@@ -40,6 +30,98 @@ export interface DevNetCluster {
   readonly ogmios?: DevNetContainer | undefined
   readonly networkName: string
 }
+
+/**
+ * Image management utilities for pulling Docker images.
+ *
+ * @since 2.0.0
+ * @category utilities
+ */
+const ImageUtils = {
+  /**
+   * Check if a Docker image exists locally.
+   */
+  isImageAvailable: (imageName: string) =>
+    Effect.tryPromise({
+      try: () => {
+        const docker = new Docker()
+        return docker.listImages({ filters: { reference: [imageName] } }).then((images) => images.length > 0)
+      },
+      catch: (cause) =>
+        new CardanoDevNetError({
+          reason: "container_inspection_failed",
+          message: `Failed to check if image '${imageName}' is available.`,
+          cause
+        })
+    }),
+
+  /**
+   * Pull a Docker image with progress logging.
+   */
+  pullImage: (imageName: string) =>
+    Effect.gen(function* () {
+      const docker = new Docker()
+
+      // eslint-disable-next-line no-console
+      console.log(`[Devnet] Pulling Docker image: ${imageName}`)
+      // eslint-disable-next-line no-console
+      console.log(`[Devnet] This may take a few minutes on first run...`)
+
+      const stream = yield* Effect.tryPromise({
+        try: () => docker.pull(imageName),
+        catch: (cause) =>
+          new CardanoDevNetError({
+            reason: "container_creation_failed",
+            message: `Failed to pull image '${imageName}'. Check internet connection and image name.`,
+            cause
+          })
+      })
+
+      // Wait for pull to complete
+      yield* Effect.tryPromise({
+        try: () =>
+          new Promise<void>((resolve, reject) => {
+            docker.modem.followProgress(
+              stream,
+              (err: Error | null) => {
+                if (err) reject(err)
+                else resolve()
+              },
+              (event: { status?: string; progress?: string; id?: string }) => {
+                // Optional: Log progress
+                if (event.status === "Downloading" || event.status === "Extracting") {
+                  // Silent progress - only show completion
+                } else if (event.status) {
+                  // eslint-disable-next-line no-console
+                  console.log(`[Devnet] ${event.status}${event.id ? ` ${event.id}` : ""}`)
+                }
+              }
+            )
+          }),
+        catch: (cause) =>
+          new CardanoDevNetError({
+            reason: "container_creation_failed",
+            message: `Failed to complete image pull for '${imageName}'.`,
+            cause
+          })
+      })
+
+      // eslint-disable-next-line no-console
+      console.log(`[Devnet] ✓ Image ready: ${imageName}`)
+    }),
+
+  /**
+   * Ensure image is available, pull if necessary.
+   */
+  ensureImageAvailable: (imageName: string) =>
+    Effect.gen(function* () {
+      const isAvailable = yield* ImageUtils.isImageAvailable(imageName)
+
+      if (!isAvailable) {
+        yield* ImageUtils.pullImage(imageName)
+      }
+    })
+} as const
 
 /**
  * Internal utilities for DevNet operations.
@@ -309,7 +391,7 @@ export const Cluster = {
    * @since 2.0.0
    * @category constructors
    */
-  make: (config: DevnetDefault.DevNetConfig = {}): Effect.Effect<DevNetCluster, CardanoDevNetError> =>
+  makeEffect: (config: DevnetDefault.DevNetConfig = {}): Effect.Effect<DevNetCluster, CardanoDevNetError> =>
     Effect.gen(function* () {
       const fullConfig: Required<DevnetDefault.DevNetConfig> = {
         clusterName: config.clusterName ?? DevnetDefault.DEFAULT_DEVNET_CONFIG.clusterName,
@@ -410,6 +492,19 @@ export const Cluster = {
         }
       }
 
+      // Ensure Docker images are available (pull if necessary)
+      yield* ImageUtils.ensureImageAvailable(fullConfig.image)
+
+      if (fullConfig.kupo.enabled) {
+        const kupoImage = fullConfig.kupo.image || DevnetDefault.DEFAULT_KUPO_CONFIG.image
+        yield* ImageUtils.ensureImageAvailable(kupoImage)
+      }
+
+      if (fullConfig.ogmios.enabled) {
+        const ogmiosImage = fullConfig.ogmios.image || DevnetDefault.DEFAULT_OGMIOS_CONFIG.image
+        yield* ImageUtils.ensureImageAvailable(ogmiosImage)
+      }
+
       // Create containers
       const cardanoContainer = yield* Utils.createCardanoContainer(fullConfig, networkName, tempDir)
       const kupoContainer = yield* Utils.createKupoContainer(fullConfig, networkName, tempDir)
@@ -442,7 +537,7 @@ export const Cluster = {
    * @since 2.0.0
    * @category constructors
    */
-  makeOrThrow: (config: DevnetDefault.DevNetConfig = {}) => Effect.runPromise(Cluster.make(config)),
+  make: (config: DevnetDefault.DevNetConfig = {}) => Effect.runPromise(Cluster.makeEffect(config)),
 
   /**
    * Start a devnet cluster (all containers).
@@ -450,10 +545,10 @@ export const Cluster = {
    * @since 2.0.0
    * @category lifecycle
    */
-  start: (cluster: DevNetCluster): Effect.Effect<void, CardanoDevNetError> =>
+  startEffect: (cluster: DevNetCluster): Effect.Effect<void, CardanoDevNetError> =>
     Effect.gen(function* () {
       // Start Cardano node first
-      yield* Container.start(cluster.cardanoNode)
+      yield* Container.startEffect(cluster.cardanoNode)
       const docker = new Docker().getContainer(cluster.cardanoNode.id)
       const awaitForBlockProduction = Effect.promise(() =>
         docker.logs({
@@ -484,10 +579,10 @@ export const Cluster = {
 
       // Start child containers
       if (cluster.kupo) {
-        yield* Container.start(cluster.kupo)
+        yield* Container.startEffect(cluster.kupo)
       }
       if (cluster.ogmios) {
-        yield* Container.start(cluster.ogmios)
+        yield* Container.startEffect(cluster.ogmios)
       }
     }),
 
@@ -497,7 +592,7 @@ export const Cluster = {
    * @since 2.0.0
    * @category lifecycle
    */
-  startOrThrow: (cluster: DevNetCluster) => Effect.runPromise(Cluster.start(cluster)),
+  start: (cluster: DevNetCluster) => Effect.runPromise(Cluster.startEffect(cluster)),
 
   /**
    * Stop a devnet cluster (all containers).
@@ -505,18 +600,18 @@ export const Cluster = {
    * @since 2.0.0
    * @category lifecycle
    */
-  stop: (cluster: DevNetCluster): Effect.Effect<void, CardanoDevNetError> =>
+  stopEffect: (cluster: DevNetCluster): Effect.Effect<void, CardanoDevNetError> =>
     Effect.gen(function* () {
       // Stop child containers first
       if (cluster.kupo) {
-        yield* Container.stop(cluster.kupo)
+        yield* Container.stopEffect(cluster.kupo)
       }
       if (cluster.ogmios) {
-        yield* Container.stop(cluster.ogmios)
+        yield* Container.stopEffect(cluster.ogmios)
       }
 
       // Stop Cardano node last
-      yield* Container.stop(cluster.cardanoNode)
+      yield* Container.stopEffect(cluster.cardanoNode)
     }),
 
   /**
@@ -525,7 +620,7 @@ export const Cluster = {
    * @since 2.0.0
    * @category lifecycle
    */
-  stopOrThrow: (cluster: DevNetCluster) => Effect.runPromise(Cluster.stop(cluster)),
+  stop: (cluster: DevNetCluster) => Effect.runPromise(Cluster.stopEffect(cluster)),
 
   /**
    * Remove a devnet cluster (all containers and network).
@@ -533,15 +628,15 @@ export const Cluster = {
    * @since 2.0.0
    * @category lifecycle
    */
-  remove: (cluster: DevNetCluster): Effect.Effect<void, CardanoDevNetError> =>
+  removeEffect: (cluster: DevNetCluster): Effect.Effect<void, CardanoDevNetError> =>
     Effect.gen(function* () {
       // Remove containers (removeContainer stops them first)
-      yield* Container.remove(cluster.cardanoNode)
+      yield* Container.removeEffect(cluster.cardanoNode)
       if (cluster.kupo) {
-        yield* Container.remove(cluster.kupo)
+        yield* Container.removeEffect(cluster.kupo)
       }
       if (cluster.ogmios) {
-        yield* Container.remove(cluster.ogmios)
+        yield* Container.removeEffect(cluster.ogmios)
       }
     }),
 
@@ -551,7 +646,7 @@ export const Cluster = {
    * @since 2.0.0
    * @category lifecycle
    */
-  removeOrThrow: (cluster: DevNetCluster) => Effect.runPromise(Cluster.remove(cluster))
+  remove: (cluster: DevNetCluster) => Effect.runPromise(Cluster.removeEffect(cluster))
 } as const
 
 /**
@@ -567,7 +662,7 @@ export const Container = {
    * @since 2.0.0
    * @category lifecycle
    */
-  start: (container: DevNetContainer): Effect.Effect<void, CardanoDevNetError> =>
+  startEffect: (container: DevNetContainer): Effect.Effect<void, CardanoDevNetError> =>
     Effect.tryPromise({
       try: () => new Docker().getContainer(container.id).start(),
       catch: (cause) =>
@@ -584,7 +679,7 @@ export const Container = {
    * @since 2.0.0
    * @category lifecycle
    */
-  startOrThrow: (container: DevNetContainer) => Effect.runPromise(Container.start(container)),
+  start: (container: DevNetContainer) => Effect.runPromise(Container.startEffect(container)),
 
   /**
    * Stop a specific devnet container.
@@ -592,7 +687,7 @@ export const Container = {
    * @since 2.0.0
    * @category lifecycle
    */
-  stop: (container: DevNetContainer): Effect.Effect<void, CardanoDevNetError> =>
+  stopEffect: (container: DevNetContainer): Effect.Effect<void, CardanoDevNetError> =>
     Effect.gen(function* () {
       const docker = new Docker()
       const dockerContainer = docker.getContainer(container.id)
@@ -626,7 +721,7 @@ export const Container = {
    * @since 2.0.0
    * @category lifecycle
    */
-  stopOrThrow: (container: DevNetContainer) => Effect.runPromise(Container.stop(container)),
+  stop: (container: DevNetContainer) => Effect.runPromise(Container.stopEffect(container)),
 
   /**
    * Remove a specific devnet container.
@@ -634,9 +729,9 @@ export const Container = {
    * @since 2.0.0
    * @category lifecycle
    */
-  remove: (container: DevNetContainer): Effect.Effect<void, CardanoDevNetError> =>
+  removeEffect: (container: DevNetContainer): Effect.Effect<void, CardanoDevNetError> =>
     Effect.gen(function* () {
-      yield* Container.stop(container)
+      yield* Container.stopEffect(container)
 
       yield* Effect.tryPromise({
         try: () => new Docker().getContainer(container.id).remove(),
@@ -655,7 +750,7 @@ export const Container = {
    * @since 2.0.0
    * @category lifecycle
    */
-  removeOrThrow: (container: DevNetContainer) => Effect.runPromise(Container.remove(container)),
+  remove: (container: DevNetContainer) => Effect.runPromise(Container.removeEffect(container)),
 
   /**
    * Get container status information.
@@ -663,7 +758,7 @@ export const Container = {
    * @since 2.0.0
    * @category inspection
    */
-  getStatus: (container: DevNetContainer): Effect.Effect<Docker.ContainerInspectInfo | undefined, CardanoDevNetError> =>
+  getStatusEffect: (container: DevNetContainer): Effect.Effect<Docker.ContainerInspectInfo | undefined, CardanoDevNetError> =>
     Effect.tryPromise({
       try: () => new Docker().getContainer(container.id).inspect(),
       catch: (cause) =>
@@ -680,35 +775,283 @@ export const Container = {
    * @since 2.0.0
    * @category inspection
    */
-  getStatusOrThrow: (container: DevNetContainer) => Effect.runPromise(Container.getStatus(container)),
+  getStatus: (container: DevNetContainer) => Effect.runPromise(Container.getStatusEffect(container)),
 
-  isImageAvailable: (imageName: string): Effect.Effect<boolean, CardanoDevNetError> =>
-    Effect.tryPromise({
-      try: () => {
-        const docker = new Docker()
-        return docker.listImages({ filters: { reference: [imageName] } }).then((images) => images.length > 0)
-      },
-      catch: (cause) =>
-        new CardanoDevNetError({
-          reason: "container_inspection_failed",
-          message: "Failed to check image availability.",
-          cause
-        })
+  /**
+   * Check if a Docker image is available locally.
+   *
+   * @since 2.0.0
+   * @category image-management
+   */
+  isImageAvailableEffect: (imageName: string) => ImageUtils.isImageAvailable(imageName),
+
+  /**
+   * Check if a Docker image is available locally, throws on error.
+   *
+   * @since 2.0.0
+   * @category image-management
+   */
+  isImageAvailable: (imageName: string) => Effect.runPromise(ImageUtils.isImageAvailable(imageName)),
+
+  /**
+   * Pull a Docker image.
+   *
+   * @since 2.0.0
+   * @category image-management
+   */
+  downloadImageEffect: (imageName: string) => ImageUtils.pullImage(imageName),
+
+  /**
+   * Pull a Docker image, throws on error.
+   *
+   * @since 2.0.0
+   * @category image-management
+   */
+  downloadImage: (imageName: string) => Effect.runPromise(ImageUtils.pullImage(imageName)),
+
+  /**
+   * Ensure image is available, pull if necessary.
+   *
+   * @since 2.0.0
+   * @category image-management
+   */
+  ensureImageAvailableEffect: (imageName: string) => ImageUtils.ensureImageAvailable(imageName),
+
+  /**
+   * Ensure image is available, pull if necessary. Throws on error.
+   *
+   * @since 2.0.0
+   * @category image-management
+   */
+  ensureImageAvailable: (imageName: string) => Effect.runPromise(ImageUtils.ensureImageAvailable(imageName)),
+
+  /**
+   * Execute a command inside a container and return the stdout output.
+   * Properly handles Docker's multiplexed streams.
+   *
+   * @example
+   * ```typescript
+   * import * as Devnet from "@evolve/evolution/Devnet"
+   *
+   * const output = await Devnet.Container.execCommand(cluster.cardanoNode, [
+   *   "cardano-cli", "query", "tip",
+   *   "--socket-path", "/opt/cardano/ipc/node.socket",
+   *   "--testnet-magic", "42"
+   * ])
+   * const tipData = JSON.parse(output)
+   * ```
+   *
+   * @since 2.0.0
+   * @category execution
+   */
+  execCommandEffect: (container: DevNetContainer, command: Array<string>): Effect.Effect<string, CardanoDevNetError> =>
+    Effect.gen(function* () {
+      const docker = new Docker()
+      const dockerContainer = docker.getContainer(container.id)
+
+      const exec = yield* Effect.tryPromise({
+        try: () =>
+          dockerContainer.exec({
+            Cmd: command,
+            AttachStdout: true,
+            AttachStderr: true
+          }),
+        catch: (cause) =>
+          new CardanoDevNetError({
+            reason: "container_inspection_failed",
+            message: `Failed to create exec instance in container '${container.name}'.`,
+            cause
+          })
+      })
+
+      const stream = yield* Effect.tryPromise({
+        try: () => exec.start({ Detach: false }),
+        catch: (cause) =>
+          new CardanoDevNetError({
+            reason: "container_inspection_failed",
+            message: `Failed to start exec in container '${container.name}'.`,
+            cause
+          })
+      })
+
+      // Demux Docker stream to separate stdout/stderr and remove control characters
+      const stdout = new PassThrough()
+      const stderr = new PassThrough()
+      docker.modem.demuxStream(stream, stdout, stderr)
+
+      let output = ""
+      let _errorOutput = ""
+
+      stdout.on("data", (chunk: Buffer) => {
+        output += chunk.toString()
+      })
+
+      stderr.on("data", (chunk: Buffer) => {
+        _errorOutput += chunk.toString()
+      })
+
+      yield* Effect.promise(
+        () =>
+          new Promise<void>((resolve) => {
+            stream.on("end", resolve)
+          })
+      )
+
+      return output.trim()
     }),
 
-  isImageAvailableOrThrow: (imageName: string) => Effect.runPromise(Container.isImageAvailable(imageName)),
+  /**
+   * Execute a command inside a container and return the stdout output. Throws on error.
+   *
+   * @since 2.0.0
+   * @category execution
+   */
+  execCommand: (container: DevNetContainer, command: Array<string>) =>
+    Effect.runPromise(Container.execCommandEffect(container, command))
+} as const
 
-  downloadImage: (imageName: string): Effect.Effect<void, CardanoDevNetError> =>
-    Effect.tryPromise({
-      try: () => {
-        const docker = new Docker()
-        return docker.pull(imageName)
-      },
-      catch: (cause) =>
-        new CardanoDevNetError({
-          reason: "container_inspection_failed",
-          message: "Failed to download the Docker image.",
-          cause
+/**
+ * Genesis UTxO operations for deterministic calculation and querying.
+ *
+ * @since 2.0.0
+ * @category genesis
+ */
+export const Genesis = {
+  /**
+   * Calculate genesis UTxOs deterministically from shelley genesis configuration.
+   * No node interaction required - purely computational.
+   *
+   * Implementation follows Cardano's `initialFundsPseudoTxIn` algorithm:
+   * Each address gets a unique pseudo-TxId by hashing the address itself (not the genesis JSON).
+   * This matches the Haskell implementation in cardano-ledger.
+   *
+   * Algorithm:
+   * 1. For each address in initialFunds:
+   *    a. Serialize address to CBOR bytes
+   *    b. Hash with blake2b-256 → this becomes the TxId
+   *    c. Output index is always 0 (minBound)
+   *
+   * Reference: cardano-ledger/eras/shelley/impl/src/Cardano/Ledger/Shelley/Genesis.hs
+   * `initialFundsPseudoTxIn addr = TxIn (pseudoTxId addr) minBound`
+   * `pseudoTxId = TxId . unsafeMakeSafeHash . Hash.castHash . Hash.hashWith serialiseAddr`
+   *
+   * @example
+   * ```typescript
+   * import * as Devnet from "@evolution-sdk/evolution/Devnet"
+   *
+   * const genesisConfig = {
+   *   initialFunds: {
+   *     "00813c32c92aad21...": 900_000_000_000
+   *   },
+   *   // ... other genesis config
+   * }
+   *
+   * const utxos = await Devnet.Genesis.calculateUtxosFromConfigOrThrow(
+   *   genesisConfig
+   * )
+   * ```
+   *
+   * @since 2.0.0
+   * @category genesis
+   */
+  calculateUtxosFromConfig: (
+    genesisConfig: DevnetDefault.ShelleyGenesis
+  ): Effect.Effect<ReadonlyArray<UTxO.UTxO>, CardanoDevNetError> =>
+    Effect.gen(function* () {
+      const utxos: Array<UTxO.UTxO> = []
+      const fundEntries = Object.entries(genesisConfig.initialFunds)
+
+      for (const [addressHex, lovelace] of fundEntries) {
+        // Convert hex address to Address object and bech32
+        const addressBech32 = yield* Effect.try({
+          try: () => {
+            const addr = Address.fromHex(addressHex)
+            return Address.toBech32(addr)
+          },
+          catch: (e) =>
+            new CardanoDevNetError({
+              reason: "container_inspection_failed",
+              message: `Failed to convert genesis address hex to bech32: ${addressHex}`,
+              cause: e
+            })
         })
-    })
+
+        // Calculate pseudo-TxId by hashing the address bytes
+        // This matches Cardano's: Hash.hashWith serialiseAddr addr
+        const addr = Address.fromHex(addressHex)
+        const addressBytes = Address.toBytes(addr)
+        const txHashBytes = blake2b(addressBytes, { dkLen: 32 })
+        const txHash = TransactionHash.toHex(new TransactionHash.TransactionHash({ hash: txHashBytes }))
+
+        utxos.push({
+          txHash,
+          outputIndex: 0, // Genesis UTxOs always use index 0 (minBound in Haskell)
+          address: addressBech32,
+          assets: Assets.fromLovelace(BigInt(lovelace))
+        })
+      }
+
+      return utxos
+    }),
+
+  /**
+   * Calculate genesis UTxOs from config, throws on error.
+   *
+   * @since 2.0.0
+   * @category genesis
+   */
+  calculateUtxosFromConfigOrThrow: (genesisConfig: DevnetDefault.ShelleyGenesis) =>
+    Effect.runPromise(Genesis.calculateUtxosFromConfig(genesisConfig)),
+
+  /**
+   * Query genesis UTxOs from the running node using cardano-cli.
+   * This is the "source of truth" method that queries actual chain state.
+   *
+   * @since 2.0.0
+   * @category genesis
+   */
+  queryUtxos: (cluster: DevNetCluster): Effect.Effect<ReadonlyArray<UTxO.UTxO>, CardanoDevNetError> =>
+    Effect.gen(function* () {
+      const output = yield* Container.execCommandEffect(cluster.cardanoNode, [
+        "cardano-cli",
+        "conway",
+        "query",
+        "utxo",
+        "--whole-utxo",
+        "--socket-path",
+        "/opt/cardano/ipc/node.socket",
+        "--testnet-magic",
+        "42",
+        "--out-file",
+        "/dev/stdout"
+      ])
+
+      const parsed = yield* Effect.try({
+        try: () => JSON.parse(output) as Record<string, { address: string; value: { lovelace: number } }>,
+        catch: (e) =>
+          new CardanoDevNetError({
+            reason: "container_inspection_failed",
+            message: "Failed to parse UTxO query output from cardano-cli",
+            cause: e
+          })
+      })
+
+      return Object.entries(parsed).map(([key, data]) => {
+        const [txHash, outputIndex] = key.split("#")
+        return {
+          txHash,
+          outputIndex: parseInt(outputIndex),
+          address: data.address,
+          assets: Assets.fromLovelace(BigInt(data.value.lovelace))
+        }
+      })
+    }),
+
+  /**
+   * Query genesis UTxOs from node, throws on error.
+   *
+   * @since 2.0.0
+   * @category genesis
+   */
+  queryUtxosOrThrow: (cluster: DevNetCluster) => Effect.runPromise(Genesis.queryUtxos(cluster))
 } as const

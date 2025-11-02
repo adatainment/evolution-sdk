@@ -1,5 +1,6 @@
 // Effect-TS imports
 import { Effect, Ref, Schema } from "effect"
+import * as Array from "effect/Array"
 
 // Core imports
 import * as AddressEras from "../../core/AddressEras.js"
@@ -7,6 +8,10 @@ import * as Bytes32 from "../../core/Bytes32.js"
 import * as PlutusData from "../../core/Data.js"
 import * as DatumOption from "../../core/DatumOption.js"
 import * as Ed25519Signature from "../../core/Ed25519Signature.js"
+import type * as PlutusV1 from "../../core/PlutusV1.js"
+import type * as PlutusV2 from "../../core/PlutusV2.js"
+import type * as PlutusV3 from "../../core/PlutusV3.js"
+import * as Redeemer from "../../core/Redeemer.js"
 import * as Transaction from "../../core/Transaction.js"
 import * as TransactionBody from "../../core/TransactionBody.js"
 import * as TransactionHash from "../../core/TransactionHash.js"
@@ -20,7 +25,6 @@ import * as Assets from "../Assets.js"
 import type * as Datum from "../Datum.js"
 import * as UTxO from "../UTxO.js"
 // Internal imports
-import type { CollectFromParams, PayToAddressParams } from "./operations/Operations.js"
 import type { UnfrackOptions } from "./TransactionBuilder.js"
 import { TransactionBuilderError, TxContext } from "./TransactionBuilder.js"
 import * as Unfrack from "./Unfrack.js"
@@ -32,7 +36,7 @@ import * as Unfrack from "./Unfrack.js"
 /**
  * This file contains the program creators that generate ProgramSteps.
  * ProgramSteps are deferred Effects executed during build() with fresh state.
- * 
+ *
  * Architecture:
  * - Program creators return deferred Effects (ProgramSteps)
  * - Programs access TxContext (single unified Context) containing config, state, and options
@@ -48,7 +52,7 @@ import * as Unfrack from "./Unfrack.js"
 /**
  * Check if an address is a script address (payment credential is ScriptHash).
  * Parses the address to extract its structure and checks the payment credential type.
- * 
+ *
  * @since 2.0.0
  * @category helpers
  */
@@ -70,7 +74,7 @@ export const isScriptAddress = (address: string): Effect.Effect<boolean, Transac
 
 /**
  * Filter UTxOs to find those locked by scripts (script-locked UTxOs).
- * 
+ *
  * @since 2.0.0
  * @category helpers
  */
@@ -96,14 +100,79 @@ export const filterScriptUtxos = (
 
 /**
  * Calculate total assets from a set of UTxOs.
- * 
+ *
  * @since 2.0.0
  * @category helpers
  */
 export const calculateTotalAssets = (utxos: ReadonlyArray<UTxO.UTxO> | Set<UTxO.UTxO>): Assets.Assets => {
-  const utxoArray = Array.isArray(utxos) ? utxos : Array.from(utxos)
-  return utxoArray.reduce((total, utxo) => Assets.add(total, utxo.assets), Assets.empty())
+  const utxoArray = (Array.isArray(utxos) ? utxos : globalThis.Array.from(utxos)) as ReadonlyArray<UTxO.UTxO>
+  return utxoArray.reduce((total: Assets.Assets, utxo: UTxO.UTxO) => Assets.add(total, utxo.assets), Assets.empty())
 }
+
+/**
+ * Calculate reference script fees using tiered pricing.
+ * 
+ * Reference scripts stored on-chain incur additional fees based on their size:
+ * - First 25KB:  15 lovelace/byte
+ * - Next 25KB:   25 lovelace/byte
+ * - Next 150KB: 100 lovelace/byte
+ * - Maximum: 200KB total
+ * 
+ * @param referenceInputs - UTxOs containing reference scripts
+ * @returns Total reference script fee in lovelace
+ * 
+ * @since 2.0.0
+ * @category helpers
+ */
+export const calculateReferenceScriptFee = (
+  referenceInputs: ReadonlyArray<UTxO.UTxO>
+): Effect.Effect<bigint, TransactionBuilderError> =>
+  Effect.gen(function* () {
+    // Calculate total reference script size in bytes
+    let totalScriptSize = 0
+    
+    for (const utxo of referenceInputs) {
+      if (utxo.scriptRef) {
+        // Get script CBOR bytes length
+        // Script is stored as CBOR hex string, convert to bytes
+        const scriptHex = utxo.scriptRef.script // Script type has 'script' property with CBOR hex
+        const scriptBytes = scriptHex.length / 2 // Hex string is 2 chars per byte
+        totalScriptSize += scriptBytes
+      }
+    }
+    
+    // No reference scripts = no fee
+    if (totalScriptSize === 0) {
+      return 0n
+    }
+    
+    // Check maximum size limit (200KB)
+    if (totalScriptSize > 200_000) {
+      return yield* Effect.fail(
+        new TransactionBuilderError({
+          message: `Total reference script size (${totalScriptSize} bytes) exceeds maximum limit of 200,000 bytes`
+        })
+      )
+    }
+    
+    // Calculate tiered fees
+    let fee = 0n
+    let remainingSize = totalScriptSize
+    let tierIndex = 0
+    const tierPrices = [15, 25, 100] // lovelace per byte for each tier
+    const tierSize = 25_000 // 25KB per tier
+    
+    while (remainingSize > 0 && tierIndex < 3) {
+      const bytesInThisTier = Math.min(remainingSize, tierSize)
+      const tierFee = BigInt(Math.ceil(bytesInThisTier * tierPrices[tierIndex]!))
+      fee += tierFee
+      
+      remainingSize -= tierSize
+      tierIndex++
+    }
+    
+    return fee
+  })
 
 // ============================================================================
 // Helper Functions - Output Construction
@@ -112,7 +181,7 @@ export const calculateTotalAssets = (utxos: ReadonlyArray<UTxO.UTxO> | Set<UTxO.
 /**
  * Convert SDK Datum to core DatumOption.
  * Parses CBOR hex strings for inline datums and hashes for datum references.
- * 
+ *
  * @since 2.0.0
  * @category helpers
  */
@@ -148,10 +217,10 @@ export const makeDatumOption = (datum: Datum.Datum): Effect.Effect<DatumOption.D
 /**
  * Create a TxOutput from user-friendly parameters.
  * Stays in SDK types for easier manipulation (merging, etc).
- * 
+ *
  * TxOutput represents an output being created in a transaction - it doesn't have
  * txHash/outputIndex yet since the transaction hasn't been submitted.
- * 
+ *
  * @since 2.0.0
  * @category helpers
  */
@@ -164,7 +233,7 @@ export const makeTxOutput = (params: {
   Effect.gen(function* () {
     // Validate address format using Schema (will fail if invalid bech32)
     yield* Schema.decodeUnknown(AddressEras.FromBech32)(params.address)
-    
+
     // Create SDK TxOutput (no txHash/outputIndex until transaction is submitted)
     const output: UTxO.TxOutput = {
       address: params.address,
@@ -172,7 +241,7 @@ export const makeTxOutput = (params: {
       datumOption: params.datum,
       scriptRef: params.scriptRef
     }
-    
+
     return output
   }).pipe(
     Effect.mapError(
@@ -188,7 +257,7 @@ export const makeTxOutput = (params: {
  * Convert SDK TxOutput to core TransactionOutput.
  * This is an internal conversion function used during transaction assembly.
  * Converts SDK types (Assets, Datum) to core CML types (Value, DatumOption).
- * 
+ *
  * @since 2.0.0
  * @category helpers
  * @internal
@@ -234,9 +303,9 @@ export const txOutputToTransactionOutput = (params: {
 /**
  * Merge additional assets into an existing UTxO (output).
  * Creates a new UTxO with combined assets from the original UTxO and additional assets.
- * 
+ *
  * Use case: Draining wallet by merging leftover into an existing payment output.
- * 
+ *
  * @since 2.0.0
  * @category helpers
  */
@@ -261,11 +330,11 @@ export const mergeAssetsIntoUTxO = (
 /**
  * Merge additional assets into an existing TransactionOutput.
  * Creates a new output with combined assets from the original output and leftover assets.
- * 
+ *
  * Use case: Draining wallet by merging leftover into an existing payment output.
- * 
+ *
  * @deprecated Use mergeAssetsIntoUTxO instead. This function works with core types and will be removed.
- * 
+ *
  * @since 2.0.0
  * @category helpers
  */
@@ -276,13 +345,13 @@ export const mergeAssetsIntoOutput = (
   Effect.gen(function* () {
     // Extract current assets from output
     const currentAssets = Assets.valueToAssets(output.amount)
-    
+
     // Merge assets
     const mergedAssets = Assets.add(currentAssets, additionalAssets)
-    
+
     // Convert merged assets back to Value
     const newValue = Assets.assetsToValue(mergedAssets)
-    
+
     // Create new output with merged value, preserving type and optional fields
     if (output instanceof TransactionOutput.BabbageTransactionOutput) {
       const newOutput = new TransactionOutput.BabbageTransactionOutput({
@@ -311,111 +380,6 @@ export const mergeAssetsIntoOutput = (
   )
 
 // ============================================================================
-// Operation Effect Programs
-// ============================================================================
-
-/**
- * Creates a ProgramStep for payToAddress operation.
- * Creates a UTxO output and tracks assets for balancing.
- * 
- * Implementation:
- * 1. Creates UTxO output from parameters using helper
- * 2. Adds output to state.outputs array
- * 3. Updates totalOutputAssets for balancing
- * 
- * @since 2.0.0
- * @category programs
- */
-export const createPayToAddressProgram = (params: PayToAddressParams) =>
-  Effect.gen(function* () {
-    const ctx = yield* TxContext
-
-    // 1. Create UTxO output from params
-    const output = yield* makeTxOutput({
-      address: params.address,
-      assets: params.assets,
-      datum: params.datum,
-      scriptRef: params.scriptRef
-    })
-
-    // 2. Add output to state
-    yield* Ref.update(ctx, (state) => ({
-      ...state,
-      outputs: [...state.outputs, output],
-      totalOutputAssets: Assets.add(state.totalOutputAssets, params.assets)
-    }))
-  })
-
-/**
- * Creates a ProgramStep for collectFrom operation.
- * Adds UTxOs as transaction inputs, validates script requirements, and tracks assets.
- * 
- * Implementation:
- * 1. Validates that inputs array is not empty
- * 2. Checks if any inputs are script-locked (require redeemers)
- * 3. Validates redeemer is provided for script-locked UTxOs
- * 4. Adds UTxOs to state.selectedUtxos
- * 5. Tracks redeemer information for script spending
- * 6. Updates total input assets for balancing
- * 
- * @since 2.0.0
- * @category programs
- */
-export const createCollectFromProgram = (params: CollectFromParams) =>
-  Effect.gen(function* () {
-    const ctx = yield* TxContext
-
-    // 1. Validate inputs exist
-    if (params.inputs.length === 0) {
-      return yield* Effect.fail(
-        new TransactionBuilderError({
-          message: "No inputs provided to collectFrom"
-        })
-      )
-    }
-
-    // 2. Filter script-locked UTxOs
-    const scriptUtxos = yield* filterScriptUtxos(params.inputs)
-
-    // 3. Validate redeemer for script UTxOs
-    if (scriptUtxos.length > 0 && !params.redeemer) {
-      return yield* Effect.fail(
-        new TransactionBuilderError({
-          message: `Redeemer required for ${scriptUtxos.length} script-locked UTxO(s)`
-        })
-      )
-    }
-
-    // 4. Add UTxOs to selected inputs and track redeemers and input assets
-    const inputAssets = calculateTotalAssets(params.inputs)
-    
-    yield* Ref.update(ctx, (state) => {
-      let newRedeemers = state.redeemers
-      
-      // 5. Track redeemer information if spending from scripts
-      if (params.redeemer && scriptUtxos.length > 0) {
-        newRedeemers = new Map(state.redeemers)
-        scriptUtxos.forEach((utxo) => {
-          const inputKey = `${utxo.txHash}#${utxo.outputIndex}`
-          newRedeemers.set(inputKey, {
-            tag: "spend",
-            data: params.redeemer!, // PlutusData CBOR hex
-            // exUnits will be filled by script evaluator during build phase
-            exUnits: undefined
-          })
-        })
-      }
-      
-      return {
-        ...state,
-        selectedUtxos: [...state.selectedUtxos, ...params.inputs],
-        redeemers: newRedeemers,
-        totalInputAssets: Assets.add(state.totalInputAssets, inputAssets)
-      }
-    })
-  })
-
-// ============================================================================
 // Transaction Assembly
 // ============================================================================
 
@@ -423,7 +387,7 @@ export const createCollectFromProgram = (params: CollectFromParams) =>
  * Convert an array of UTxOs to an array of TransactionInputs.
  * Inputs are sorted by txHash then outputIndex for deterministic ordering.
  * Converts SDK types (UTxO.UTxO) to core types (TransactionInput).
- * 
+ *
  * @since 2.0.0
  * @category assembly
  */
@@ -433,17 +397,17 @@ export const buildTransactionInputs = (
   Effect.gen(function* () {
     // Convert each UTxO to TransactionInput
     const inputs: Array<TransactionInput.TransactionInput> = []
-    
+
     for (const utxo of utxos) {
       // Parse transaction hash from hex string
       const txHash = yield* Schema.decodeUnknown(TransactionHash.FromHex)(utxo.txHash)
-      
+
       // Create TransactionInput
       const input = new TransactionInput.TransactionInput({
         transactionId: txHash,
         index: BigInt(utxo.outputIndex)
       })
-      
+
       inputs.push(input)
     }
 
@@ -453,13 +417,13 @@ export const buildTransactionInputs = (
       // Compare transaction hashes (byte arrays)
       const hashA = a.transactionId.hash
       const hashB = b.transactionId.hash
-      
+
       for (let i = 0; i < hashA.length; i++) {
         if (hashA[i] !== hashB[i]) {
           return hashA[i] - hashB[i]
         }
       }
-      
+
       // If hashes are equal, compare by index
       return Number(a.index - b.index)
     })
@@ -478,14 +442,14 @@ export const buildTransactionInputs = (
 /**
  * Assemble a Transaction from inputs, outputs, and calculated fee.
  * Creates TransactionBody with all required fields.
- * 
+ *
  * This is where SDK UTxO outputs are converted to core TransactionOutputs.
- * 
+ *
  * This is minimal assembly with accurate fee:
  * - Build witness set with redeemers and signatures (Step 4 - future)
  * - Run script evaluation to fill ExUnits (Step 5 - future)
  * - Add change output (Step 6 - future)
- * 
+ *
  * @since 2.0.0
  * @category assembly
  */
@@ -493,8 +457,16 @@ export const assembleTransaction = (
   inputs: ReadonlyArray<TransactionInput.TransactionInput>,
   outputs: ReadonlyArray<UTxO.TxOutput>,
   fee: bigint
-): Effect.Effect<Transaction.Transaction, TransactionBuilderError> =>
+): Effect.Effect<Transaction.Transaction, TransactionBuilderError, TxContext> =>
   Effect.gen(function* () {
+    // Get state ref to access scripts and redeemers
+    const stateRef = yield* TxContext
+    const state = yield* Ref.get(stateRef)
+
+    yield* Effect.logDebug(`[Assembly] Building transaction with ${inputs.length} inputs, ${outputs.length} outputs`)
+    yield* Effect.logDebug(`[Assembly] Scripts in state: ${state.scripts.size}`)
+    yield* Effect.logDebug(`[Assembly] Redeemers in state: ${state.redeemers.size}`)
+
     // Convert SDK TxOutput outputs to core TransactionOutputs
     const transactionOutputs: Array<TransactionOutput.TransactionOutput> = yield* Effect.all(
       outputs.map((output) =>
@@ -506,12 +478,60 @@ export const assembleTransaction = (
         })
       )
     )
-    
+
+    // Build collateral inputs if present
+    let collateralInputs: Array.NonEmptyReadonlyArray<TransactionInput.TransactionInput> | undefined
+    let collateralReturn: TransactionOutput.TransactionOutput | undefined
+    let totalCollateral: bigint | undefined
+
+    if (state.collateral) {
+      yield* Effect.logDebug(
+        `[Assembly] Adding collateral: ${state.collateral.inputs.length} inputs, ` +
+          `total ${state.collateral.totalAmount} lovelace`
+      )
+
+      // Collateral phase guarantees at least one input for script transactions
+      collateralInputs = (yield* buildTransactionInputs(state.collateral.inputs)) as Array.NonEmptyReadonlyArray<TransactionInput.TransactionInput>
+      totalCollateral = state.collateral.totalAmount
+
+      // Collateral return is only present if there are leftover assets
+      if (state.collateral.returnOutput) {
+        yield* Effect.logDebug(
+          `[Assembly] Collateral return assets: ${Object.keys(state.collateral.returnOutput.assets).length} keys`
+        )
+        collateralReturn = yield* txOutputToTransactionOutput({
+          address: state.collateral.returnOutput.address,
+          assets: state.collateral.returnOutput.assets,
+          datum: state.collateral.returnOutput.datumOption,
+          scriptRef: state.collateral.returnOutput.scriptRef
+        })
+        yield* Effect.logDebug(
+          `[Assembly] Collateral return TransactionOutput amount type: ${collateralReturn.amount._tag}`
+        )
+      }
+    }
+
+    // Convert reference inputs from UTxOs to TransactionInputs (only if there are any)
+    let referenceInputs:
+      | readonly [TransactionInput.TransactionInput, ...Array<TransactionInput.TransactionInput>]
+      | undefined
+    if (state.referenceInputs.length > 0) {
+      const refInputs = yield* buildTransactionInputs(state.referenceInputs)
+      referenceInputs = refInputs as readonly [
+        TransactionInput.TransactionInput,
+        ...Array<TransactionInput.TransactionInput>,
+      ]
+    }
+
     // Create TransactionBody with calculated fee
     const body = new TransactionBody.TransactionBody({
       inputs: inputs as Array<TransactionInput.TransactionInput>,
       outputs: transactionOutputs,
-      fee  // Now using actual calculated fee, not placeholder
+      fee, // Now using actual calculated fee, not placeholder
+      collateralInputs, // Collateral inputs from Collateral phase
+      collateralReturn, // Collateral return output from Collateral phase
+      totalCollateral, // Total collateral amount from Collateral phase
+      referenceInputs // Reference inputs for reading on-chain data (undefined if none)
       // Optional fields omitted for now:
       // - ttl: will be set if setValidityRange is called
       // - certificates: will be set if certificate operations added
@@ -525,23 +545,114 @@ export const assembleTransaction = (
       // - networkId: will be set from config
       // - collateralReturn: will be calculated during witness building
       // - totalCollateral: will be calculated during witness building
-      // - referenceInputs: will be set if reference inputs added
       // - votingProcedures: N/A for transaction building
       // - proposalProcedures: N/A for transaction building
       // - currentTreasuryValue: N/A for transaction building
       // - donation: N/A for transaction building
     })
 
-    // Create empty witness set (will be populated in Step 4)
+    // Populate witness set with scripts and redeemers from state
+    const plutusV1Scripts: Array<PlutusV1.PlutusV1> = []
+    const plutusV2Scripts: Array<PlutusV2.PlutusV2> = []
+    const plutusV3Scripts: Array<PlutusV3.PlutusV3> = []
+    const nativeScripts: Array<any> = [] // TODO: Add native script type
+
+    // Group scripts by type
+    for (const [scriptHash, coreScript] of state.scripts) {
+      yield* Effect.logDebug(`[Assembly] Processing script with hash: ${scriptHash}, type: ${coreScript._tag}`)
+
+      switch (coreScript._tag) {
+        case "PlutusV1":
+          plutusV1Scripts.push(coreScript) // Push whole script object, not just bytes
+          break
+        case "PlutusV2":
+          plutusV2Scripts.push(coreScript) // Push whole script object, not just bytes
+          break
+        case "PlutusV3":
+          plutusV3Scripts.push(coreScript) // Push whole script object, not just bytes
+          break
+        case "NativeScript":
+          nativeScripts.push(coreScript)
+          break
+      }
+    }
+
+    // Build redeemers array from state
+    const redeemers: Array<Redeemer.Redeemer> = []
+
+    // Create a mapping from UTxO reference (txHash#outputIndex) to input index
+    const inputIndexMap = new Map<string, number>()
+    for (let i = 0; i < inputs.length; i++) {
+      const input = inputs[i]!
+      const txHashHex = TransactionHash.toHex(input.transactionId)
+      const key = `${txHashHex}#${input.index}`
+      yield* Effect.logDebug(`[Assembly] Input ${i}: ${key}`)
+      inputIndexMap.set(key, i)
+    }
+
+    yield* Effect.logDebug(`[Assembly] Input index map has ${inputIndexMap.size} entries`)
+    yield* Effect.logDebug(`[Assembly] Redeemer map keys: ${globalThis.Array.from(state.redeemers.keys()).join(", ")}`)
+
+    // Build redeemers with correct indices
+    for (const [key, redeemerData] of state.redeemers) {
+      yield* Effect.logDebug(`[Assembly] Processing redeemer for key: ${key}`)
+
+      // Find the index of this input
+      const inputIndex = inputIndexMap.get(key)
+      if (inputIndex === undefined) {
+        yield* Effect.logWarning(`[Assembly] Could not find input index for redeemer key: ${key}`)
+        continue
+      }
+
+      // Parse the redeemer data from CBOR hex
+      const plutusData = PlutusData.fromCBORHex(redeemerData.data)
+
+      yield* Effect.logDebug(
+        `[Assembly] Redeemer exUnits before creating: mem=${redeemerData.exUnits?.mem ?? 0n}, steps=${redeemerData.exUnits?.steps ?? 0n}`
+      )
+
+      // Create proper Redeemer object
+      const redeemer = new Redeemer.Redeemer({
+        tag: redeemerData.tag, // "spend", "mint", "cert", or "reward"
+        index: BigInt(inputIndex), // Use actual input index
+        data: plutusData,
+        exUnits: redeemerData.exUnits
+          ? ([redeemerData.exUnits.mem, redeemerData.exUnits.steps] as const)
+          : ([0n, 0n] as const) // [memory, steps] - will be updated by script evaluation
+      })
+
+      yield* Effect.logDebug(
+        `[Assembly] Created redeemer: tag=${redeemer.tag}, index=${redeemer.index}, exUnits=[${redeemer.exUnits[0]}, ${redeemer.exUnits[1]}]`
+      )
+
+      redeemers.push(redeemer)
+    }
+
+    // Extract plutus data (datums) from selected UTxOs
+    const plutusDataArray: Array<PlutusData.Data> = []
+    for (const utxo of state.selectedUtxos) {
+      if (utxo.datumOption?.type === "inlineDatum") {
+        const datum = yield* PlutusData.Either.fromCBORHex(utxo.datumOption.inline)
+        plutusDataArray.push(datum)
+        yield* Effect.logDebug(`[Assembly] Extracted inline datum from UTxO`)
+      }
+    }
+
+    yield* Effect.logDebug(`[Assembly] WitnessSet populated:`)
+    yield* Effect.logDebug(`  - PlutusV2 scripts: ${plutusV2Scripts.length}`)
+    yield* Effect.logDebug(`  - Redeemers: ${redeemers.length}`)
+    yield* Effect.logDebug(`  - Plutus data: ${plutusDataArray.length}`)
+
+    // Create witness set with scripts and redeemers
     const witnessSet = new TransactionWitnessSet.TransactionWitnessSet({
       vkeyWitnesses: [],
-      nativeScripts: [],
+      nativeScripts,
       bootstrapWitnesses: [],
-      plutusV1Scripts: [],
-      plutusData: [],
-      redeemers: [],
-      plutusV2Scripts: [],
-      plutusV3Scripts: []
+      plutusV1Scripts,
+      plutusData: plutusDataArray,
+      redeemers,
+      plutusV2Scripts,
+      plutusV3Scripts
     })
 
     // Create Transaction
@@ -570,7 +681,7 @@ export const assembleTransaction = (
 /**
  * Calculate the size of a transaction in bytes for fee estimation.
  * Uses CBOR serialization to get accurate size.
- * 
+ *
  * @since 2.0.0
  * @category fee-calculation
  */
@@ -587,7 +698,7 @@ export const calculateTransactionSize = (
           cause: error
         })
     })
-    
+
     return cborBytes.length
   }).pipe(
     Effect.mapError(
@@ -601,35 +712,33 @@ export const calculateTransactionSize = (
 
 /**
  * Calculate minimum transaction fee based on protocol parameters.
- * 
+ *
  * Formula: minFee = txSizeInBytes × minFeeCoefficient + minFeeConstant
- * 
+ *
  * @since 2.0.0
  * @category fee-calculation
  */
 export const calculateMinimumFee = (
   transactionSizeBytes: number,
   protocolParams: {
-    minFeeCoefficient: bigint  // minFeeA
-    minFeeConstant: bigint      // minFeeB
+    minFeeCoefficient: bigint // minFeeA
+    minFeeConstant: bigint // minFeeB
   }
 ): bigint => {
   const { minFeeCoefficient, minFeeConstant } = protocolParams
-  
-  return (BigInt(transactionSizeBytes) * minFeeCoefficient) + minFeeConstant
+
+  return BigInt(transactionSizeBytes) * minFeeCoefficient + minFeeConstant
 }
 
 /**
  * Extract payment key hash from a Cardano address.
  * Returns null if address has script credential or no payment credential.
- * 
+ *
  * @since 2.0.0
  * @category fee-calculation
  * @internal
  */
-const extractPaymentKeyHash = (
-  address: string
-): Effect.Effect<Uint8Array | null, TransactionBuilderError> =>
+const extractPaymentKeyHash = (address: string): Effect.Effect<Uint8Array | null, TransactionBuilderError> =>
   Effect.gen(function* () {
     const addressStructure = yield* Effect.try({
       try: () => Address.toAddressStructure(address),
@@ -641,10 +750,7 @@ const extractPaymentKeyHash = (
     })
 
     // Check if payment credential is a KeyHash
-    if (
-      addressStructure.paymentCredential?._tag === "KeyHash" &&
-      addressStructure.paymentCredential.hash
-    ) {
+    if (addressStructure.paymentCredential?._tag === "KeyHash" && addressStructure.paymentCredential.hash) {
       return addressStructure.paymentCredential.hash
     }
 
@@ -655,7 +761,7 @@ const extractPaymentKeyHash = (
  * Build a fake VKeyWitness for fee estimation.
  * Creates a witness with 32-byte vkey and 64-byte signature (96 bytes total).
  * This matches CML's approach for accurate witness size calculation.
- * 
+ *
  * @since 2.0.0
  * @category fee-calculation
  * @internal
@@ -699,7 +805,7 @@ const buildFakeVKeyWitness = (
  * Build a fake witness set for fee estimation from transaction inputs.
  * Extracts unique payment key hashes from input addresses and creates
  * fake witnesses to accurately estimate witness set size in CBOR.
- * 
+ *
  * @since 2.0.0
  * @category fee-calculation
  */
@@ -743,14 +849,14 @@ export const buildFakeWitnessSet = (
 
 /**
  * Calculate transaction fee iteratively until stable.
- * 
+ *
  * Algorithm:
  * 1. Build fake witness set from input UTxOs for accurate size estimation
  * 2. Build transaction with fee = 0
  * 3. Calculate size and fee
  * 4. Rebuild transaction with calculated fee
  * 5. If size changed, recalculate (usually converges in 1-2 iterations)
- * 
+ *
  * @since 2.0.0
  * @category fee-calculation
  */
@@ -758,15 +864,25 @@ export const calculateFeeIteratively = (
   inputUtxos: ReadonlyArray<UTxO.UTxO>,
   inputs: ReadonlyArray<TransactionInput.TransactionInput>,
   outputs: ReadonlyArray<UTxO.TxOutput>,
+  redeemers: Map<
+    string,
+    {
+      readonly tag: "spend" | "mint" | "cert" | "reward"
+      readonly data: string
+      readonly exUnits?: { readonly mem: bigint; readonly steps: bigint }
+    }
+  >,
   protocolParams: {
     minFeeCoefficient: bigint
     minFeeConstant: bigint
+    priceMem?: number
+    priceStep?: number
   }
 ): Effect.Effect<bigint, TransactionBuilderError> =>
   Effect.gen(function* () {
     // Build fake witness set once for accurate size estimation
     const fakeWitnessSet = yield* buildFakeWitnessSet(inputUtxos)
-    
+
     // Convert SDK TxOutput outputs to core TransactionOutputs once
     const transactionOutputs: Array<TransactionOutput.TransactionOutput> = yield* Effect.all(
       outputs.map((output) =>
@@ -778,13 +894,13 @@ export const calculateFeeIteratively = (
         })
       )
     )
-    
+
     let currentFee = 0n
     let previousSize = 0
     let previousFee = 0n
     let iterations = 0
-    const maxIterations = 10  // Increase to ensure convergence
-    
+    const maxIterations = 10 // Increase to ensure convergence
+
     while (iterations < maxIterations) {
       // Build transaction with current fee estimate
       const body = new TransactionBody.TransactionBody({
@@ -792,23 +908,37 @@ export const calculateFeeIteratively = (
         outputs: transactionOutputs,
         fee: currentFee
       })
-      
+
       const transaction = new Transaction.Transaction({
         body,
-        witnessSet: fakeWitnessSet,  // Use fake witness set for accurate size
+        witnessSet: fakeWitnessSet, // Use fake witness set for accurate size
         isValid: true,
         auxiliaryData: null
       })
-      
+
       // Calculate size
       const size = yield* calculateTransactionSize(transaction)
-      
-      // Calculate fee based on size
-      const calculatedFee = calculateMinimumFee(size, {
+
+      // Calculate base fee based on size
+      const baseFee = calculateMinimumFee(size, {
         minFeeCoefficient: protocolParams.minFeeCoefficient,
         minFeeConstant: protocolParams.minFeeConstant
       })
-      
+
+      // Calculate ExUnits cost from redeemers (if pricing available)
+      let exUnitsCost = 0n
+      if (protocolParams.priceMem && protocolParams.priceStep) {
+        for (const [_, redeemerData] of redeemers) {
+          if (redeemerData.exUnits) {
+            const memCost = BigInt(Math.ceil(protocolParams.priceMem * Number(redeemerData.exUnits.mem)))
+            const stepsCost = BigInt(Math.ceil(protocolParams.priceStep * Number(redeemerData.exUnits.steps)))
+            exUnitsCost += memCost + stepsCost
+          }
+        }
+      }
+
+      const calculatedFee = baseFee + exUnitsCost
+
       // Check if fully converged: fee is stable AND size is stable
       if (currentFee === previousFee && size === previousSize && currentFee >= calculatedFee) {
         if (iterations > 1) {
@@ -818,18 +948,16 @@ export const calculateFeeIteratively = (
         }
         return currentFee
       }
-      
+
       // Update for next iteration
       previousFee = currentFee
       currentFee = calculatedFee
       previousSize = size
       iterations++
     }
-    
+
     // Didn't converge within max iterations - return the calculated fee
-    yield* Effect.logDebug(
-      `Fee calculation reached max iterations (${maxIterations}): ${currentFee} lovelace`
-    )
+    yield* Effect.logDebug(`Fee calculation reached max iterations (${maxIterations}): ${currentFee} lovelace`)
     return currentFee
   }).pipe(
     Effect.mapError(
@@ -848,9 +976,9 @@ export const calculateFeeIteratively = (
 /**
  * Verify if selected UTxOs can cover outputs + fee for ALL assets.
  * Used by the re-selection loop to determine if more UTxOs are needed.
- * 
+ *
  * Checks both lovelace AND native assets (tokens/NFTs) to ensure complete balance.
- * 
+ *
  * @since 2.0.0
  * @category fee-calculation
  */
@@ -860,37 +988,28 @@ export const verifyTransactionBalance = (
   fee: bigint
 ): { sufficient: boolean; shortfall: bigint; change: bigint } => {
   // Sum all input assets
-  const totalInputAssets = selectedUtxos.reduce(
-    (acc, utxo) => Assets.add(acc, utxo.assets),
-    Assets.empty()
-  )
-  
+  const totalInputAssets = selectedUtxos.reduce((acc, utxo) => Assets.add(acc, utxo.assets), Assets.empty())
+
   // Sum all output assets
-  const totalOutputAssets = outputs.reduce(
-    (acc, output) => Assets.add(acc, output.assets),
-    Assets.empty()
-  )
-  
+  const totalOutputAssets = outputs.reduce((acc, output) => Assets.add(acc, output.assets), Assets.empty())
+
   // Add fee to required lovelace
-  const requiredAssets = Assets.add(
-    totalOutputAssets,
-    Assets.fromLovelace(fee)
-  )
-  
+  const requiredAssets = Assets.add(totalOutputAssets, Assets.fromLovelace(fee))
+
   // Calculate balance for ALL assets: inputs - (outputs + fee)
   const balance = Assets.subtract(totalInputAssets, requiredAssets)
-  
+
   // Check if ANY asset is negative (insufficient)
   let hasShortfall = false
   let lovelaceShortfall = 0n
-  
+
   // Check lovelace
   const balanceLovelace = Assets.getAsset(balance, "lovelace")
   if (balanceLovelace < 0n) {
     hasShortfall = true
     lovelaceShortfall = -balanceLovelace
   }
-  
+
   // Check all native assets
   for (const [unit, amount] of Object.entries(balance)) {
     if (unit !== "lovelace" && amount < 0n) {
@@ -902,7 +1021,7 @@ export const verifyTransactionBalance = (
       break
     }
   }
-  
+
   return {
     sufficient: !hasShortfall,
     shortfall: lovelaceShortfall,
@@ -917,7 +1036,7 @@ export const verifyTransactionBalance = (
 /**
  * Validate that inputs cover outputs plus fee.
  * This is the ONLY validation for minimal build - no coin selection.
- * 
+ *
  * @since 2.0.0
  * @category validation
  */
@@ -928,21 +1047,18 @@ export const validateTransactionBalance = (params: {
 }): Effect.Effect<void, TransactionBuilderError> =>
   Effect.gen(function* () {
     const { fee, totalInputAssets, totalOutputAssets } = params
-    
+
     // Calculate total outputs including fee (outputs + fee)
-    const totalRequired = Assets.add(
-      totalOutputAssets,
-      Assets.fromLovelace(fee)
-    )
-    
+    const totalRequired = Assets.add(totalOutputAssets, Assets.fromLovelace(fee))
+
     // Check each asset using Assets.getUnits and Assets.getAsset helpers
     for (const unit of Assets.getUnits(totalRequired)) {
       const requiredAmount = Assets.getAsset(totalRequired, unit)
       const availableAmount = Assets.getAsset(totalInputAssets, unit)
-      
+
       if (availableAmount < requiredAmount) {
         const shortfall = requiredAmount - availableAmount
-        
+
         return yield* Effect.fail(
           new TransactionBuilderError({
             message: `Insufficient ${unit}: need ${requiredAmount}, have ${availableAmount} (short by ${shortfall})`,
@@ -956,13 +1072,13 @@ export const validateTransactionBalance = (params: {
         )
       }
     }
-    
+
     // All assets covered
   })
 
 /**
  * Calculate leftover assets (will become excess fee in minimal build).
- * 
+ *
  * @since 2.0.0
  * @category validation
  */
@@ -972,11 +1088,11 @@ export const calculateLeftoverAssets = (params: {
   fee: bigint
 }): Assets.Assets => {
   const { fee, totalInputAssets, totalOutputAssets } = params
-  
+
   // Start with inputs, subtract outputs and fee using Assets helpers
   const afterOutputs = Assets.subtract(totalInputAssets, totalOutputAssets)
   const leftover = Assets.subtract(afterOutputs, Assets.fromLovelace(fee))
-  
+
   // Filter out zero or negative amounts
   return Assets.filter(leftover, (_unit, amount) => amount > 0n)
 }
@@ -984,10 +1100,10 @@ export const calculateLeftoverAssets = (params: {
 /**
  * Calculate minimum ADA required for a UTxO based on its actual CBOR size.
  * Uses the Babbage-era formula: coinsPerUtxoByte * utxoSize.
- * 
+ *
  * This function creates a temporary TransactionOutput, encodes it to CBOR,
  * and calculates the exact size to determine the minimum lovelace required.
- * 
+ *
  * @since 2.0.0
  * @category change
  */
@@ -1006,7 +1122,7 @@ export const calculateMinimumUtxoLovelace = (params: {
       datum: params.datum,
       scriptRef: params.scriptRef
     })
-    
+
     // Encode to CBOR bytes to get the actual size
     const cborBytes = yield* Effect.try({
       try: () => TransactionOutput.toCBORBytes(tempOutput),
@@ -1016,20 +1132,20 @@ export const calculateMinimumUtxoLovelace = (params: {
           cause: error
         })
     })
-    
+
     // Calculate minimum lovelace: coinsPerUtxoByte * size
     return params.coinsPerUtxoByte * BigInt(cborBytes.length)
   })
 
 /**
  * Create change output(s) for leftover assets.
- * 
+ *
  * When unfracking is disabled (default):
  * 1. Check if leftover assets exist
  * 2. Calculate minimum ADA required for change output
  * 3. If leftover lovelace < minimum, cannot create change (warning)
  * 4. Create single output with all leftover assets to change address
- * 
+ *
  * When unfracking is enabled:
  * 1. Apply Unfrack.It optimization strategies
  * 2. Bundle tokens into optimally-sized UTxOs
@@ -1037,7 +1153,7 @@ export const calculateMinimumUtxoLovelace = (params: {
  * 4. Group NFTs by policy if configured
  * 5. Roll up or subdivide ADA-only UTxOs
  * 6. Return multiple change outputs for optimal wallet structure
- * 
+ *
  * @since 2.0.0
  * @category change
  */
@@ -1049,33 +1165,34 @@ export const createChangeOutput = (params: {
 }): Effect.Effect<ReadonlyArray<UTxO.TxOutput>, TransactionBuilderError> =>
   Effect.gen(function* () {
     const { changeAddress, coinsPerUtxoByte, leftoverAssets, unfrackOptions } = params
-    
+
     // If no leftover, no change needed
     if (Assets.isEmpty(leftoverAssets)) {
       yield* Effect.logDebug(`[createChangeOutput] No leftover assets, skipping change`)
       return []
     }
-    
+
     // If unfracking is enabled, use Unfrack module
     if (unfrackOptions) {
       const unfrackedOutputs = yield* Unfrack.createUnfrackedChangeOutputs(
         changeAddress,
         leftoverAssets,
         unfrackOptions,
-        coinsPerUtxoByte,
+        coinsPerUtxoByte
       ).pipe(
-        Effect.mapError((error) => 
-          new TransactionBuilderError({
-            message: `Failed to create unfracked change outputs: ${error.message}`,
-            cause: error
-          })
+        Effect.mapError(
+          (error) =>
+            new TransactionBuilderError({
+              message: `Failed to create unfracked change outputs: ${error.message}`,
+              cause: error
+            })
         )
       )
-      
+
       yield* Effect.logDebug(`[createChangeOutput] Created ${unfrackedOutputs.length} unfracked change outputs`)
       return unfrackedOutputs
     }
-    
+
     // Default behavior: single change output using accurate CBOR-based calculation
     // Calculate minimum UTxO using actual CBOR encoding size
     const minLovelace = yield* calculateMinimumUtxoLovelace({
@@ -1083,28 +1200,30 @@ export const createChangeOutput = (params: {
       assets: leftoverAssets,
       coinsPerUtxoByte
     })
-    
+
     // Check if we have enough lovelace for change
     const leftoverLovelace = Assets.getAsset(leftoverAssets, "lovelace")
-    
+
     yield* Effect.logDebug(
       `[createChangeOutput] Leftover: ${leftoverLovelace} lovelace, MinUTxO: ${minLovelace} lovelace`
     )
-    
+
     if (leftoverLovelace < minLovelace) {
       // Not enough lovelace to create valid change output
       // This is not an error - just means leftover becomes extra fee
-      yield* Effect.logDebug(`[createChangeOutput] Insufficient lovelace for change (${leftoverLovelace} < ${minLovelace}), returning empty`)
+      yield* Effect.logDebug(
+        `[createChangeOutput] Insufficient lovelace for change (${leftoverLovelace} < ${minLovelace}), returning empty`
+      )
       return []
     }
-    
+
     // Create change output using SDK UTxO output creation
     const changeOutput = yield* makeTxOutput({
       address: changeAddress,
       assets: leftoverAssets
     })
-    
+
     yield* Effect.logDebug(`[createChangeOutput] Created 1 change output with ${leftoverLovelace} lovelace`)
-    
+
     return [changeOutput]
   })

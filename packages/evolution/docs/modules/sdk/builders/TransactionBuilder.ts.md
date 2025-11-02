@@ -1,6 +1,6 @@
 ---
 title: sdk/builders/TransactionBuilder.ts
-nav_order: 139
+nav_order: 146
 parent: Modules
 ---
 
@@ -46,7 +46,9 @@ double-spending. UTxOs can come from any source (wallet, DeFi protocols, other p
   - [AvailableUtxosTag (class)](#availableutxostag-class)
   - [BuildOptionsTag (class)](#buildoptionstag-class)
   - [ChangeAddressTag (class)](#changeaddresstag-class)
+  - [FullProtocolParametersTag (class)](#fullprotocolparameterstag-class)
   - [ProtocolParametersTag (class)](#protocolparameterstag-class)
+  - [TxBuilderConfigTag (class)](#txbuilderconfigtag-class)
   - [TxContext (class)](#txcontext-class)
 - [errors](#errors)
   - [EvaluationError (class)](#evaluationerror-class)
@@ -231,7 +233,7 @@ Provides chainable builder methods common to both.
 
 **Signature**
 
-```ts
+````ts
 export interface TransactionBuilderBase {
   /**
    * Append a payment output to the transaction.
@@ -254,8 +256,71 @@ export interface TransactionBuilderBase {
    * @category builder-methods
    */
   readonly collectFrom: (params: CollectFromParams) => this
+
+  /**
+   * Attach a Plutus script to the transaction.
+   *
+   * Scripts must be attached before being referenced by transaction inputs, minting policies,
+   * or certificate operations. The script is stored in the builder state and indexed by its hash
+   * for efficient lookup during transaction assembly.
+   *
+   * Queues a deferred operation that will be executed when build() is called.
+   * Returns the same builder for method chaining.
+   *
+   * @example
+   * ```typescript
+   * import * as Script from "./Script.js"
+   *
+   * const script = Script.makePlutusV2Script("590a42590a3f01000...")
+   *
+   * const tx = await builder
+   *   .attachScript(script)
+   *   .collectFrom({ inputs: [scriptUtxo], redeemer: myRedeemer })
+   *   .build()
+   * ```
+   *
+   * @since 2.0.0
+   * @category builder-methods
+   */
+  readonly attachScript: (script: Script.Script) => this
+
+  /**
+   * Add reference inputs to the transaction.
+   *
+   * Reference inputs allow reading UTxO data (datums, reference scripts) without consuming them.
+   * They are commonly used to:
+   * - Reference validators/scripts stored on-chain (reduces tx size and fees)
+   * - Read datum values without spending the UTxO
+   * - Share scripts across multiple transactions
+   *
+   * Reference scripts incur tiered fees based on size:
+   * - Tier 1 (0-25KB): 15 lovelace/byte
+   * - Tier 2 (25-50KB): 25 lovelace/byte
+   * - Tier 3 (50-200KB): 100 lovelace/byte
+   * - Maximum: 200KB total limit
+   *
+   * Queues a deferred operation that will be executed when build() is called.
+   * Returns the same builder for method chaining.
+   *
+   * @example
+   * ```typescript
+   * import * as UTxO from "./UTxO.js"
+   *
+   * // Use reference script stored on-chain instead of attaching to transaction
+   * const refScriptUtxo = await provider.getUtxoByTxHash("abc123...")
+   *
+   * const tx = await builder
+   *   .readFrom({ referenceInputs: [refScriptUtxo] })
+   *   .collectFrom({ inputs: [scriptUtxo], redeemer: myRedeemer })
+   *   .build()
+   * ```
+   *
+   * @since 2.0.0
+   * @category builder-methods
+   */
+  readonly readFrom: (params: ReadFromParams) => this
 }
-```
+````
 
 Added in v2.0.0
 
@@ -282,13 +347,18 @@ export interface ProtocolParameters {
   /** Maximum transaction size in bytes */
   maxTxSize: number
 
+  /** Price per memory unit for script execution (optional, for ExUnits cost calculation) */
+  priceMem?: number
+
+  /** Price per CPU step for script execution (optional, for ExUnits cost calculation) */
+  priceStep?: number
+
   // Future fields for advanced features:
   // maxBlockHeaderSize?: number
   // maxTxExecutionUnits?: ExUnits
   // maxBlockExecutionUnits?: ExUnits
   // collateralPercentage?: number
   // maxCollateralInputs?: number
-  // prices?: Prices
 }
 ```
 
@@ -340,6 +410,25 @@ export interface TxBuilderConfig {
    * When wallet is omitted, provider is only used if you call provider methods directly.
    */
   readonly provider?: Provider.Provider
+
+  /**
+   * Network type for slot configuration in script evaluation.
+   *
+   * Used to determine the correct slot configuration when evaluating Plutus scripts.
+   * Each network has different genesis times and slot configurations.
+   *
+   * Options:
+   * - `"Mainnet"`: Production network
+   * - `"Preview"`: Preview testnet
+   * - `"Preprod"`: Pre-production testnet
+   * - `"Custom"`: Custom network (emulator/devnet) - requires slotConfig in BuildOptions
+   *
+   * When omitted, defaults to "Mainnet".
+   *
+   * @default "Mainnet"
+   * @since 2.0.0
+   */
+  readonly network?: Network
 
   // Future fields:
   // readonly costModels?: Uint8Array // Cost models for script evaluation
@@ -430,6 +519,22 @@ export declare class ChangeAddressTag
 
 Added in v2.0.0
 
+## FullProtocolParametersTag (class)
+
+Full protocol parameters (including cost models, execution units, etc.) for script evaluation.
+This is resolved from provider.Effect.getProtocolParameters() and includes all fields
+needed for UPLC evaluation, unlike the minimal ProtocolParametersTag.
+
+Available to evaluation phase via Effect Context.
+
+**Signature**
+
+```ts
+export declare class FullProtocolParametersTag
+```
+
+Added in v2.0.0
+
 ## ProtocolParametersTag (class)
 
 Resolved protocol parameters for the current build.
@@ -444,6 +549,19 @@ Available to all phase functions via Effect Context.
 
 ```ts
 export declare class ProtocolParametersTag
+```
+
+Added in v2.0.0
+
+## TxBuilderConfigTag (class)
+
+Transaction builder configuration containing provider, wallet, and network information.
+Available to phases that need to access provider or wallet directly.
+
+**Signature**
+
+```ts
+export declare class TxBuilderConfigTag
 ```
 
 Added in v2.0.0
@@ -616,10 +734,17 @@ Contains all state needed during transaction construction.
 export interface TxBuilderState {
   readonly selectedUtxos: ReadonlyArray<UTxO.UTxO> // SDK type: Array for ordering, converted at build
   readonly outputs: ReadonlyArray<UTxO.TxOutput> // Transaction outputs (no txHash/outputIndex yet)
-  readonly scripts: Map<string, any> // Scripts attached to the transaction
+  readonly scripts: Map<string, CoreScript.Script> // Scripts attached to the transaction
   readonly totalOutputAssets: Assets.Assets // Asset totals for balancing
   readonly totalInputAssets: Assets.Assets // Asset totals for balancing
   readonly redeemers: Map<string, RedeemerData> // Redeemer data for script inputs
+  readonly referenceInputs: ReadonlyArray<UTxO.UTxO> // Reference inputs (UTxOs with reference scripts)
+  readonly collateral?: {
+    // Collateral data for script transactions
+    readonly inputs: ReadonlyArray<UTxO.UTxO>
+    readonly totalAmount: bigint
+    readonly returnOutput?: UTxO.TxOutput // Optional: only if there are leftover assets
+  }
 }
 ```
 
@@ -867,16 +992,56 @@ export interface BuildOptions {
    */
   readonly onInsufficientChange?: "error" | "burn"
 
-  // Script evaluator - if provided, replaces the default provider-based evaluation
-  // Use createUPLCEvaluator() for UPLC libraries, or implement Evaluator directly
+  /**
+   * Script evaluator for Plutus script execution costs.
+   *
+   * If provided, replaces the default provider-based evaluation.
+   * Use `createUPLCEvaluator()` for UPLC libraries, or implement `Evaluator` directly.
+   *
+   * @since 2.0.0
+   */
   readonly evaluator?: Evaluator
 
-  // Collateral handling
-  readonly collateral?: ReadonlyArray<UTxO.UTxO> // Manual collateral (max 3)
-  // Amount to set as collateral default 5_000_000n
+  /**
+   * Custom slot configuration for script evaluation.
+   *
+   * By default, slot config is determined from the network (mainnet/preview/preprod).
+   * Provide this to override for custom networks (emulator, devnet, etc.).
+   *
+   * The slot configuration defines the relationship between slots and Unix time,
+   * which is required for UPLC evaluation of time-based validators.
+   *
+   * Use cases:
+   * - Emulator with custom genesis time
+   * - Development network with different slot configuration
+   * - Testing with specific time scenarios
+   *
+   * Example:
+   * ```typescript
+   * // For custom emulator
+   * builder.build({
+   *   slotConfig: {
+   *     zeroTime: 1234567890000n,
+   *     zeroSlot: 0n,
+   *     slotLength: 1000
+   *   }
+   * })
+   * ```
+   *
+   * @since 2.0.0
+   */
+  readonly slotConfig?: SlotConfig
+
+  /**
+   * Amount to set as collateral return output (in lovelace).
+   *
+   * Used for Plutus script transactions to cover potential script execution failures.
+   * If not provided, defaults to 5 ADA (5_000_000 lovelace).
+   *
+   * @default 5_000_000n
+   * @since 2.0.0
+   */
   readonly setCollateral?: bigint
-  // Minimum fee
-  readonly minFee?: Coin.Coin
 
   /**
    * Unfrack: Optimize wallet UTxO structure

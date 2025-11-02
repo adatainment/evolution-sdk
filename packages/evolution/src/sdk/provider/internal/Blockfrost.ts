@@ -110,6 +110,10 @@ export const BlockfrostRedeemer = Schema.Struct({
   fee: Schema.String
 })
 
+/**
+ * Blockfrost evaluation response schema (array format)
+ * Used by /utils/txs/evaluate endpoint (CBOR body, no additional UTxOs)
+ */
 export const BlockfrostEvaluationResponse = Schema.Struct({
   result: Schema.Struct({
     EvaluationResult: Schema.Array(BlockfrostRedeemer)
@@ -117,6 +121,30 @@ export const BlockfrostEvaluationResponse = Schema.Struct({
 })
 
 export type BlockfrostEvaluationResponse = Schema.Schema.Type<typeof BlockfrostEvaluationResponse>
+
+/**
+ * Schema for JSONWSP-wrapped Ogmios evaluation response
+ * Used by /utils/txs/evaluate/utxos endpoint
+ * Format: { type: "jsonwsp/response", result: { EvaluationResult: { "spend:0": { memory, steps } } } }
+ */
+export const JsonwspOgmiosEvaluationResponse = Schema.Struct({
+  type: Schema.optional(Schema.String),
+  version: Schema.optional(Schema.String),
+  servicename: Schema.optional(Schema.String),
+  methodname: Schema.optional(Schema.String),
+  result: Schema.Struct({
+    EvaluationResult: Schema.Record({
+      key: Schema.String, // "spend:0", "mint:1", etc.
+      value: Schema.Struct({
+        memory: Schema.Number,
+        steps: Schema.Number
+      })
+    })
+  }),
+  reflection: Schema.optional(Schema.Unknown)
+})
+
+export type JsonwspOgmiosEvaluationResponse = Schema.Schema.Type<typeof JsonwspOgmiosEvaluationResponse>
 
 // ============================================================================
 // Transformation Functions
@@ -216,7 +244,7 @@ export const transformDelegation = (blockfrostDelegation: BlockfrostDelegation):
 export const transformEvaluationResult = (
   blockfrostResponse: BlockfrostEvaluationResponse
 ): Array<EvalRedeemer> => {
-  return blockfrostResponse.result.EvaluationResult.map((redeemer) => ({
+  return blockfrostResponse.result.EvaluationResult.map((redeemer: Schema.Schema.Type<typeof BlockfrostRedeemer>) => ({
     ex_units: {
       mem: Number(redeemer.unit_mem),
       steps: Number(redeemer.unit_steps)
@@ -224,4 +252,33 @@ export const transformEvaluationResult = (
     redeemer_index: redeemer.tx_index,
     redeemer_tag: redeemer.purpose === "cert" ? "publish" : redeemer.purpose === "reward" ? "withdraw" : redeemer.purpose
   }))
+}
+
+/**
+ * Transform JSONWSP-wrapped Ogmios evaluation response to Evolution SDK format
+ * Used by /utils/txs/evaluate/utxos endpoint
+ * Format: { result: { EvaluationResult: { "spend:0": { "memory": 1100, "steps": 160100 }, ... } } }
+ */
+export const transformJsonwspOgmiosEvaluationResult = (
+  jsonwspResponse: JsonwspOgmiosEvaluationResponse
+): Array<EvalRedeemer> => {
+  const result: Array<EvalRedeemer> = []
+  const evaluationResult = jsonwspResponse.result.EvaluationResult
+  
+  for (const [key, budget] of Object.entries(evaluationResult)) {
+    // Parse "spend:0", "mint:1", etc.
+    const [tag, indexStr] = key.split(":")
+    const index = parseInt(indexStr, 10)
+    
+    result.push({
+      ex_units: {
+        mem: budget.memory,
+        steps: budget.steps
+      },
+      redeemer_index: index,
+      redeemer_tag: tag as any
+    })
+  }
+  
+  return result
 }

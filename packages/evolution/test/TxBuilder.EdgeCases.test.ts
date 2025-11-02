@@ -300,7 +300,7 @@ describe("TxBuilder P0 Edge Cases - MinUTxO Boundary Precision", () => {
 
     // Strict ADA validation: exact value from deterministic transaction
     const changeAda = changeOutput.amount.coin
-    expect(changeAda).toBe(3_822_751n)
+    expect(changeAda).toBe(3_825_479n) // 6M - 2M - 174,521 fee (435 bytes)
 
     // Strict asset validation
     expect(changeOutput.amount._tag).toBe("WithAssets")
@@ -323,7 +323,7 @@ describe("TxBuilder P0 Edge Cases - MinUTxO Boundary Precision", () => {
 
     // Fee validation
     const fee = tx.body.fee
-    expect(fee).toBe(177_249n)
+    expect(fee).toBe(174_521n) // 435 bytes * 44 + 155_381
   })
 
   it("fee oscillation through 3 reselection attempts", async () => {

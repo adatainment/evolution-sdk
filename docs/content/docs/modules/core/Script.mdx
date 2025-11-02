@@ -22,10 +22,12 @@ parent: Modules
   - [FromCDDL](#fromcddl)
   - [ScriptCDDL](#scriptcddl)
 - [utils](#utils)
+  - [FromCBORBytes](#fromcborbytes)
+  - [FromCBORHex](#fromcborhex)
   - [Script (type alias)](#script-type-alias)
   - [ScriptCDDL (type alias)](#scriptcddl-type-alias)
   - [fromCBOR](#fromcbor)
-  - [fromCBORHex](#fromcborhex)
+  - [fromCBORHex](#fromcborhex-1)
   - [toCBOR](#tocbor)
   - [toCBORHex](#tocborhex)
 
@@ -156,6 +158,79 @@ export declare const ScriptCDDL: Schema.Union<
 Added in v2.0.0
 
 # utils
+
+## FromCBORBytes
+
+**Signature**
+
+```ts
+export declare const FromCBORBytes: (
+  options?: CBOR.CodecOptions
+) => Schema.transform<
+  Schema.transformOrFail<
+    typeof Schema.Uint8ArrayFromSelf,
+    Schema.declare<CBOR.CBOR, CBOR.CBOR, readonly [], never>,
+    never
+  >,
+  Schema.transformOrFail<
+    Schema.Union<
+      [
+        Schema.Tuple2<
+          Schema.Literal<[0n]>,
+          Schema.Schema<NativeScripts.NativeScriptCDDL, NativeScripts.NativeScriptCDDL, never>
+        >,
+        Schema.Tuple2<Schema.Literal<[1n]>, typeof Schema.Uint8ArrayFromSelf>,
+        Schema.Tuple2<Schema.Literal<[2n]>, typeof Schema.Uint8ArrayFromSelf>,
+        Schema.Tuple2<Schema.Literal<[3n]>, typeof Schema.Uint8ArrayFromSelf>
+      ]
+    >,
+    Schema.SchemaClass<
+      NativeScripts.NativeScript | PlutusV1.PlutusV1 | PlutusV2.PlutusV2 | PlutusV3.PlutusV3,
+      NativeScripts.NativeScript | PlutusV1.PlutusV1 | PlutusV2.PlutusV2 | PlutusV3.PlutusV3,
+      never
+    >,
+    never
+  >
+>
+```
+
+## FromCBORHex
+
+**Signature**
+
+```ts
+export declare const FromCBORHex: (
+  options?: CBOR.CodecOptions
+) => Schema.transform<
+  Schema.transform<Schema.Schema<string, string, never>, Schema.Schema<Uint8Array, Uint8Array, never>>,
+  Schema.transform<
+    Schema.transformOrFail<
+      typeof Schema.Uint8ArrayFromSelf,
+      Schema.declare<CBOR.CBOR, CBOR.CBOR, readonly [], never>,
+      never
+    >,
+    Schema.transformOrFail<
+      Schema.Union<
+        [
+          Schema.Tuple2<
+            Schema.Literal<[0n]>,
+            Schema.Schema<NativeScripts.NativeScriptCDDL, NativeScripts.NativeScriptCDDL, never>
+          >,
+          Schema.Tuple2<Schema.Literal<[1n]>, typeof Schema.Uint8ArrayFromSelf>,
+          Schema.Tuple2<Schema.Literal<[2n]>, typeof Schema.Uint8ArrayFromSelf>,
+          Schema.Tuple2<Schema.Literal<[3n]>, typeof Schema.Uint8ArrayFromSelf>
+        ]
+      >,
+      Schema.SchemaClass<
+        NativeScripts.NativeScript | PlutusV1.PlutusV1 | PlutusV2.PlutusV2 | PlutusV3.PlutusV3,
+        NativeScripts.NativeScript | PlutusV1.PlutusV1 | PlutusV2.PlutusV2 | PlutusV3.PlutusV3,
+        never
+      >,
+      never
+    >
+  >
+>
+```
 
 ## Script (type alias)
 

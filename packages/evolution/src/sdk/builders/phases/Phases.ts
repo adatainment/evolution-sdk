@@ -13,7 +13,15 @@
  *
  * @since 2.0.0
  */
-export type Phase = "selection" | "changeCreation" | "feeCalculation" | "balance" | "fallback" | "complete"
+export type Phase =
+  | "selection"
+  | "changeCreation"
+  | "feeCalculation"
+  | "balance"
+  | "evaluation"
+  | "collateral"
+  | "fallback"
+  | "complete"
 
 /**
  * Result returned by a phase indicating the next phase to execute.

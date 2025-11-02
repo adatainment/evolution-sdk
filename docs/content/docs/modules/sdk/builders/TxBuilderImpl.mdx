@@ -1,6 +1,6 @@
 ---
 title: sdk/builders/TxBuilderImpl.ts
-nav_order: 141
+nav_order: 148
 parent: Modules
 ---
 
@@ -25,6 +25,7 @@ parent: Modules
   - [calculateTransactionSize](#calculatetransactionsize)
   - [verifyTransactionBalance](#verifytransactionbalance)
 - [helpers](#helpers)
+  - [calculateReferenceScriptFee](#calculatereferencescriptfee)
   - [calculateTotalAssets](#calculatetotalassets)
   - [filterScriptUtxos](#filterscriptutxos)
   - [isScriptAddress](#isscriptaddress)
@@ -32,9 +33,6 @@ parent: Modules
   - [makeTxOutput](#maketxoutput)
   - [~~mergeAssetsIntoOutput~~](#mergeassetsintooutput)
   - [mergeAssetsIntoUTxO](#mergeassetsintoutxo)
-- [programs](#programs)
-  - [createCollectFromProgram](#createcollectfromprogram)
-  - [createPayToAddressProgram](#createpaytoaddressprogram)
 - [validation](#validation)
   - [calculateLeftoverAssets](#calculateleftoverassets)
   - [validateTransactionBalance](#validatetransactionbalance)
@@ -63,7 +61,7 @@ export declare const assembleTransaction: (
   inputs: ReadonlyArray<TransactionInput.TransactionInput>,
   outputs: ReadonlyArray<UTxO.TxOutput>,
   fee: bigint
-) => Effect.Effect<Transaction.Transaction, TransactionBuilderError>
+) => Effect.Effect<Transaction.Transaction, TransactionBuilderError, TxContext>
 ```
 
 Added in v2.0.0
@@ -178,7 +176,15 @@ export declare const calculateFeeIteratively: (
   inputUtxos: ReadonlyArray<UTxO.UTxO>,
   inputs: ReadonlyArray<TransactionInput.TransactionInput>,
   outputs: ReadonlyArray<UTxO.TxOutput>,
-  protocolParams: { minFeeCoefficient: bigint; minFeeConstant: bigint }
+  redeemers: Map<
+    string,
+    {
+      readonly tag: "spend" | "mint" | "cert" | "reward"
+      readonly data: string
+      readonly exUnits?: { readonly mem: bigint; readonly steps: bigint }
+    }
+  >,
+  protocolParams: { minFeeCoefficient: bigint; minFeeConstant: bigint; priceMem?: number; priceStep?: number }
 ) => Effect.Effect<bigint, TransactionBuilderError>
 ```
 
@@ -236,6 +242,27 @@ export declare const verifyTransactionBalance: (
 Added in v2.0.0
 
 # helpers
+
+## calculateReferenceScriptFee
+
+Calculate reference script fees using tiered pricing.
+
+Reference scripts stored on-chain incur additional fees based on their size:
+
+- First 25KB: 15 lovelace/byte
+- Next 25KB: 25 lovelace/byte
+- Next 150KB: 100 lovelace/byte
+- Maximum: 200KB total
+
+**Signature**
+
+```ts
+export declare const calculateReferenceScriptFee: (
+  referenceInputs: ReadonlyArray<UTxO.UTxO>
+) => Effect.Effect<bigint, TransactionBuilderError>
+```
+
+Added in v2.0.0
 
 ## calculateTotalAssets
 
@@ -344,53 +371,6 @@ export declare const mergeAssetsIntoUTxO: (
   utxo: UTxO.UTxO,
   additionalAssets: Assets.Assets
 ) => Effect.Effect<UTxO.UTxO, TransactionBuilderError>
-```
-
-Added in v2.0.0
-
-# programs
-
-## createCollectFromProgram
-
-Creates a ProgramStep for collectFrom operation.
-Adds UTxOs as transaction inputs, validates script requirements, and tracks assets.
-
-Implementation:
-
-1. Validates that inputs array is not empty
-2. Checks if any inputs are script-locked (require redeemers)
-3. Validates redeemer is provided for script-locked UTxOs
-4. Adds UTxOs to state.selectedUtxos
-5. Tracks redeemer information for script spending
-6. Updates total input assets for balancing
-
-**Signature**
-
-```ts
-export declare const createCollectFromProgram: (
-  params: CollectFromParams
-) => Effect.Effect<undefined, TransactionBuilderError, TxContext>
-```
-
-Added in v2.0.0
-
-## createPayToAddressProgram
-
-Creates a ProgramStep for payToAddress operation.
-Creates a UTxO output and tracks assets for balancing.
-
-Implementation:
-
-1. Creates UTxO output from parameters using helper
-2. Adds output to state.outputs array
-3. Updates totalOutputAssets for balancing
-
-**Signature**
-
-```ts
-export declare const createPayToAddressProgram: (
-  params: PayToAddressParams
-) => Effect.Effect<void, TransactionBuilderError, TxContext>
 ```
 
 Added in v2.0.0

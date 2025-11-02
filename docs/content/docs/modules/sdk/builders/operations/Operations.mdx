@@ -1,6 +1,6 @@
 ---
 title: sdk/builders/operations/Operations.ts
-nav_order: 128
+nav_order: 131
 parent: Modules
 ---
 
@@ -14,6 +14,7 @@ parent: Modules
   - [CollectFromParams (interface)](#collectfromparams-interface)
   - [MintTokensParams (interface)](#minttokensparams-interface)
   - [PayToAddressParams (interface)](#paytoaddressparams-interface)
+  - [ReadFromParams (interface)](#readfromparams-interface)
 
 ---
 
@@ -51,5 +52,15 @@ export interface PayToAddressParams {
   readonly assets: Assets.Assets // Mandatory: ADA and/or native tokens to send
   readonly datum?: Datum.Datum // Optional: Datum to attach for script addresses
   readonly scriptRef?: Script.Script // Optional: Reference script to attach
+}
+```
+
+## ReadFromParams (interface)
+
+**Signature**
+
+```ts
+export interface ReadFromParams {
+  readonly referenceInputs: ReadonlyArray<UTxO.UTxO> // Mandatory: UTxOs to read as reference inputs
 }
 ```

@@ -1,6 +1,6 @@
 ---
 title: sdk/Devnet/Devnet.ts
-nav_order: 148
+nav_order: 155
 parent: Modules
 ---
 
@@ -14,6 +14,8 @@ parent: Modules
   - [Cluster](#cluster-1)
 - [container](#container)
   - [Container](#container-1)
+- [genesis](#genesis)
+  - [Genesis](#genesis-1)
 - [utils](#utils)
   - [CardanoDevNetError (class)](#cardanodevneterror-class)
   - [DevNetCluster (interface)](#devnetcluster-interface)
@@ -31,14 +33,14 @@ Cluster management operations for Cardano DevNet.
 
 ```ts
 export declare const Cluster: {
-  readonly make: (config?: DevnetDefault.DevNetConfig) => Effect.Effect<DevNetCluster, CardanoDevNetError>
-  readonly makeOrThrow: (config?: DevnetDefault.DevNetConfig) => Promise<DevNetCluster>
-  readonly start: (cluster: DevNetCluster) => Effect.Effect<void, CardanoDevNetError>
-  readonly startOrThrow: (cluster: DevNetCluster) => Promise<void>
-  readonly stop: (cluster: DevNetCluster) => Effect.Effect<void, CardanoDevNetError>
-  readonly stopOrThrow: (cluster: DevNetCluster) => Promise<void>
-  readonly remove: (cluster: DevNetCluster) => Effect.Effect<void, CardanoDevNetError>
-  readonly removeOrThrow: (cluster: DevNetCluster) => Promise<void>
+  readonly makeEffect: (config?: DevnetDefault.DevNetConfig) => Effect.Effect<DevNetCluster, CardanoDevNetError>
+  readonly make: (config?: DevnetDefault.DevNetConfig) => Promise<DevNetCluster>
+  readonly startEffect: (cluster: DevNetCluster) => Effect.Effect<void, CardanoDevNetError>
+  readonly start: (cluster: DevNetCluster) => Promise<void>
+  readonly stopEffect: (cluster: DevNetCluster) => Effect.Effect<void, CardanoDevNetError>
+  readonly stop: (cluster: DevNetCluster) => Promise<void>
+  readonly removeEffect: (cluster: DevNetCluster) => Effect.Effect<void, CardanoDevNetError>
+  readonly remove: (cluster: DevNetCluster) => Promise<void>
 }
 ```
 
@@ -54,19 +56,50 @@ Individual container management operations.
 
 ```ts
 export declare const Container: {
-  readonly start: (container: DevNetContainer) => Effect.Effect<void, CardanoDevNetError>
-  readonly startOrThrow: (container: DevNetContainer) => Promise<void>
-  readonly stop: (container: DevNetContainer) => Effect.Effect<void, CardanoDevNetError>
-  readonly stopOrThrow: (container: DevNetContainer) => Promise<void>
-  readonly remove: (container: DevNetContainer) => Effect.Effect<void, CardanoDevNetError>
-  readonly removeOrThrow: (container: DevNetContainer) => Promise<void>
-  readonly getStatus: (
+  readonly startEffect: (container: DevNetContainer) => Effect.Effect<void, CardanoDevNetError>
+  readonly start: (container: DevNetContainer) => Promise<void>
+  readonly stopEffect: (container: DevNetContainer) => Effect.Effect<void, CardanoDevNetError>
+  readonly stop: (container: DevNetContainer) => Promise<void>
+  readonly removeEffect: (container: DevNetContainer) => Effect.Effect<void, CardanoDevNetError>
+  readonly remove: (container: DevNetContainer) => Promise<void>
+  readonly getStatusEffect: (
     container: DevNetContainer
   ) => Effect.Effect<Docker.ContainerInspectInfo | undefined, CardanoDevNetError>
-  readonly getStatusOrThrow: (container: DevNetContainer) => Promise<Docker.ContainerInspectInfo | undefined>
-  readonly isImageAvailable: (imageName: string) => Effect.Effect<boolean, CardanoDevNetError>
-  readonly isImageAvailableOrThrow: (imageName: string) => Promise<boolean>
-  readonly downloadImage: (imageName: string) => Effect.Effect<void, CardanoDevNetError>
+  readonly getStatus: (container: DevNetContainer) => Promise<Docker.ContainerInspectInfo | undefined>
+  readonly isImageAvailableEffect: (imageName: string) => Effect.Effect<boolean, CardanoDevNetError, never>
+  readonly isImageAvailable: (imageName: string) => Promise<boolean>
+  readonly downloadImageEffect: (imageName: string) => Effect.Effect<void, CardanoDevNetError, never>
+  readonly downloadImage: (imageName: string) => Promise<void>
+  readonly ensureImageAvailableEffect: (imageName: string) => Effect.Effect<void, CardanoDevNetError, never>
+  readonly ensureImageAvailable: (imageName: string) => Promise<void>
+  readonly execCommandEffect: (
+    container: DevNetContainer,
+    command: Array<string>
+  ) => Effect.Effect<string, CardanoDevNetError>
+  readonly execCommand: (container: DevNetContainer, command: Array<string>) => Promise<string>
+}
+```
+
+Added in v2.0.0
+
+# genesis
+
+## Genesis
+
+Genesis UTxO operations for deterministic calculation and querying.
+
+**Signature**
+
+```ts
+export declare const Genesis: {
+  readonly calculateUtxosFromConfig: (
+    genesisConfig: DevnetDefault.ShelleyGenesis
+  ) => Effect.Effect<ReadonlyArray<UTxO.UTxO>, CardanoDevNetError>
+  readonly calculateUtxosFromConfigOrThrow: (
+    genesisConfig: DevnetDefault.ShelleyGenesis
+  ) => Promise<readonly UTxO.UTxO[]>
+  readonly queryUtxos: (cluster: DevNetCluster) => Effect.Effect<ReadonlyArray<UTxO.UTxO>, CardanoDevNetError>
+  readonly queryUtxosOrThrow: (cluster: DevNetCluster) => Promise<readonly UTxO.UTxO[]>
 }
 ```
 

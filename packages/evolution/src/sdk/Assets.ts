@@ -242,8 +242,17 @@ export const assetsToValue = (assets: Assets): CoreValue.Value => {
     // Create core asset name from hex string (or empty if undefined)
     const coreAssetName = AssetName.fromHex(assetName || "")
 
-    // Get or create policy map
-    let policyMap = multiAssetMap.get(corePolicyId)
+    // Find existing policy map by comparing bytes (Map uses reference equality, not value equality)
+    let policyMap: Map<AssetName.AssetName, PositiveCoin.PositiveCoin> | undefined
+    
+    for (const [existingId, existingMap] of multiAssetMap.entries()) {
+      if (CorePolicyId.equals(existingId, corePolicyId)) {
+        policyMap = existingMap
+        break
+      }
+    }
+
+    // If policy map doesn't exist, create new one
     if (!policyMap) {
       policyMap = new Map()
       multiAssetMap.set(corePolicyId, policyMap)

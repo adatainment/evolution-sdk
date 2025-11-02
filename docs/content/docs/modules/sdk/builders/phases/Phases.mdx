@@ -1,6 +1,6 @@
 ---
 title: sdk/builders/phases/Phases.ts
-nav_order: 133
+nav_order: 140
 parent: Modules
 ---
 
@@ -32,7 +32,15 @@ Build phases of the transaction state machine.
 **Signature**
 
 ```ts
-export type Phase = "selection" | "changeCreation" | "feeCalculation" | "balance" | "fallback" | "complete"
+export type Phase =
+  | "selection"
+  | "changeCreation"
+  | "feeCalculation"
+  | "balance"
+  | "evaluation"
+  | "collateral"
+  | "fallback"
+  | "complete"
 ```
 
 Added in v2.0.0

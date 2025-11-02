@@ -14,6 +14,7 @@ import * as Assets from "../../Assets.js"
 import type * as UTxO from "../../UTxO.js"
 import type { CoinSelectionAlgorithm, CoinSelectionFunction } from "../CoinSelection.js"
 import { largestFirstSelection } from "../CoinSelection.js"
+import * as EvaluationStateManager from "../EvaluationStateManager.js"
 import {
   AvailableUtxosTag,
   BuildOptionsTag,
@@ -101,11 +102,29 @@ const addUtxosToState = (selectedUtxos: ReadonlyArray<UTxO.UTxO>): Effect.Effect
     const additionalAssets = calculateTotalAssets(selectedUtxos)
 
     // Update state with new UTxOs and input assets
-    yield* Ref.update(ctx, (state) => ({
-      ...state,
-      selectedUtxos: [...state.selectedUtxos, ...selectedUtxos],
-      totalInputAssets: Assets.add(state.totalInputAssets, additionalAssets)
-    }))
+    const state = yield* Ref.get(ctx)
+    const hasRedeemers = state.redeemers.size > 0
+    
+    yield* Ref.update(ctx, (state) => {
+      // Invalidate redeemer exUnits when inputs change (immutable operation)
+      // This ensures re-evaluation happens with the new transaction structure
+      const updatedRedeemers = hasRedeemers
+        ? EvaluationStateManager.invalidateExUnits(state.redeemers)
+        : state.redeemers
+      
+      return {
+        ...state,
+        selectedUtxos: [...state.selectedUtxos, ...selectedUtxos],
+        totalInputAssets: Assets.add(state.totalInputAssets, additionalAssets),
+        redeemers: updatedRedeemers
+      }
+    })
+    
+    if (hasRedeemers) {
+      yield* Effect.logDebug(
+        "[Selection] Invalidated redeemer exUnits - re-evaluation required after input change"
+      )
+    }
   })
 
 /**
@@ -234,8 +253,16 @@ export const executeSelection = (): Effect.Effect<PhaseResult, TransactionBuilde
       }
     }
 
-    // Step 6: Update context and proceed
+    // Step 6: Update context and check for scripts
     yield* Ref.update(buildCtxRef, (ctx) => ({ ...ctx, attempt: ctx.attempt + 1, shortfall: 0n }))
+
+    // Check if this is a script transaction (has redeemers)
+    // If so, route to Collateral BEFORE ChangeCreation
+    const finalState = yield* Ref.get(ctx)
+    if (finalState.redeemers.size > 0) {
+      yield* Effect.logDebug("[Selection] Script transaction detected - routing to Collateral phase")
+      return { next: "collateral" as const }
+    }
 
     return { next: "changeCreation" as const }
   })

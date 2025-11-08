@@ -71,27 +71,6 @@ const bytes = Address.toBytes(address);
 const fromBytes = Address.fromBytes(bytes);
 ```
 
-### Utility Functions
-
-```typescript twoslash
-import * as AddressStructure from "@evolution-sdk/evolution/core/AddressStructure";
-
-const addr1: any = null as any;
-const addr2: any = null as any;
-// ---cut---
-// Compare addresses
-const areEqual = AddressStructure.equals(addr1, addr2);
-
-// Check if has staking
-const hasStaking = AddressStructure.hasStakingCredential(addr1);
-
-// Check if enterprise (no staking)
-const isEnterprise = AddressStructure.isEnterprise(addr1);
-
-// Get network ID
-const networkId = AddressStructure.getNetworkId(addr1);
-```
-
 ## Choosing the Right Type
 
 ### Use Base Addresses When

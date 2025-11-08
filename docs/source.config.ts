@@ -22,8 +22,8 @@ export default defineConfig({
         light: "github-light",
         dark: "github-dark"
       },
-      // Explicit language list for lazy loading - add all JS/TS variants
-      langs: ['typescript', 'ts', 'tsx', 'javascript', 'js', 'jsx', 'bash', 'sh'],
+      // Explicit language list for lazy loading
+      langs: ['ts', 'tsx', 'js', 'jsx', 'bash', 'sh'],
       transformers: [
         ...(rehypeCodeDefaultOptions.transformers ?? []),
         transformerTwoslash({

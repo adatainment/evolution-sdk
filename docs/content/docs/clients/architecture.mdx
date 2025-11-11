@@ -32,7 +32,7 @@ interface ReadOnlyWalletConfig {
 ### Backend Transaction Building
 
 ```typescript twoslash
-import { createClient, Transaction } from "@evolution-sdk/evolution";
+import { createClient, Core } from "@evolution-sdk/evolution";
 
 // Backend: read-only wallet with user's address (from frontend)
 const backendClient = createClient({
@@ -58,7 +58,7 @@ builder.payToAddress({
 // Build returns result, get transaction and serialize
 const result = await builder.build();
 const unsignedTx = await result.toTransaction();
-const txCbor = Transaction.toCBORHex(unsignedTx);
+const txCbor = Core.Transaction.toCBORHex(unsignedTx);
 
 // Return to frontend for signing
 // Frontend: wallet.signTx(txCbor) → wallet.submitTx(signedTxCbor)
@@ -230,7 +230,7 @@ async function sendPayment(recipientAddress: string, lovelace: bigint) {
 
 // @filename: backend.ts
 // ===== Backend (Server) =====
-import { createClient, Transaction } from "@evolution-sdk/evolution";
+import { createClient, Core } from "@evolution-sdk/evolution";
 
 export async function buildPayment(
   userAddress: string,
@@ -261,7 +261,7 @@ export async function buildPayment(
   // Return unsigned CBOR for frontend to sign
   const result = await builder.build();
   const unsignedTx = await result.toTransaction();
-  const txCbor = Transaction.toCBORHex(unsignedTx);
+  const txCbor = Core.Transaction.toCBORHex(unsignedTx);
 
   return { txCbor };
 }

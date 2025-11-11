@@ -441,7 +441,7 @@ describe("TxBuilder Unfrack + DrainTo Integration", () => {
       expect(tx.body.outputs.length).toBeGreaterThanOrEqual(1) // At least payment output
       expect(tx.body.fee).toBeGreaterThan(0n) // Fee must be positive
 
-      const totalInput = utxos.reduce((sum, utxo) => sum + utxo.assets.lovelace, 0n)
+      const totalInput = utxos.reduce((sum, utxo) => sum + Assets.getLovelace(utxo.assets), 0n)
       const totalOutput = tx.body.outputs.reduce((sum, output) => sum + output.amount.coin, 0n)
       
       // Verify balance: inputs = outputs + fee

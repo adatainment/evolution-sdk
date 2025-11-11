@@ -70,19 +70,8 @@ const sortCollateralCandidates = (
     if (!aIsPure && bIsPure) return 1
 
     // Then by lovelace amount (descending - prefer largest first)
-    return Number(b.assets.lovelace - a.assets.lovelace)
+    return Number(Assets.getLovelace(b.assets) - Assets.getLovelace(a.assets))
   })
-}
-
-/**
- * Extract tokens (non-lovelace assets) from assets object.
- *
- * @since 2.0.0
- * @category helpers
- */
-const extractTokens = (assets: Assets.Assets): Omit<Assets.Assets, "lovelace"> => {
-  const { lovelace: _lovelace, ...tokens } = assets
-  return tokens
 }
 
 // ============================================================================
@@ -207,11 +196,11 @@ export const executeCollateral = (): Effect.Effect<
       }
 
       selectedCollateral.push(utxo)
-      totalLovelace += utxo.assets.lovelace
+      totalLovelace += Assets.getLovelace(utxo.assets)
       totalAssets = Assets.add(totalAssets, utxo.assets)
 
       yield* Effect.logDebug(
-        `[Collateral] Selected UTxO: ${utxo.txHash}#${utxo.outputIndex} (${utxo.assets.lovelace} lovelace)`
+        `[Collateral] Selected UTxO: ${utxo.txHash}#${utxo.outputIndex} (${Assets.getLovelace(utxo.assets)} lovelace)`
       )
 
       // Check if we have enough
@@ -283,10 +272,7 @@ export const executeCollateral = (): Effect.Effect<
     // ═══════════════════════════════════════════════════════════
     // STEP 7: Validate MinUTxO for Return Output
     // ═══════════════════════════════════════════════════════════
-    const returnAssets: Assets.Assets = {
-      lovelace: returnLovelace,
-      ...extractTokens(totalAssets) // Include all tokens from selected collateral
-    }
+    const returnAssets = Assets.setLovelace(totalAssets, returnLovelace)
     
     yield* Effect.logDebug(`[Collateral] Return assets keys: ${Object.keys(returnAssets).length} (${Object.keys(returnAssets).join(", ")})`)
 

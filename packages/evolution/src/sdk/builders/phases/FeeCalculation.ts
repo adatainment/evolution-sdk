@@ -99,10 +99,7 @@ export const executeFeeCalculation = (): Effect.Effect<
     const outputAssets = state.totalOutputAssets
     const leftoverBeforeFee = Assets.subtract(inputAssets, outputAssets)
 
-    const leftoverAfterFee: Assets.Assets = {
-      ...leftoverBeforeFee,
-      lovelace: leftoverBeforeFee.lovelace - calculatedFee
-    }
+    const leftoverAfterFee = Assets.subtractLovelace(leftoverBeforeFee, calculatedFee)
 
     // Step 6: Store both fee and leftoverAfterFee in context
     yield* Ref.update(buildCtxRef, (ctx) => ({

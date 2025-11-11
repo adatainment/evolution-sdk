@@ -1,8 +1,8 @@
 import { describe, expect, it } from "@effect/vitest"
 import { FastCheck, Schema } from "effect"
 
+import * as Address from "../src/core/Address.js"
 import * as AddressEras from "../src/core/AddressEras.js"
-import * as AddressStructure from "../src/core/AddressStructure.js"
 import * as KeyHash from "../src/core/KeyHash.js"
 import * as Assets from "../src/sdk/Assets.js"
 import type { TxBuilderConfig } from "../src/sdk/builders/TransactionBuilder.js"
@@ -121,7 +121,7 @@ describe("Fallback Tier 3: onInsufficientChange Strategy", () => {
     expect(tx.body.fee).toBe(165_369n) // Deterministic fee for this tx size
 
     // Verify leftover is burned
-    const inputTotal = utxo.assets.lovelace // 2_170_000n
+    const inputTotal = Assets.getLovelace(utxo.assets) // 2_170_000n
     const outputTotal = tx.body.outputs[0].amount.coin // 2_000_000n
     const leftover = inputTotal - outputTotal - tx.body.fee // 2_170_000 - 2_000_000 - 165_369 = 4_631
     expect(leftover).toBe(4_631n) // Exact leftover amount that was "burned" (becomes excess)
@@ -390,13 +390,13 @@ describe("Fee Validation: Multiple Witnesses Edge Case", () => {
     // Generate 10 unique addresses using KeyHash.arbitrary for payment credentials
     const uniqueAddresses = FastCheck.sample(KeyHash.arbitrary, { seed: 123, numRuns: 10 }).map((keyHash) => {
       // Create payment key address structure (enterprise address)
-      const addressStruct = AddressStructure.AddressStructure.make({
+      const addressStruct = Address.Address.make({
         networkId: 0, // Testnet
         paymentCredential: keyHash // Payment key credential
         // No staking credential = enterprise address
       })
       // Convert to bech32 string
-      return Schema.encodeSync(AddressStructure.FromBech32)(addressStruct)
+      return Schema.encodeSync(Address.FromBech32)(addressStruct)
     })
 
     // Create one UTxO per unique address

@@ -4,7 +4,7 @@ import { Effect, pipe, Schema } from "effect"
 import type { ParseError } from "effect/ParseResult"
 
 import type * as Address from "../../Address.js"
-import type * as Assets from "../../Assets.js"
+import * as Assets from "../../Assets.js"
 import type * as Credential from "../../Credential.js"
 import * as Script from "../../Script.js"
 import type * as UtxO from "../../UTxO.js"
@@ -277,13 +277,13 @@ export const toUTxO = (koiosUTxO: UTxO, address: string): UtxO.UTxO => ({
   txHash: koiosUTxO.tx_hash,
   outputIndex: koiosUTxO.tx_index,
   assets: (() => {
-    const a: Assets.Assets = { lovelace: BigInt(koiosUTxO.value) }
+    const tokens: Record<string, bigint> = {}
     if (koiosUTxO.asset_list) {
       koiosUTxO.asset_list.forEach((am: Asset) => {
-        a[am.policy_id + am.asset_name] = BigInt(am.quantity)
+        tokens[am.policy_id + am.asset_name] = BigInt(am.quantity)
       })
     }
-    return a
+    return Assets.make(BigInt(koiosUTxO.value), tokens)
   })(),
   address,
   datumOption: koiosUTxO.inline_datum

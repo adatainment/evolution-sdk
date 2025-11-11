@@ -164,17 +164,15 @@ export const executeChangeCreation = (): Effect.Effect<
     const outputAssets = state.totalOutputAssets
     const leftoverBeforeFee = Assets.subtract(inputAssets, outputAssets)
 
-    const tentativeLeftover: Assets.Assets = {
-      ...leftoverBeforeFee,
-      lovelace: leftoverBeforeFee.lovelace - buildCtx.calculatedFee
-    }
+    const tentativeLeftover = Assets.subtractLovelace(leftoverBeforeFee, buildCtx.calculatedFee)
 
     // Step 3: Check if negative - return to selection immediately
-    if (tentativeLeftover.lovelace < 0n) {
-      const shortfall = -tentativeLeftover.lovelace
+    const leftoverLovelace = Assets.getLovelace(tentativeLeftover)
+    if (leftoverLovelace < 0n) {
+      const shortfall = -leftoverLovelace
 
       yield* Effect.logDebug(
-        `[ChangeCreation] Insufficient lovelace for fee: ${tentativeLeftover.lovelace}. ` +
+        `[ChangeCreation] Insufficient lovelace for fee: ${leftoverLovelace}. ` +
           `Shortfall: ${shortfall}. Returning to selection.`
       )
 
@@ -194,9 +192,9 @@ export const executeChangeCreation = (): Effect.Effect<
       coinsPerUtxoByte: protocolParams.coinsPerUtxoByte
     })
 
-    if (tentativeLeftover.lovelace < minLovelaceForSingle) {
+    if (leftoverLovelace < minLovelaceForSingle) {
       // Not even affordable for single output - trigger reselection
-      const shortfall = minLovelaceForSingle - tentativeLeftover.lovelace
+      const shortfall = minLovelaceForSingle - leftoverLovelace
       const buildCtx = yield* Ref.get(buildCtxRef)
       const MAX_ATTEMPTS = 3
 
@@ -213,7 +211,7 @@ export const executeChangeCreation = (): Effect.Effect<
       // Try reselection up to MAX_ATTEMPTS (if UTxOs available)
       if (hasMoreUtxos && buildCtx.attempt < MAX_ATTEMPTS) {
         yield* Effect.logDebug(
-          `[ChangeCreation] Leftover ${tentativeLeftover.lovelace} < ${minLovelaceForSingle} minUTxO ` +
+          `[ChangeCreation] Leftover ${leftoverLovelace} < ${minLovelaceForSingle} minUTxO ` +
             `(shortfall: ${shortfall}${isAdaOnlyLeftover ? ", ADA-only" : ", with native assets"}). ` +
             `Attempting reselection (${buildCtx.attempt + 1}/${MAX_ATTEMPTS})`
         )
@@ -239,11 +237,11 @@ export const executeChangeCreation = (): Effect.Effect<
           new TransactionBuilderError({
             message:
               `Cannot balance transaction: Native assets present in leftover ` +
-              `but insufficient lovelace (${tentativeLeftover.lovelace} < ${minLovelaceForSingle} minUTxO) ` +
+              `but insufficient lovelace (${leftoverLovelace} < ${minLovelaceForSingle} minUTxO) ` +
               `after ${buildCtx.attempt} selection attempts.\n\n` +
               `Your leftover includes native assets (tokens) which require at least ` +
               `${minLovelaceForSingle} lovelace to create a valid change output, but only ` +
-              `${tentativeLeftover.lovelace} lovelace remains.\n\n` +
+              `${leftoverLovelace} lovelace remains.\n\n` +
               `Solutions:\n` +
               `1. Include the native assets in your payment outputs\n` +
               `2. Add more lovelace to your wallet\n` +
@@ -263,7 +261,7 @@ export const executeChangeCreation = (): Effect.Effect<
           new TransactionBuilderError({
             message:
               `Cannot create valid change: Insufficient funds to cover payment, fees, and minimum UTxO requirements.\n\n` +
-              `Available: ${tentativeLeftover.lovelace} lovelace\n` +
+              `Available: ${leftoverLovelace} lovelace\n` +
               `Required: At least ${minLovelaceForSingle} lovelace for change output\n\n` +
               `Solutions:\n` +
               `1. Add more funds to your wallet\n` +

@@ -1,15 +1,14 @@
-import { Function, Schema } from "effect"
+/**
+ * SDK Address module - user-friendly Bech32 string representation
+ *
+ * @since 2.0.0
+ */
 
-import * as CoreAddressStructure from "../core/AddressStructure.js"
+import { Schema } from "effect"
 
-// bech32
+import * as CoreAddress from "../core/Address.js"
+
 export type Address = string
 
-export const toAddressStructure = Schema.decodeSync(CoreAddressStructure.FromBech32)
-export const fromAddressStructure = Schema.encodeSync(CoreAddressStructure.FromBech32)
-
-export const fromJsonToAddressStructure = Schema.decodeSync(CoreAddressStructure.AddressStructure)
-export const fromAddressStructureToJson = Schema.encodeSync(CoreAddressStructure.AddressStructure)
-
-export const addressToJson = Function.flow(toAddressStructure, fromAddressStructureToJson)
-export const jsonToAddress = Function.flow(fromJsonToAddressStructure, fromAddressStructure)
+export const toCoreAddress = Schema.decodeSync(CoreAddress.FromBech32)
+export const fromCoreAddress = Schema.encodeSync(CoreAddress.FromBech32)

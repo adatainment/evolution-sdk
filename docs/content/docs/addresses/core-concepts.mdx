@@ -1,0 +1,100 @@
+---
+title: Core Concepts
+description: Understanding Evolution SDK's two-layer address architecture
+---
+
+# Core Concepts
+
+> **Looking for a quick start?** See the [Addresses Overview](/docs/addresses) for practical examples. This page provides a deep dive into Evolution's two-layer address architecture.
+
+Evolution SDK provides **two layers** for working with addresses: a **simple string-based SDK layer** for everyday use and a **detailed Core layer** for when you need to inspect or construct addresses.
+
+## Two-Layer Architecture
+
+### SDK Layer: Simple Strings
+
+The SDK layer treats addresses as simple Bech32 strings - perfect for most use cases. The `Address` type is a type alias for `string`, providing TypeScript type-safety.
+
+```typescript twoslash
+import { Address } from "@evolution-sdk/evolution"
+
+// Just a string!
+const address: Address.Address = "addr1qx2kd28nq8ac5prwg32hhvudlwggpgfp8utlyqxu6wqgz62f79qsdmm5dsknt9ecr5w468r9ey0fxwkdrwh08ly3tu9sy0f4qd"
+
+// Use it directly in your app
+console.log("Sending funds to:", address)
+```
+
+**Use the SDK layer when:**
+- • You just need to pass addresses around
+- • Building user-facing applications
+- • Working with wallet integrations
+- • You don't need to inspect address internals
+
+### Core Layer: Rich Types
+
+The Core layer provides detailed address structures with full type information and validation.
+
+```typescript twoslash
+import { Core } from "@evolution-sdk/evolution"
+
+const bech32 = "addr1qx2kd28nq8ac5prwg32hhvudlwggpgfp8utlyqxu6wqgz62f79qsdmm5dsknt9ecr5w468r9ey0fxwkdrwh08ly3tu9sy0f4qd"
+
+// Parse into rich address structure
+const address = Core.Address.fromBech32(bech32)
+
+// Access detailed information
+console.log("Network:", address.networkId) // 1 for mainnet, 0 for testnet
+console.log("Payment credential:", address.paymentCredential)
+console.log("Staking credential:", address.stakingCredential)
+
+// Utility functions
+const isEnterprise = Core.Address.isEnterprise(address) // false
+const hasStaking = Core.Address.hasStakingCredential(address) // true
+```
+
+**Use the Core layer when:**
+- • You need to inspect address components
+- • Building scripts or smart contracts
+- • Validating address structures
+- • Converting between formats (hex, bytes)
+- • Constructing addresses from credentials
+
+## When to Use Which Layer
+
+### Typical Application Flow
+
+```typescript twoslash
+import { Address, Core } from "@evolution-sdk/evolution"
+
+// 1. Receive address from user (SDK layer)
+const userAddress: Address.Address = "addr1qx2kd28nq8ac5prwg32hhvudlwggpgfp8utlyqxu6wqgz62f79qsdmm5dsknt9ecr5w468r9ey0fxwkdrwh08ly3tu9sy0f4qd"
+
+// 2. Use SDK layer for simple operations
+function processPayment(addr: Address.Address) {
+  console.log("Processing payment to:", addr)
+}
+processPayment(userAddress)
+
+// 3. Use Core layer when validation is needed
+const validated = Core.Address.fromBech32(userAddress)
+
+if (Core.Address.isEnterprise(validated)) {
+  console.warn("Enterprise address detected - no staking rewards!")
+}
+```
+
+## Summary
+
+| Layer | Type | Use For | Example |
+|-------|------|---------|---------|
+| **SDK** | `string` | User-facing apps, simple operations | `const addr: Address = "addr1..."` |
+| **Core** | `Core.Address.Address` | Validation, inspection, serialization | `const addr = Core.Address.fromBech32(...)` |
+
+**General Rule:** Start with the SDK layer for simplicity. Only reach for the Core layer when you need to inspect, validate, or parse addresses.
+
+## Next Steps
+
+- [Addresses Overview](/docs/addresses) - Learn about Evolution's simplified address model and practical examples
+- [Validation](/docs/addresses/validation) - Parse and validate addresses with error handling
+- [Conversion](/docs/addresses/conversion) - Transform between Bech32, hex, and byte formats

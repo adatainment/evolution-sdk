@@ -1,18 +1,20 @@
-import { Option } from "effect"
+import { Effect as Eff, Option, ParseResult, Schema } from "effect"
 
 import * as AssetName from "../core/AssetName.js"
 import * as Coin from "../core/Coin.js"
+import * as CoreMint from "../core/Mint.js"
 import * as MultiAsset from "../core/MultiAsset.js"
+import * as NonZeroInt64 from "../core/NonZeroInt64.js"
 import * as CorePolicyId from "../core/PolicyId.js"
 import * as PositiveCoin from "../core/PositiveCoin.js"
 import * as CoreValue from "../core/Value.js"
 import * as Unit from "./Unit.js"
 
-export interface Assets {
-  lovelace: bigint
-  [key: string]: bigint
-}
+export const AssetsSchema = Schema.Struct({
+  lovelace: Schema.optional(Schema.BigIntFromSelf)
+}).pipe(Schema.extend(Schema.Record({ key: Schema.String, value: Schema.BigIntFromSelf })))
 
+export type Assets = typeof AssetsSchema.Type
 /**
  * Sort assets according to CBOR canonical ordering rules (RFC 7049 section 3.9).
  * Lovelace comes first, then assets sorted by policy ID length, then lexicographically.
@@ -52,7 +54,11 @@ export const sortCanonical = (assets: Assets): Assets => {
  * Useful for calculating fees, rewards, or scaling asset amounts.
  */
 export const multiply = (assets: Assets, factor: bigint): Assets => {
-  const result: Record<string, bigint> = { lovelace: assets.lovelace * factor }
+  const result: Record<string, bigint> = {}
+
+  if (assets.lovelace !== undefined) {
+    result.lovelace = assets.lovelace * factor
+  }
 
   for (const [unit, amount] of Object.entries(assets)) {
     if (unit !== "lovelace") {
@@ -68,7 +74,11 @@ export const multiply = (assets: Assets, factor: bigint): Assets => {
  * Useful for calculating what needs to be subtracted or for representing debts.
  */
 export const negate = (assets: Assets): Assets => {
-  const result: Record<string, bigint> = { lovelace: -assets.lovelace }
+  const result: Record<string, bigint> = {}
+
+  if (assets.lovelace !== undefined) {
+    result.lovelace = -assets.lovelace
+  }
 
   for (const [unit, amount] of Object.entries(assets)) {
     if (unit !== "lovelace") {
@@ -95,7 +105,15 @@ export const empty = (): Assets => ({
 
 // Utility functions
 export const add = (a: Assets, b: Assets): Assets => {
-  const result: Record<string, bigint> = { lovelace: a.lovelace + b.lovelace }
+  const result: Record<string, bigint> = {}
+
+  const lovelaceA = a.lovelace ?? 0n
+  const lovelaceB = b.lovelace ?? 0n
+  const totalLovelace = lovelaceA + lovelaceB
+
+  if (totalLovelace !== 0n) {
+    result.lovelace = totalLovelace
+  }
 
   // Add all tokens from a
   for (const [unit, amount] of Object.entries(a)) {
@@ -115,7 +133,15 @@ export const add = (a: Assets, b: Assets): Assets => {
 }
 
 export const subtract = (a: Assets, b: Assets): Assets => {
-  const result: Record<string, bigint> = { lovelace: a.lovelace - b.lovelace }
+  const result: Record<string, bigint> = {}
+
+  const lovelaceA = a.lovelace ?? 0n
+  const lovelaceB = b.lovelace ?? 0n
+  const diffLovelace = lovelaceA - lovelaceB
+
+  if (diffLovelace !== 0n) {
+    result.lovelace = diffLovelace
+  }
 
   // Add all tokens from a
   for (const [unit, amount] of Object.entries(a)) {
@@ -145,7 +171,11 @@ export const subtract = (a: Assets, b: Assets): Assets => {
 export const merge = (...assets: Array<Assets>): Assets => assets.reduce(add, empty())
 
 export const filter = (assets: Assets, predicate: (unit: string, amount: bigint) => boolean): Assets => {
-  const result: Record<string, bigint> = { lovelace: assets.lovelace }
+  const result: Record<string, bigint> = {}
+
+  if (assets.lovelace !== undefined) {
+    result.lovelace = assets.lovelace
+  }
 
   for (const [unit, amount] of Object.entries(assets)) {
     if (unit !== "lovelace" && predicate(unit, amount)) {
@@ -158,17 +188,17 @@ export const filter = (assets: Assets, predicate: (unit: string, amount: bigint)
 
 // Conversion and validation helpers
 export const getAsset = (assets: Assets, unit: string): bigint => {
-  if (unit === "lovelace") return assets.lovelace
+  if (unit === "lovelace") return assets.lovelace ?? 0n
   return assets[unit] || 0n
 }
 
 export const hasAsset = (assets: Assets, unit: string): boolean => {
-  if (unit === "lovelace") return assets.lovelace > 0n
+  if (unit === "lovelace") return (assets.lovelace ?? 0n) > 0n
   return unit in assets && assets[unit] > 0n
 }
 
 export const isEmpty = (assets: Assets): boolean => {
-  if (assets.lovelace > 0n) return false
+  if ((assets.lovelace ?? 0n) > 0n) return false
   for (const [unit, amount] of Object.entries(assets)) {
     if (unit !== "lovelace" && amount > 0n) return false
   }
@@ -184,10 +214,51 @@ export const getUnits = (assets: Assets): Array<string> => {
 }
 
 /**
+ * Get the lovelace amount from Assets, defaulting to 0n if undefined.
+ * 
+ * @since 2.0.0
+ * @category helpers
+ */
+export const getLovelace = (assets: Assets): bigint => assets.lovelace ?? 0n
+
+/**
+ * Set the lovelace amount in Assets.
+ * 
+ * @since 2.0.0
+ * @category helpers
+ */
+export const setLovelace = (assets: Assets, amount: bigint): Assets => ({
+  ...assets,
+  lovelace: amount
+})
+
+/**
+ * Subtract a lovelace amount from Assets.
+ * 
+ * @since 2.0.0
+ * @category helpers
+ */
+export const subtractLovelace = (assets: Assets, amount: bigint): Assets => ({
+  ...assets,
+  lovelace: getLovelace(assets) - amount
+})
+
+/**
+ * Add a lovelace amount to Assets.
+ * 
+ * @since 2.0.0
+ * @category helpers
+ */
+export const addLovelace = (assets: Assets, amount: bigint): Assets => ({
+  ...assets,
+  lovelace: getLovelace(assets) + amount
+})
+
+/**
  * Convert a core Value to the Assets interface format.
  */
 export const valueToAssets = (value: CoreValue.Value): Assets => {
-  const assets: Assets = { lovelace: 0n }
+  const assets: Record<string, bigint> = {}
 
   // Add ADA (lovelace) from the Value
   const adaAmount = CoreValue.getAda(value)
@@ -211,7 +282,7 @@ export const valueToAssets = (value: CoreValue.Value): Assets => {
     }
   }
 
-  return assets
+  return assets as Assets
 }
 
 /**
@@ -244,7 +315,7 @@ export const assetsToValue = (assets: Assets): CoreValue.Value => {
 
     // Find existing policy map by comparing bytes (Map uses reference equality, not value equality)
     let policyMap: Map<AssetName.AssetName, PositiveCoin.PositiveCoin> | undefined
-    
+
     for (const [existingId, existingMap] of multiAssetMap.entries()) {
       if (CorePolicyId.equals(existingId, corePolicyId)) {
         policyMap = existingMap
@@ -267,3 +338,203 @@ export const assetsToValue = (assets: Assets): CoreValue.Value => {
 
   return CoreValue.withAssets(coin, multiAsset)
 }
+
+// ============================================================================
+// Value Assets Schemas
+// ============================================================================
+
+/**
+ * Transform between Assets (SDK-friendly) and Value (Core).
+ *
+ * Encoded side: Assets format { lovelace?: bigint, [unit: string]: bigint }
+ * Type side: Value (OnlyCoin | WithAssets)
+ *
+ * @since 2.0.0
+ * @category schemas
+ */
+export const ValueFromAssets = Schema.transformOrFail(
+  AssetsSchema, // Encoded: Assets format
+  Schema.typeSchema(CoreValue.Value), // Type: Core Value
+  {
+    strict: true,
+    decode: (assets) =>
+      Eff.gen(function* () {
+        // Assets → Value
+        const lovelace = assets.lovelace ?? 0n
+        const coin = lovelace
+
+        const nativeAssets = Object.entries(assets).filter(([unit]) => unit !== "lovelace")
+
+        if (nativeAssets.length === 0) {
+          return CoreValue.onlyCoin(coin)
+        }
+
+        const multiAssetMap = MultiAsset.empty()
+
+        for (const [unit, amount] of nativeAssets) {
+          const policyIdHex = unit.slice(0, 56)
+          const assetNameHex = unit.slice(56) || ""
+          const corePolicyId = yield* ParseResult.decode(CorePolicyId.FromHex)(policyIdHex)
+          const coreAssetName = yield* ParseResult.decode(AssetName.FromHex)(assetNameHex)
+
+          // Find existing policy map by comparing bytes
+          let policyMap: Map<AssetName.AssetName, PositiveCoin.PositiveCoin> | undefined
+
+          for (const [existingId, existingMap] of multiAssetMap.entries()) {
+            if (CorePolicyId.equals(existingId, corePolicyId)) {
+              policyMap = existingMap
+              break
+            }
+          }
+
+          if (!policyMap) {
+            policyMap = new Map()
+            multiAssetMap.set(corePolicyId, policyMap)
+          }
+
+          policyMap.set(coreAssetName, amount)
+        }
+
+        return CoreValue.withAssets(coin, multiAssetMap as MultiAsset.MultiAsset)
+      }),
+    encode: (value) =>
+      Eff.gen(function* () {
+        // Value → Assets
+        const assets: Record<string, bigint> = {}
+
+        const adaAmount = CoreValue.getAda(value)
+        if (adaAmount !== 0n) {
+          assets.lovelace = adaAmount
+        }
+
+        const multiAsset = CoreValue.getAssets(value)
+        if (Option.isSome(multiAsset)) {
+          const policyIds = MultiAsset.getPolicyIds(multiAsset.value)
+
+          for (const policyId of policyIds) {
+            const policyIdStr = CorePolicyId.toHex(policyId)
+            const assetsByPolicy = MultiAsset.getAssetsByPolicy(multiAsset.value, policyId)
+
+            for (const [assetName, amount] of assetsByPolicy) {
+              const assetNameStr = AssetName.toHex(assetName)
+              const unit = policyIdStr + assetNameStr
+              assets[unit] = BigInt(amount.toString())
+            }
+          }
+        }
+
+        return assets
+      })
+  }
+).annotations({
+  identifier: "Value.FromAssets",
+  title: "Value from Assets",
+  description: "Transform between Assets format and Value"
+})
+
+// ============================================================================
+// Mint Assets Schemas
+// ============================================================================
+
+/**
+ * Transform between Assets (SDK-friendly) and Mint (Core).
+ *
+ * Encoded side: Assets format { [unit: string]: bigint } (non-zero values only)
+ * Type side: Mint (Map<PolicyId, Map<AssetName, NonZeroInt64>>)
+ *
+ * Note: Unlike Value.FromAssets, this excludes "lovelace" since you cannot mint/burn ADA.
+ *
+ * @since 2.0.0
+ * @category schemas
+ */
+export const MintFromAssets = Schema.transformOrFail(
+  AssetsSchema, // Encoded: Assets format
+  Schema.typeSchema(CoreMint.Mint), // Type: Core Mint
+  {
+    strict: true,
+    decode: (assets) =>
+      Eff.gen(function* () {
+        const mint = new Map<CorePolicyId.PolicyId, Map<AssetName.AssetName, NonZeroInt64.NonZeroInt64>>()
+        for (const [unit, amount] of Object.entries(assets)) {
+          if (unit === "lovelace") {
+            return yield* ParseResult.fail(
+              new ParseResult.Type(
+                Schema.String.ast,
+                unit,
+                "Mint.FromAssets: 'lovelace' key is not allowed in Mint assets representation"
+              )
+            )
+          }
+
+          const policyId = yield* ParseResult.decode(CorePolicyId.FromHex)(unit.slice(0, 56))
+          const assetName = yield* ParseResult.decode(AssetName.FromHex)(unit.slice(56) || "")
+          const nonZeroAmount = yield* ParseResult.decode(Schema.typeSchema(NonZeroInt64.NonZeroInt64))(amount)
+
+          let assetMap = mint.get(policyId)
+          if (!assetMap) {
+            assetMap = new Map()
+            mint.set(policyId, assetMap)
+          }
+          assetMap.set(assetName, nonZeroAmount)
+        }
+        return mint
+      }),
+    encode: (mint) =>
+      Eff.gen(function* () {
+        // Mint → Assets
+        const assets: Record<string, bigint> = {}
+
+        for (const [policyId, assetMap] of mint.entries()) {
+          const policyIdStr = CorePolicyId.toHex(policyId)
+
+          for (const [assetName, amount] of assetMap.entries()) {
+            const assetNameStr = AssetName.toHex(assetName)
+            const unit = policyIdStr + assetNameStr
+            assets[unit] = BigInt(amount.toString())
+          }
+        }
+
+        return assets
+      })
+  }
+).annotations({
+  identifier: "Assets.MintFromAssets",
+  title: "Mint from Assets",
+  description: "Transform between Assets format and Mint"
+})
+
+// ============================================================================
+// Conversion Helpers
+// ============================================================================
+
+/**
+ * Convert Core Value to SDK Assets format.
+ *
+ * @since 2.0.0
+ * @category conversion
+ */
+export const fromValue = Schema.encodeSync(ValueFromAssets)
+
+/**
+ * Convert SDK Assets to Core Value.
+ *
+ * @since 2.0.0
+ * @category conversion
+ */
+export const toValue = Schema.decodeSync(ValueFromAssets)
+
+/**
+ * Convert Core Mint to SDK Assets format (without lovelace).
+ *
+ * @since 2.0.0
+ * @category conversion
+ */
+export const fromMint = Schema.encodeSync(MintFromAssets)
+
+/**
+ * Convert SDK Assets to Core Mint (lovelace key will be rejected).
+ *
+ * @since 2.0.0
+ * @category conversion
+ */
+export const toMint = Schema.decodeSync(MintFromAssets)

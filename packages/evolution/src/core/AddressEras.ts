@@ -51,7 +51,7 @@ import * as RewardAccount from "./RewardAccount.js"
  * @since 2.0.0
  * @category model
  */
-export class AddressError extends Data.TaggedError("AddressError")<{
+export class AddressErasError extends Data.TaggedError("AddressErasError")<{
   message?: string
   cause?: unknown
 }> {}
@@ -250,7 +250,7 @@ export const arbitrary = FastCheck.oneof(
  * @since 2.0.0
  * @category parsing
  */
-export const fromBytes = Function.makeDecodeSync(FromBytes, AddressError, "Address.fromBytes")
+export const fromBytes = Function.makeDecodeSync(FromBytes, AddressErasError, "Address.fromBytes")
 
 /**
  * Parse an Address from hex string.
@@ -258,7 +258,7 @@ export const fromBytes = Function.makeDecodeSync(FromBytes, AddressError, "Addre
  * @since 2.0.0
  * @category parsing
  */
-export const fromHex = Function.makeDecodeSync(FromHex, AddressError, "Address.fromHex")
+export const fromHex = Function.makeDecodeSync(FromHex, AddressErasError, "Address.fromHex")
 
 /**
  * Parse an Address from Bech32 string.
@@ -266,7 +266,7 @@ export const fromHex = Function.makeDecodeSync(FromHex, AddressError, "Address.f
  * @since 2.0.0
  * @category parsing
  */
-export const fromBech32 = Function.makeDecodeSync(FromBech32, AddressError, "Address.fromBech32")
+export const fromBech32 = Function.makeDecodeSync(FromBech32, AddressErasError, "Address.fromBech32")
 
 // ============================================================================
 // Encoding Functions
@@ -278,7 +278,7 @@ export const fromBech32 = Function.makeDecodeSync(FromBech32, AddressError, "Add
  * @since 2.0.0
  * @category encoding
  */
-export const toBytes = Function.makeEncodeSync(FromBytes, AddressError, "Address.toBytes")
+export const toBytes = Function.makeEncodeSync(FromBytes, AddressErasError, "Address.toBytes")
 
 /**
  * Convert an Address to hex string.
@@ -286,7 +286,7 @@ export const toBytes = Function.makeEncodeSync(FromBytes, AddressError, "Address
  * @since 2.0.0
  * @category encoding
  */
-export const toHex = Function.makeEncodeSync(FromHex, AddressError, "Address.toHex")
+export const toHex = Function.makeEncodeSync(FromHex, AddressErasError, "Address.toHex")
 
 /**
  * Convert an Address to Bech32 string.
@@ -294,7 +294,7 @@ export const toHex = Function.makeEncodeSync(FromHex, AddressError, "Address.toH
  * @since 2.0.0
  * @category encoding
  */
-export const toBech32 = Function.makeEncodeSync(FromBech32, AddressError, "Address.toBech32")
+export const toBech32 = Function.makeEncodeSync(FromBech32, AddressErasError, "Address.toBech32")
 
 /**
  * Effect-based error handling variants for functions that can fail.
@@ -303,11 +303,11 @@ export const toBech32 = Function.makeEncodeSync(FromBech32, AddressError, "Addre
  * @category effect
  */
 export namespace Either {
-  export const fromBytes = Function.makeDecodeEither(FromBytes, AddressError)
-  export const fromHex = Function.makeDecodeEither(FromHex, AddressError)
-  export const fromBech32 = Function.makeDecodeEither(FromBech32, AddressError)
+  export const fromBytes = Function.makeDecodeEither(FromBytes, AddressErasError)
+  export const fromHex = Function.makeDecodeEither(FromHex, AddressErasError)
+  export const fromBech32 = Function.makeDecodeEither(FromBech32, AddressErasError)
 
-  export const toBytes = Function.makeEncodeEither(FromBytes, AddressError)
-  export const toHex = Function.makeEncodeEither(FromHex, AddressError)
-  export const toBech32 = Function.makeEncodeEither(FromBech32, AddressError)
+  export const toBytes = Function.makeEncodeEither(FromBytes, AddressErasError)
+  export const toHex = Function.makeEncodeEither(FromHex, AddressErasError)
+  export const toBech32 = Function.makeEncodeEither(FromBech32, AddressErasError)
 }

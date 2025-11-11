@@ -60,7 +60,7 @@ export const isScriptAddress = (address: string): Effect.Effect<boolean, Transac
   Effect.gen(function* () {
     // Parse address to structure
     const addressStructure = yield* Effect.try({
-      try: () => Address.toAddressStructure(address),
+      try: () => Address.toCoreAddress(address),
       catch: (error) =>
         new TransactionBuilderError({
           message: `Failed to parse address: ${address}`,
@@ -741,7 +741,7 @@ export const calculateMinimumFee = (
 const extractPaymentKeyHash = (address: string): Effect.Effect<Uint8Array | null, TransactionBuilderError> =>
   Effect.gen(function* () {
     const addressStructure = yield* Effect.try({
-      try: () => Address.toAddressStructure(address),
+      try: () => Address.toCoreAddress(address),
       catch: (error) =>
         new TransactionBuilderError({
           message: `Failed to parse address ${address}`,

@@ -1,13 +1,13 @@
 import { Schema } from "effect"
 
-import * as _Credential from "../core/Credential.js"
-import type * as _KeyHash from "../core/KeyHash.js"
-import type * as _ScriptHash from "../core/ScriptHash.js"
+import * as CoreCredential from "../core/Credential.js"
+import type * as CoreKeyHash from "../core/KeyHash.js"
+import type * as CoreScriptHash from "../core/ScriptHash.js"
 
-export type ScriptHash = typeof _ScriptHash.ScriptHash.Encoded
-export type KeyHash = typeof _KeyHash.KeyHash.Encoded
+export type ScriptHash = typeof CoreScriptHash.ScriptHash.Encoded
+export type KeyHash = typeof CoreKeyHash.KeyHash.Encoded
 
-export type Credential = typeof _Credential.CredentialSchema.Encoded
+export type Credential = typeof CoreCredential.CredentialSchema.Encoded
 
-export const fromCredentialToJson = Schema.encodeSync(_Credential.CredentialSchema)
-export const jsonToCredential = Schema.decodeSync(_Credential.CredentialSchema)
+export const fromCoreCredential = Schema.encodeSync(CoreCredential.CredentialSchema)
+export const toCoreCredential = Schema.decodeSync(CoreCredential.CredentialSchema)

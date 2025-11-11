@@ -73,13 +73,6 @@ export const NonZeroInt64 = Schema.Union(NegInt64Schema, PosInt64Schema).annotat
  */
 export type NonZeroInt64 = typeof NonZeroInt64.Type
 
-/**
- * Smart constructor for creating NonZeroInt64 values.
- *
- * @since 2.0.0
- * @category constructors
- */
-export const make = Schema.decodeSync(NonZeroInt64)
 
 /**
  * Check if a value is a valid NonZeroInt64.

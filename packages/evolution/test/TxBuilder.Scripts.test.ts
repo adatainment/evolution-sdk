@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "@effect/vitest"
 import { Schema } from "effect"
 
-import * as AddressStructure from "../src/core/AddressStructure.js"
+import * as CoreAddress from "../src/core/Address.js"
 import * as Data from "../src/core/Data.js"
 import * as PlutusV2 from "../src/core/PlutusV2.js"
 import * as ScriptHash from "../src/core/ScriptHash.js"
@@ -118,11 +118,11 @@ describe("TxBuilder Script Handling", () => {
 
     const coreScript = new PlutusV2.PlutusV2({ bytes: scriptBytes })
     const scriptHash = ScriptHash.fromScript(coreScript)
-    const addressStruct = AddressStructure.AddressStructure.make({
+    const addressStruct = CoreAddress.Address.make({
       networkId: 0,
       paymentCredential: scriptHash
     })
-    return Schema.encodeSync(AddressStructure.FromBech32)(addressStruct)
+    return Schema.encodeSync(CoreAddress.FromBech32)(addressStruct)
   }
 
   it("should build transaction collecting from PlutusV2 script UTxO", async () => {
@@ -564,7 +564,7 @@ describe("TxBuilder Script Handling", () => {
     // - Collateral added to transaction first
     // - FeeCalculation includes collateral size (188 bytes)
     // - Change created with correct fee from the start
-    const expectedChange = scriptUtxo.assets.lovelace - 2_000_000n - fee
+    const expectedChange = Assets.getLovelace(scriptUtxo.assets) - 2_000_000n - fee
     
     expect(changeAmount).toBe(expectedChange)
     

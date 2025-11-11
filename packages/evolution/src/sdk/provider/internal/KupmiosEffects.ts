@@ -2,7 +2,7 @@ import { FetchHttpClient } from "@effect/platform"
 import { Array as _Array, Effect, pipe, Schedule, Schema } from "effect"
 
 import type * as Address from "../../Address.js"
-import type * as Assets from "../../Assets.js"
+import * as Assets from "../../Assets.js"
 import type * as Credential from "../../Credential.js"
 import type { EvalRedeemer } from "../../EvalRedeemer.js"
 import type * as OutRef from "../../OutRef.js"
@@ -52,11 +52,11 @@ const toProtocolParameters = (result: Ogmios.ProtocolParameters): ProtocolParame
 }
 
 const toAssets = (value: Kupo.UTxO["value"]): Assets.Assets => {
-  const assets: Assets.Assets = { lovelace: BigInt(value.coins) }
+  const tokens: Record<string, bigint> = {}
   for (const unit of Object.keys(value.assets)) {
-    assets[unit.replace(".", "")] = BigInt(value.assets[unit])
+    tokens[unit.replace(".", "")] = BigInt(value.assets[unit])
   }
-  return assets
+  return Assets.make(BigInt(value.coins), tokens)
 }
 
 const retrieveDatumEffect =

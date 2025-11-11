@@ -14,7 +14,7 @@ import * as KeyHash from "./KeyHash.js"
 import * as NetworkId from "./NetworkId.js"
 import * as ScriptHash from "./ScriptHash.js"
 
-export class AddressStructureError extends Data.TaggedError("AddressStructureError")<{
+export class AddressError extends Data.TaggedError("AddressError")<{
   message?: string
   cause?: unknown
 }> {}
@@ -23,7 +23,7 @@ export class AddressStructureError extends Data.TaggedError("AddressStructureErr
  * @since 1.0.0
  * @category Schema
  */
-export class AddressStructure extends Schema.Class<AddressStructure>("AddressStructure")({
+export class Address extends Schema.Class<Address>("AddressStructure")({
   networkId: NetworkId.NetworkId,
   paymentCredential: Credential.CredentialSchema,
   stakingCredential: Schema.optional(Credential.CredentialSchema)
@@ -47,7 +47,7 @@ export class AddressStructure extends Schema.Class<AddressStructure>("AddressStr
  */
 export const FromBytes = Schema.transformOrFail(
   Schema.Union(Bytes57.BytesSchema, Bytes29.BytesSchema),
-  Schema.typeSchema(AddressStructure),
+  Schema.typeSchema(Address),
   {
     strict: true,
     encode: (_, __, ___, toA) =>
@@ -93,7 +93,7 @@ export const FromBytes = Schema.transformOrFail(
             ? new KeyHash.KeyHash({ hash: fromA.slice(29, 57) })
             : new ScriptHash.ScriptHash({ hash: fromA.slice(29, 57) })
 
-          return AddressStructure.make({
+          return Address.make({
             networkId,
             paymentCredential,
             stakingCredential
@@ -105,7 +105,7 @@ export const FromBytes = Schema.transformOrFail(
             ? new KeyHash.KeyHash({ hash: fromA.slice(1, 29) })
             : new ScriptHash.ScriptHash({ hash: fromA.slice(1, 29) })
 
-          return AddressStructure.make({
+          return Address.make({
             networkId,
             paymentCredential,
             stakingCredential: undefined
@@ -135,7 +135,7 @@ export const FromHex = Schema.compose(Bytes.FromHex, FromBytes).annotations({
  * @since 1.0.0
  * @category Transformations
  */
-export const FromBech32 = Schema.transformOrFail(Schema.String, Schema.typeSchema(AddressStructure), {
+export const FromBech32 = Schema.transformOrFail(Schema.String, Schema.typeSchema(Address), {
   strict: true,
   encode: (_, __, ___, toA) =>
     Eff.gen(function* () {
@@ -167,7 +167,7 @@ export const FromBech32 = Schema.transformOrFail(Schema.String, Schema.typeSchem
  * @since 1.0.0
  * @category Utils
  */
-export const equals = (a: AddressStructure, b: AddressStructure): boolean =>
+export const equals = (a: Address, b: Address): boolean =>
   a.networkId === b.networkId &&
   Credential.equals(a.paymentCredential, b.paymentCredential) &&
   ((a.stakingCredential === undefined && b.stakingCredential === undefined) ||
@@ -181,7 +181,7 @@ export const equals = (a: AddressStructure, b: AddressStructure): boolean =>
  * @since 1.0.0
  * @category Utils
  */
-export const hasStakingCredential = (address: AddressStructure): boolean => address.stakingCredential !== undefined
+export const hasStakingCredential = (address: Address): boolean => address.stakingCredential !== undefined
 
 /**
  * Check if AddressStructure is enterprise-like (no staking credential)
@@ -189,7 +189,7 @@ export const hasStakingCredential = (address: AddressStructure): boolean => addr
  * @since 1.0.0
  * @category Utils
  */
-export const isEnterprise = (address: AddressStructure): boolean => address.stakingCredential === undefined
+export const isEnterprise = (address: Address): boolean => address.stakingCredential === undefined
 
 /**
  * Get network ID from AddressStructure
@@ -197,7 +197,7 @@ export const isEnterprise = (address: AddressStructure): boolean => address.stak
  * @since 1.0.0
  * @category Utils
  */
-export const getNetworkId = (address: AddressStructure): NetworkId.NetworkId => address.networkId
+export const getNetworkId = (address: Address): NetworkId.NetworkId => address.networkId
 
 /**
  * Sync functions using Function module utilities
@@ -205,12 +205,12 @@ export const getNetworkId = (address: AddressStructure): NetworkId.NetworkId => 
  * @since 1.0.0
  * @category Functions
  */
-export const fromBech32 = Function.makeDecodeSync(FromBech32, AddressStructureError, "fromBech32")
-export const toBech32 = Function.makeEncodeSync(FromBech32, AddressStructureError, "toBech32")
-export const fromHex = Function.makeDecodeSync(FromHex, AddressStructureError, "fromHex")
-export const toHex = Function.makeEncodeSync(FromHex, AddressStructureError, "toHex")
-export const fromBytes = Function.makeDecodeSync(FromBytes, AddressStructureError, "fromBytes")
-export const toBytes = Function.makeEncodeSync(FromBytes, AddressStructureError, "toBytes")
+export const fromBech32 = Function.makeDecodeSync(FromBech32, AddressError, "fromBech32")
+export const toBech32 = Function.makeEncodeSync(FromBech32, AddressError, "toBech32")
+export const fromHex = Function.makeDecodeSync(FromHex, AddressError, "fromHex")
+export const toHex = Function.makeEncodeSync(FromHex, AddressError, "toHex")
+export const fromBytes = Function.makeDecodeSync(FromBytes, AddressError, "fromBytes")
+export const toBytes = Function.makeEncodeSync(FromBytes, AddressError, "toBytes")
 
 /**
  * FastCheck arbitrary generator for testing
@@ -224,7 +224,7 @@ export const arbitrary = FastCheck.record({
   stakingCredential: FastCheck.option(Credential.arbitrary)
 }).map(
   (props) =>
-    new AddressStructure({
+    new Address({
       ...props,
       stakingCredential: props.stakingCredential ?? undefined
     })
@@ -237,7 +237,7 @@ export namespace Either {
    * @since 1.0.0
    * @category parsing
    */
-  export const fromBytes = Function.makeDecodeEither(FromBytes, AddressStructureError)
+  export const fromBytes = Function.makeDecodeEither(FromBytes, AddressError)
 
   /**
    * Parse an AddressStructure from hex string.
@@ -245,7 +245,7 @@ export namespace Either {
    * @since 1.0.0
    * @category parsing
    */
-  export const fromHex = Function.makeDecodeEither(FromHex, AddressStructureError)
+  export const fromHex = Function.makeDecodeEither(FromHex, AddressError)
 
   /**
    * Convert an AddressStructure to bytes.
@@ -253,7 +253,7 @@ export namespace Either {
    * @since 1.0.0
    * @category encoding
    */
-  export const toBytes = Function.makeEncodeEither(FromBytes, AddressStructureError)
+  export const toBytes = Function.makeEncodeEither(FromBytes, AddressError)
 
   /**
    * Convert an AddressStructure to hex string.
@@ -261,7 +261,7 @@ export namespace Either {
    * @since 1.0.0
    * @category encoding
    */
-  export const toHex = Function.makeEncodeEither(FromHex, AddressStructureError)
+  export const toHex = Function.makeEncodeEither(FromHex, AddressError)
 
   /**
    * Convert AddressStructure to Bech32 string.
@@ -269,7 +269,7 @@ export namespace Either {
    * @since 1.0.0
    * @category encoding
    */
-  export const toBech32 = Function.makeEncodeEither(FromBech32, AddressStructureError)
+  export const toBech32 = Function.makeEncodeEither(FromBech32, AddressError)
 
   /**
    * Parse an AddressStructure from Bech32 string.
@@ -277,5 +277,5 @@ export namespace Either {
    * @since 1.0.0
    * @category parsing
    */
-  export const fromBech32 = Function.makeDecodeEither(FromBech32, AddressStructureError)
+  export const fromBech32 = Function.makeDecodeEither(FromBech32, AddressError)
 }

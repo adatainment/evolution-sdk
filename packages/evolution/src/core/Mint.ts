@@ -32,7 +32,7 @@ export const AssetMap = Schema.Map({
   key: AssetName.AssetName,
   value: NonZeroInt64.NonZeroInt64
 }).annotations({
-  identifier: "AssetMap"
+  identifier: "Mint.AssetMap"
 })
 
 export type AssetMap = typeof AssetMap.Type
@@ -53,13 +53,11 @@ export type AssetMap = typeof AssetMap.Type
 export const Mint = Schema.Map({
   key: PolicyId.PolicyId,
   value: AssetMap
+}).annotations({
+  identifier: "Mint",
+  title: "Token Mint Operations",
+  description: "A collection of token minting/burning operations grouped by policy ID"
 })
-  .pipe(Schema.brand("Mint"))
-  .annotations({
-    identifier: "Mint",
-    title: "Token Mint Operations",
-    description: "A collection of token minting/burning operations grouped by policy ID"
-  })
 
 /**
  * Type alias for Mint representing a collection of minting/burning operations.
@@ -111,7 +109,12 @@ export const singleton = (
 export const fromEntries = (
   entries: Array<[PolicyId.PolicyId, Array<[AssetName.AssetName, NonZeroInt64.NonZeroInt64]>]>
 ): Mint => {
-  return new Map(entries.map(([policyId, assetEntries]) => [policyId, new Map(assetEntries)])) as Mint
+  const map = new Map(entries.map(([policyId, assetEntries]) => [policyId, new Map(assetEntries)])) as Mint
+  // Validate the constructed Mint
+  if (!is(map)) {
+    throw new MintError({ message: "Invalid Mint structure" })
+  }
+  return map
 }
 
 /**

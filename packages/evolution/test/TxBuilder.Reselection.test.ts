@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, FastCheck, Schema } from "effect"
 
-import * as AddressStructure from "../src/core/AddressStructure.js"
+import * as CoreAddress from "../src/core/Address.js"
 import * as KeyHash from "../src/core/KeyHash.js"
 import * as Assets from "../src/sdk/Assets.js"
 import type { TxBuilderConfig } from "../src/sdk/builders/TransactionBuilder.js"
@@ -492,13 +492,13 @@ describe("TxBuilder Re-selection Loop", () => {
       // This ensures payment key addresses (not script addresses)
       const uniqueAddresses = FastCheck.sample(KeyHash.arbitrary, { seed: 42, numRuns: 200 }).map((keyHash) => {
         // Create payment key address structure
-        const addressStruct = AddressStructure.AddressStructure.make({
+        const addressStruct = CoreAddress.Address.make({
           networkId: 0, // Testnet
           paymentCredential: keyHash // Payment key credential
           // No staking credential = enterprise address
         })
         // Convert to bech32 string
-        return Schema.encodeSync(AddressStructure.FromBech32)(addressStruct)
+        return Schema.encodeSync(CoreAddress.FromBech32)(addressStruct)
       })
 
       // Create 150 UTxOs with truly unique addresses

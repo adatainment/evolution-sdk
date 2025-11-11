@@ -32,14 +32,18 @@ export class KeyHashError extends Data.TaggedError("KeyHashError")<{
 export class KeyHash extends Schema.TaggedClass<KeyHash>()("KeyHash", {
   hash: Hash28.BytesFromHex
 }) {
-  toJSON(): string {
-    return toHex(this)
+  toJSON() {
+    return {
+      _tag: "KeyHash" as const,
+      hash: Bytes.toHex(this.hash)
+    }
   }
 
   toString(): string {
     return `KeyHash({ hash: ${this.hash} })`
   }
 }
+
 
 /**
  * Schema transformer from bytes to KeyHash.
@@ -131,6 +135,7 @@ export const toBytes = (keyhash: KeyHash): Uint8Array => new Uint8Array(keyhash.
  */
 export const toHex = (keyhash: KeyHash): string => Bytes.toHex(keyhash.hash)
 
+
 /**
  * Create a KeyHash from a PrivateKey
  *
@@ -171,4 +176,6 @@ export namespace Either {
   export const fromHex = Function.makeDecodeEither(FromHex, KeyHashError)
   export const toBytes = Function.makeEncodeEither(FromBytes, KeyHashError)
   export const toHex = Function.makeEncodeEither(FromHex, KeyHashError)
+  export const encode = Schema.encodeEither(KeyHash)
+  export const decode = Schema.decodeEither(KeyHash)
 }

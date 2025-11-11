@@ -1,0 +1,10 @@
+{
+  "title": "Address Types",
+  "pages": [
+    "index",
+    "base",
+    "enterprise",
+    "reward",
+    "pointer"
+  ]
+}

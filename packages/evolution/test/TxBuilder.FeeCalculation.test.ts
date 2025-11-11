@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect } from "effect"
 
-import type * as Assets from "../src/sdk/Assets.js"
+import * as Assets from "../src/sdk/Assets.js"
 import {
   calculateLeftoverAssets,
   calculateMinimumFee,
@@ -281,7 +281,7 @@ describe("TxBuilder Fee Calculation", () => {
       })
 
       // 10M - 5M - 200k = 4.8M
-      expect(leftover.lovelace).toBe(4_800_000n)
+      expect(Assets.getLovelace(leftover)).toBe(4_800_000n)
     })
 
     it("should calculate leftover native assets", () => {
@@ -303,7 +303,7 @@ describe("TxBuilder Fee Calculation", () => {
         totalOutputAssets
       })
 
-      expect(leftover.lovelace).toBe(4_800_000n)
+      expect(Assets.getLovelace(leftover)).toBe(4_800_000n)
       expect(leftover["policy1.asset1"]).toBe(300n)
     })
 
@@ -325,7 +325,7 @@ describe("TxBuilder Fee Calculation", () => {
       })
 
       // Leftover lovelace should be 0 (inputs - outputs - fee = 5.2M - 5M - 0.2M = 0)
-      expect(leftover.lovelace).toBe(0n)
+      expect(Assets.getLovelace(leftover)).toBe(0n)
       // Should only have lovelace key (no other assets)
       expect(Object.keys(leftover).filter((k) => k !== "lovelace")).toHaveLength(0)
     })
@@ -349,7 +349,7 @@ describe("TxBuilder Fee Calculation", () => {
         totalOutputAssets
       })
 
-      expect(leftover.lovelace).toBe(4_800_000n)
+      expect(Assets.getLovelace(leftover)).toBe(4_800_000n)
       expect(leftover["policy1.asset1"]).toBeUndefined()
     })
 
@@ -374,7 +374,7 @@ describe("TxBuilder Fee Calculation", () => {
         totalOutputAssets
       })
 
-      expect(leftover.lovelace).toBe(4_800_000n)
+      expect(Assets.getLovelace(leftover)).toBe(4_800_000n)
       expect(leftover["policy1.asset1"]).toBe(400n)
       expect(leftover["policy2.asset2"]).toBe(200n)
     })
@@ -402,7 +402,7 @@ describe("TxBuilder Fee Calculation", () => {
         totalOutputAssets
       })
 
-      expect(leftover.lovelace).toBe(4_800_000n)
+      expect(Assets.getLovelace(leftover)).toBe(4_800_000n)
       expect(leftover["policy1.asset1"]).toBeUndefined()
       expect(leftover["policy2.asset2"]).toBeUndefined()
       expect(leftover["policy3.asset3"]).toBe(100n)

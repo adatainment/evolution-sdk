@@ -207,10 +207,7 @@ export const executeSelection = (): Effect.Effect<PhaseResult, TransactionBuilde
 
     // Step 3: Calculate total needed (outputs + shortfall)
     // Shortfall contains fee + any missing lovelace for change outputs
-    const totalNeeded: Assets.Assets = {
-      ...outputAssets,
-      lovelace: outputAssets.lovelace + buildCtx.shortfall
-    }
+    const totalNeeded = Assets.addLovelace(outputAssets, buildCtx.shortfall)
 
     // Step 4: Calculate asset delta & extract shortfalls
     const assetDelta = Assets.subtract(totalNeeded, inputAssets)

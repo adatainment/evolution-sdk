@@ -523,7 +523,7 @@ describe("Unfrack UTxO Optimization", () => {
 
         expect(outputs).toBeDefined()
         expect(outputs).toHaveLength(1)
-        expect(outputs![0].assets.lovelace).toBe(50_000000n)
+        expect(Assets.getLovelace(outputs![0].assets)).toBe(50_000000n)
         expect(outputs![0].address).toBe(changeTestAddress)
       })
     )
@@ -550,8 +550,8 @@ describe("Unfrack UTxO Optimization", () => {
 
         expect(outputs).toBeDefined()
         expect(outputs).toHaveLength(3)
-        expect(outputs![0].assets.lovelace).toBe(100_000000n)
-        expect(outputs![1].assets.lovelace).toBe(50_000000n)
+        expect(Assets.getLovelace(outputs![0].assets)).toBe(100_000000n)
+        expect(Assets.getLovelace(outputs![1].assets)).toBe(50_000000n)
       })
     )
 
@@ -607,7 +607,7 @@ describe("Unfrack UTxO Optimization", () => {
         // Should have 1 ADA-only output (1 ADA, no tokens)
         expect(outputs).toBeDefined()
         expect(outputs).toHaveLength(1)
-        expect(outputs![0].assets.lovelace).toBe(1_000000n)
+        expect(Assets.getLovelace(outputs![0].assets)).toBe(1_000000n)
       })
     )
   })
@@ -657,18 +657,18 @@ describe("Unfrack UTxO Optimization", () => {
 
           // Verify token output has its minUTxO + tokens
           const tokenOutput = tokenOutputs[0]
-          expect(tokenOutput.assets.lovelace).toBeGreaterThan(0n) // Has minUTxO (typically ~0.45-2 ADA depending on tokens)
-          expect(tokenOutput.assets.lovelace).toBeLessThan(10_000000n) // But not excessive
+          expect(Assets.getLovelace(tokenOutput.assets)).toBeGreaterThan(0n) // Has minUTxO (typically ~0.45-2 ADA depending on tokens)
+          expect(Assets.getLovelace(tokenOutput.assets)).toBeLessThan(10_000000n) // But not excessive
           expect(tokenOutput.assets[`${policyA}${toHex("token1")}`]).toBe(100n)
 
           // Exactly 2 ADA-only outputs from 60/40 split
           const adaOnlyOutputs = outputs.filter(output =>
-            Object.keys(output.assets).length === 1 && output.assets.lovelace > 0n
+            Object.keys(output.assets).length === 1 && Assets.getLovelace(output.assets) > 0n
           )
           expect(adaOnlyOutputs.length).toBe(2)
           
           // Verify the total ADA in outputs equals original (minus what's locked in bundles)
-          const totalOutputLovelace = outputs.reduce((sum, out) => sum + out.assets.lovelace, 0n)
+          const totalOutputLovelace = outputs.reduce((sum, out) => sum + Assets.getLovelace(out.assets), 0n)
           expect(totalOutputLovelace).toBe(100_000000n) // All 100 ADA accounted for
         }
       })
@@ -708,7 +708,7 @@ describe("Unfrack UTxO Optimization", () => {
           const delta = Assets.subtract(changeAssets, totalOutputAssets)
           
           // All assets must be conserved exactly
-          expect(delta.lovelace).toBe(0n)
+          expect(Assets.getLovelace(delta)).toBe(0n)
           const deltaUnits = Assets.getUnits(delta).filter(unit => unit !== 'lovelace')
           for (const unit of deltaUnits) {
             expect(delta[unit]).toBe(0n)
@@ -730,7 +730,7 @@ describe("Unfrack UTxO Optimization", () => {
 
           // Exactly 2 ADA-only outputs from 60/40 subdivision
           const adaOnlyOutputs = outputs.filter(output =>
-            Object.keys(output.assets).length === 1 && output.assets.lovelace > 0n
+            Object.keys(output.assets).length === 1 && Assets.getLovelace(output.assets) > 0n
           )
           expect(adaOnlyOutputs.length).toBe(2)
         }
@@ -787,12 +787,12 @@ describe("Unfrack UTxO Optimization", () => {
           
           // Exactly 3 ADA-only outputs from subdivision (50/30/20 split)
           const adaOnlyOutputs = outputs.filter(output =>
-            Object.keys(output.assets).length === 1 && output.assets.lovelace > 0n
+            Object.keys(output.assets).length === 1 && Assets.getLovelace(output.assets) > 0n
           )
           expect(adaOnlyOutputs.length).toBe(3)
           
           // Verify total lovelace is conserved
-          const totalOutputLovelace = outputs.reduce((sum, out) => sum + out.assets.lovelace, 0n)
+          const totalOutputLovelace = outputs.reduce((sum, out) => sum + Assets.getLovelace(out.assets), 0n)
           expect(totalOutputLovelace).toBe(150_000000n)
         }
       })
@@ -852,12 +852,12 @@ describe("Unfrack UTxO Optimization", () => {
           
           // Exactly 3 ADA-only outputs from subdivision (50/25/25 split)
           const adaOnlyOutputs = outputs.filter(output =>
-            Object.keys(output.assets).length === 1 && output.assets.lovelace > 0n
+            Object.keys(output.assets).length === 1 && Assets.getLovelace(output.assets) > 0n
           )
           expect(adaOnlyOutputs.length).toBe(3)
           
           // Verify total lovelace is conserved
-          const totalOutputLovelace = outputs.reduce((sum, out) => sum + out.assets.lovelace, 0n)
+          const totalOutputLovelace = outputs.reduce((sum, out) => sum + Assets.getLovelace(out.assets), 0n)
           expect(totalOutputLovelace).toBe(200_000000n)
         }
       })
@@ -903,10 +903,10 @@ describe("Unfrack UTxO Optimization", () => {
           expect(tokenOutputs[0].assets[`${policyA}${toHex("token1")}`]).toBe(100n)
           
           // Verify the token bundle has all the lovelace (no separate ADA-only output)
-          expect(tokenOutputs[0].assets.lovelace).toBe(10_000000n)
+          expect(Assets.getLovelace(tokenOutputs[0].assets)).toBe(10_000000n)
           
           // Verify total lovelace is conserved
-          const totalOutputLovelace = outputs.reduce((sum, out) => sum + out.assets.lovelace, 0n)
+          const totalOutputLovelace = outputs.reduce((sum, out) => sum + Assets.getLovelace(out.assets), 0n)
           expect(totalOutputLovelace).toBe(10_000000n)
         }
       })
@@ -958,7 +958,7 @@ describe("Unfrack UTxO Optimization", () => {
           const delta = Assets.subtract(changeAssets, totalOutputAssets)
           
           // All assets must be conserved exactly
-          expect(delta.lovelace).toBe(0n)
+          expect(Assets.getLovelace(delta)).toBe(0n)
           const deltaUnits = Assets.getUnits(delta).filter(unit => unit !== 'lovelace')
           for (const unit of deltaUnits) {
             expect(delta[unit]).toBe(0n)
@@ -998,7 +998,7 @@ describe("Unfrack UTxO Optimization", () => {
 
           // Verify exactly 4 ADA-only outputs from subdivision (40/30/20/10 split)
           const adaOnlyOutputs = outputs.filter(output =>
-            Object.keys(output.assets).length === 1 && output.assets.lovelace > 0n
+            Object.keys(output.assets).length === 1 && Assets.getLovelace(output.assets) > 0n
           )
           expect(adaOnlyOutputs.length).toBe(4)
         }
@@ -1057,7 +1057,7 @@ describe("Unfrack UTxO Optimization", () => {
           expect(totalTokens).toBe(50)
 
           // Verify total lovelace is conserved
-          const totalOutputLovelace = outputs.reduce((sum, out) => sum + out.assets.lovelace, 0n)
+          const totalOutputLovelace = outputs.reduce((sum, out) => sum + Assets.getLovelace(out.assets), 0n)
           expect(totalOutputLovelace).toBe(20_000000n)
         }
       })
@@ -1355,7 +1355,7 @@ describe("Unfrack UTxO Optimization", () => {
           // FUNDAMENTAL: Asset Conservation
           const totalOutputAssets = Assets.merge(...outputs.map(out => out.assets))
           const delta = Assets.subtract(changeAssets, totalOutputAssets)
-          expect(delta.lovelace).toBe(0n)
+          expect(Assets.getLovelace(delta)).toBe(0n)
           
           // Should have 2 token bundles
           const tokenOutputs = outputs.filter(output =>
@@ -1405,7 +1405,7 @@ describe("Unfrack UTxO Optimization", () => {
           // FUNDAMENTAL: Asset Conservation - must pass regardless of subdivision outcome
           const totalOutputAssets = Assets.merge(...outputs.map(out => out.assets))
           const delta = Assets.subtract(changeAssets, totalOutputAssets)
-          expect(delta.lovelace).toBe(0n)
+          expect(Assets.getLovelace(delta)).toBe(0n)
           
           // Should have 1 token bundle
           const tokenOutputs = outputs.filter(output =>
@@ -1441,7 +1441,7 @@ describe("Unfrack UTxO Optimization", () => {
         // Should either create 1 output or return undefined depending on minUTxO calculation
         if (outputs !== undefined) {
           expect(outputs).toHaveLength(1)
-          expect(outputs[0].assets.lovelace).toBe(1_000000n)
+          expect(Assets.getLovelace(outputs[0].assets)).toBe(1_000000n)
         } else {
           // If undefined, it means 1 ADA < minUTxO for this address
           expect(outputs).toBeUndefined()
@@ -1475,7 +1475,7 @@ describe("Unfrack UTxO Optimization", () => {
           // If outputs created, verify each meets minUTxO
           expect(outputs.length).toBeGreaterThan(0)
           outputs.forEach(output => {
-            expect(output.assets.lovelace).toBeGreaterThan(0n)
+            expect(Assets.getLovelace(output.assets)).toBeGreaterThan(0n)
           })
         } else {
           // Confirmed: insufficient for subdivision

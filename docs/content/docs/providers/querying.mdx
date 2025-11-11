@@ -64,7 +64,7 @@ const utxos = await client.getUtxos("addr1qxy...");
 
 // Calculate total ADA
 const totalLovelace = utxos.reduce(
-  (sum, utxo) => sum + utxo.assets.lovelace,
+  (sum, utxo) => sum + (utxo.assets.lovelace ?? 0n),
   0n
 );
 console.log("Total ADA:", Number(totalLovelace) / 1_000_000);
@@ -249,7 +249,7 @@ async function getPortfolioBalance(addresses: string[]) {
     addresses.map(async (address) => {
       const utxos = await client.getUtxos(address);
       const lovelace = utxos.reduce(
-        (sum, utxo) => sum + utxo.assets.lovelace,
+        (sum, utxo) => sum + (utxo.assets.lovelace ?? 0n),
         0n
       );
       

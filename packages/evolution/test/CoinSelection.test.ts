@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import type * as Assets from "../src/sdk/Assets.js"
 import { CoinSelectionError, largestFirstSelection } from "../src/sdk/builders/CoinSelection.js"
-import type * as UTxO from "../src/sdk/UTxO.js"
+import * as UTxO from "../src/sdk/UTxO.js"
 import { createTestUtxo } from "./utils/utxo-helpers.js"
 
 /**
@@ -144,7 +144,7 @@ describe("Largest-First Coin Selection", () => {
       // Should select first two UTxOs (5M + 3M = 8M lovelace, 100 + 50 = 150 tokens)
       expect(result.selectedUtxos).toHaveLength(2)
       
-      const totalLovelace = result.selectedUtxos.reduce((sum, u) => sum + u.assets.lovelace, 0n)
+      const totalLovelace = UTxO.getTotalLovelace([...result.selectedUtxos])
       const totalTokens = result.selectedUtxos.reduce((sum, u) => sum + (u.assets[assetUnit] || 0n), 0n)
       
       expect(totalLovelace).toBeGreaterThanOrEqual(7_000_000n)
@@ -383,7 +383,7 @@ describe("Largest-First Coin Selection", () => {
       // Should select exactly 3 UTxOs (30M >= 25M)
       expect(result.selectedUtxos).toHaveLength(3)
       
-      const total = result.selectedUtxos.reduce((sum, u) => sum + u.assets.lovelace, 0n)
+      const total = UTxO.getTotalLovelace([...result.selectedUtxos])
       expect(total).toBe(30_000_000n)
     })
   })

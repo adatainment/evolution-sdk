@@ -112,7 +112,7 @@ async function getPortfolioBalance(addresses: string[]) {
     addresses.map(async (address) => {
       const utxos = await client.getUtxos(address);
       const lovelace = utxos.reduce(
-        (sum, utxo) => sum + utxo.assets.lovelace,
+        (sum, utxo) => sum + (utxo.assets.lovelace ?? 0n),
         0n
       );
       return { address, lovelace };

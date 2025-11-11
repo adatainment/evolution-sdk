@@ -9,40 +9,22 @@ Validating addresses is critical before using them in transactions. The SDK prov
 
 ## Basic Validation
 
-### Validate Bech32 Address
+Create a helper function for safe address validation:
 
 ```typescript twoslash
-import { Address } from "@evolution-sdk/evolution";
-
-const addressString = "addr1qx2kd28nq8ac5prwg32hhvudlwggpgfp8utlyqxu6wqgz62f79qsdmm5dsknt9ecr5w468r9ey0fxwkdrwh08ly3tu9sy0f4qd";
-
-// Validate and parse Bech32 address
-try {
-  const address = Address.fromBech32(addressString);
-  console.log("Valid address:", address);
-} catch (error) {
-  console.error("Invalid address:", error);
-}
-```
-
-### Safe Validation Function
-
-Create a helper function for safe validation:
-
-```typescript twoslash
-import { Address } from "@evolution-sdk/evolution";
+import { Core } from "@evolution-sdk/evolution";
 
 function validateAddress(addressString: string) {
   try {
-    const address = Address.fromBech32(addressString);
-    return { success: true, address };
+    const address = Core.Address.fromBech32(addressString);
+    return { success: true, address } as const;
   } catch (error) {
-    return { success: false, error };
+    return { success: false, error } as const;
   }
 }
 
 // Usage
-const result = validateAddress("addr1qx...");
+const result = validateAddress("addr1qx2kd28nq8ac5prwg32hhvudlwggpgfp8utlyqxu6wqgz62f79qsdmm5dsknt9ecr5w468r9ey0fxwkdrwh08ly3tu9sy0f4qd");
 if (result.success) {
   console.log("Valid address:", result.address);
 } else {
@@ -55,19 +37,19 @@ if (result.success) {
 Verify an address belongs to the expected network:
 
 ```typescript twoslash
-import { AddressDetails } from "@evolution-sdk/evolution";
+import { Core } from "@evolution-sdk/evolution";
 
 function validateNetwork(
   addressString: string,
   expectedNetwork: "mainnet" | "testnet"
 ): boolean {
   try {
-    const details = AddressDetails.fromBech32(addressString);
+    const address = Core.Address.fromBech32(addressString);
     const expectedNetworkId = expectedNetwork === "mainnet" ? 1 : 0;
     
-    if (details.networkId !== expectedNetworkId) {
+    if (address.networkId !== expectedNetworkId) {
       console.error(
-        `Wrong network: expected ${expectedNetwork}, got ${details.networkId === 1 ? "mainnet" : "testnet"}`
+        `Wrong network: expected ${expectedNetwork}, got ${address.networkId === 1 ? "mainnet" : "testnet"}`
       );
       return false;
     }
@@ -80,21 +62,21 @@ function validateNetwork(
 }
 
 // Usage
-const isValid = validateNetwork("addr1qx...", "mainnet"); // true
-const isInvalid = validateNetwork("addr_test1...", "mainnet"); // false
+const isValid = validateNetwork("addr1qx2kd28nq8ac5prwg32hhvudlwggpgfp8utlyqxu6wqgz62f79qsdmm5dsknt9ecr5w468r9ey0fxwkdrwh08ly3tu9sy0f4qd", "mainnet"); // true
+const isInvalid = validateNetwork("addr_test1qz...", "mainnet"); // false
 ```
 
-## Address Type Validation
+## Address Type Checking
 
-Check if an address is a specific type:
+Check if an address has staking credentials:
 
 ```typescript twoslash
-import { AddressDetails } from "@evolution-sdk/evolution";
+import { Core } from "@evolution-sdk/evolution";
 
-function isBaseAddress(addressString: string): boolean {
+function hasStakingCredential(addressString: string): boolean {
   try {
-    const details = AddressDetails.fromBech32(addressString);
-    return details.type === "BaseAddress";
+    const address = Core.Address.fromBech32(addressString);
+    return Core.Address.hasStakingCredential(address);
   } catch {
     return false;
   }
@@ -102,177 +84,30 @@ function isBaseAddress(addressString: string): boolean {
 
 function isEnterpriseAddress(addressString: string): boolean {
   try {
-    const details = AddressDetails.fromBech32(addressString);
-    return details.type === "EnterpriseAddress";
+    const address = Core.Address.fromBech32(addressString);
+    return Core.Address.isEnterprise(address);
   } catch {
     return false;
   }
 }
 
 // Usage
-console.log(isBaseAddress("addr1qx...")); // true if has staking credential
-console.log(isEnterpriseAddress("addr1vx...")); // true if no staking credential
+console.log(hasStakingCredential("addr1qx...")); // true for base addresses
+console.log(isEnterpriseAddress("addr1vx...")); // true for enterprise addresses
 ```
-
-## Credential Type Validation
-
-Verify credential types (key hash vs script hash):
-
-```typescript twoslash
-import { AddressDetails, BaseAddress } from "@evolution-sdk/evolution";
-
-function hasScriptCredential(addressString: string): boolean {
-  try {
-    const details = AddressDetails.fromBech32(addressString);
-    const addr = details.address;
-    
-    if (addr._tag === "BaseAddress" || addr._tag === "EnterpriseAddress") {
-      const hasScriptPayment = addr.paymentCredential._tag === "ScriptHash";
-      const hasScriptStaking = 
-        addr._tag === "BaseAddress" && addr.stakeCredential._tag === "ScriptHash";
-      
-      return hasScriptPayment || hasScriptStaking;
-    }
-    
-    return false;
-  } catch {
-    return false;
-  }
-}
-
-function isFullyKeyBased(addressString: string): boolean {
-  try {
-    const details = AddressDetails.fromBech32(addressString);
-    const addr = details.address;
-    
-    if (addr._tag === "BaseAddress" || addr._tag === "EnterpriseAddress") {
-      const hasKeyPayment = addr.paymentCredential._tag === "KeyHash";
-      const hasKeyStaking = 
-        addr._tag === "EnterpriseAddress" || 
-        addr.stakeCredential._tag === "KeyHash";
-      
-      return hasKeyPayment && hasKeyStaking;
-    }
-    
-    return false;
-  } catch {
-    return false;
-  }
-}
-```
-
-## Comprehensive Validation Function
-
-Combine multiple checks into a comprehensive validator:
-
-```typescript twoslash
-import { AddressDetails } from "@evolution-sdk/evolution";
-
-interface ValidationResult {
-  valid: boolean;
-  errors: string[];
-  warnings: string[];
-  details?: AddressDetails.AddressDetails;
-}
-
-function comprehensiveValidation(
-  addressString: string,
-  options?: {
-    expectedNetwork?: "mainnet" | "testnet";
-    requireStaking?: boolean;
-    allowScripts?: boolean;
-  }
-): ValidationResult {
-  const result: ValidationResult = {
-    valid: true,
-    errors: [],
-    warnings: []
-  };
-  
-  // Parse address
-  try {
-    const details = AddressDetails.fromBech32(addressString);
-    result.details = details;
-    
-    // Network validation
-    if (options?.expectedNetwork) {
-      const expectedId = options.expectedNetwork === "mainnet" ? 1 : 0;
-      if (details.networkId !== expectedId) {
-        result.valid = false;
-        result.errors.push(
-          `Wrong network: expected ${options.expectedNetwork}, got ${details.networkId === 1 ? "mainnet" : "testnet"}`
-        );
-      }
-    }
-    
-    // Staking validation
-    if (options?.requireStaking && details.type !== "BaseAddress") {
-      result.valid = false;
-      result.errors.push("Address must have staking credential");
-    }
-    
-    // Script validation
-    if (!options?.allowScripts) {
-      const addr = details.address;
-      if (addr._tag === "BaseAddress" || addr._tag === "EnterpriseAddress") {
-        const hasScript = 
-          addr.paymentCredential._tag === "ScriptHash" ||
-          (addr._tag === "BaseAddress" && addr.stakeCredential._tag === "ScriptHash");
-        
-        if (hasScript) {
-          result.warnings.push("Address contains script credentials");
-        }
-      }
-    }
-    
-  } catch (error) {
-    result.valid = false;
-    result.errors.push(`Invalid address format: ${error}`);
-  }
-  
-  return result;
-}
-
-// Usage
-const validation = comprehensiveValidation("addr1qx...", {
-  expectedNetwork: "mainnet",
-  requireStaking: true,
-  allowScripts: false
-});
-
-if (!validation.valid) {
-  console.error("Validation errors:", validation.errors);
-}
-
-if (validation.warnings.length > 0) {
-  console.warn("Validation warnings:", validation.warnings);
-}
-```
-
-## Best Practices
-
-**Always Validate External Input**: Never trust addresses from external sources without validation.
-
-**Check Network**: Sending to wrong network results in permanent loss of funds.
-
-**Handle Errors Gracefully**: Provide clear error messages to users about what went wrong.
-
-**Validate Before Transactions**: Always validate addresses before including them in transactions.
-
-**Consider Script Addresses**: Script addresses have complex spending conditions. Ensure users understand before sending funds.
 
 ## Common Validation Scenarios
 
 ### User Input Validation
 
 ```typescript twoslash
-import { Address } from "@evolution-sdk/evolution";
+import { Core } from "@evolution-sdk/evolution";
 
 function validateUserInput(input: string): string | null {
   const trimmed = input.trim();
   
   try {
-    Address.fromBech32(trimmed);
+    Core.Address.fromBech32(trimmed);
     return trimmed;
   } catch (error) {
     alert("Invalid address format. Please check and try again.");
@@ -284,7 +119,7 @@ function validateUserInput(input: string): string | null {
 ### Bulk Validation
 
 ```typescript twoslash
-import { Address } from "@evolution-sdk/evolution";
+import { Core } from "@evolution-sdk/evolution";
 
 function validateMany(addresses: string[]): {
   valid: string[];
@@ -295,7 +130,7 @@ function validateMany(addresses: string[]): {
   
   for (const addr of addresses) {
     try {
-      Address.fromBech32(addr);
+      Core.Address.fromBech32(addr);
       valid.push(addr);
     } catch (error) {
       invalid.push({ address: addr, error: String(error) });
@@ -306,19 +141,8 @@ function validateMany(addresses: string[]): {
 }
 ```
 
-## Security Considerations
-
-**Network Mismatch Prevention**: Always validate network ID to prevent sending testnet transactions on mainnet or vice versa.
-
-**Format Verification**: Validate address format before using in transactions to prevent errors.
-
-**User Education**: Inform users about the importance of double-checking addresses before sending funds.
-
-**Transaction Review**: Show users the decoded address structure during transaction review.
-
 ## Next Steps
 
-- [Address Conversion](/docs/addresses/conversion) - Format transformations
-- [Base Addresses](/docs/addresses/base) - Understanding base addresses
-- [Enterprise Addresses](/docs/addresses/enterprise) - Enterprise address format
-- [Transactions](/docs/transactions) - Using validated addresses in transactions
+- **[Address Conversion](/docs/addresses/conversion)** - Transform between Bech32, hex, and byte formats
+- **[Address Types](/docs/addresses/address-types)** - Overview of all Cardano address types
+- **[Core Concepts](/docs/addresses/core-concepts)** - Understanding the two-layer architecture

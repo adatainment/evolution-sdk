@@ -2,10 +2,8 @@
   "title": "Addresses",
   "pages": [
     "index",
-    "base",
-    "enterprise",
-    "reward",
-    "pointer",
+    "core-concepts",
+    "address-types",
     "franken",
     "construction",
     "conversion",

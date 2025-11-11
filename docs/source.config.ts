@@ -27,13 +27,7 @@ export default defineConfig({
       transformers: [
         ...(rehypeCodeDefaultOptions.transformers ?? []),
         transformerTwoslash({
-          typesCache: createFileSystemTypesCache(),
-          // Reduce memory by limiting TypeScript's work
-          twoslashOptions: {
-            compilerOptions: {
-              skipLibCheck: true,
-            }
-          }
+          typesCache: createFileSystemTypesCache()
         })
       ]
     }

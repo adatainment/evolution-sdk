@@ -36,10 +36,10 @@ Mnemonics provide human-friendly backup and recovery. The same 24 words reconstr
 Use the SDK to generate a cryptographically secure 24-word mnemonic:
 
 ```typescript twoslash
-import { PrivateKey } from "@evolution-sdk/evolution";
+import { Core } from "@evolution-sdk/evolution";
 
 // Generate 24-word mnemonic (256-bit entropy)
-const mnemonic = PrivateKey.generateMnemonic();
+const mnemonic = Core.PrivateKey.generateMnemonic();
 console.log(mnemonic);
 // Example output: "abandon abandon abandon ... art art art"
 ```

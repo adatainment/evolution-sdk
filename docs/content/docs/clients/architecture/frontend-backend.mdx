@@ -81,7 +81,7 @@ Backend services use read-only clients configured with user addresses to build u
 **Cannot Do**: Sign transactions, access private keys
 
 ```typescript twoslash
-import { createClient, Transaction } from "@evolution-sdk/evolution";
+import { createClient, Core } from "@evolution-sdk/evolution";
 
 export async function buildTransaction(userAddress: string) {
   // Create read-only client with user's address
@@ -108,7 +108,7 @@ export async function buildTransaction(userAddress: string) {
   // Build and return unsigned transaction
   const result = await builder.build();
   const unsignedTx = await result.toTransaction();
-  const txCbor = Transaction.toCBORHex(unsignedTx);
+  const txCbor = Core.Transaction.toCBORHex(unsignedTx);
 
   return { txCbor };
 }
@@ -186,7 +186,7 @@ async function sendPayment(recipientAddress: string, lovelace: bigint) {
 
 // @filename: backend.ts
 // ===== Backend (Server) =====
-import { createClient, Transaction } from "@evolution-sdk/evolution";
+import { createClient, Core } from "@evolution-sdk/evolution";
 import type { BuildPaymentResponse } from "./shared";
 
 export async function buildPayment(
@@ -218,7 +218,7 @@ export async function buildPayment(
   // Return unsigned CBOR for frontend to sign
   const result = await builder.build();
   const unsignedTx = await result.toTransaction();
-  const txCbor = Transaction.toCBORHex(unsignedTx);
+  const txCbor = Core.Transaction.toCBORHex(unsignedTx);
 
   return { txCbor };
 }
@@ -337,7 +337,7 @@ const result = await builder.build();
 const unsignedTx = await result.toTransaction();
 
 // Return to frontend for signing
-return { txCbor: Transaction.toCBORHex(unsignedTx) };
+return { txCbor: Core.Transaction.toCBORHex(unsignedTx) };
 ```
 
 ---

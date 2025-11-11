@@ -81,16 +81,17 @@ export const executeBalance = (): Effect.Effect<
     // Calculate total change assets
     const changeAssets = buildCtx.changeOutputs.reduce(
       (acc, output) => Assets.merge(acc, output.assets),
-      { lovelace: 0n } as Assets.Assets
+      Assets.empty()
     )
 
     // Delta = inputs - outputs - change - fee
     let delta = Assets.subtract(inputAssets, outputAssets)
     delta = Assets.subtract(delta, changeAssets)
-    delta = { ...delta, lovelace: delta.lovelace - buildCtx.calculatedFee }
+    delta = Assets.subtractLovelace(delta, buildCtx.calculatedFee)
 
     // Check if balanced: lovelace must be exactly 0 and all native assets must be 0
-    const isBalanced = delta.lovelace === 0n
+    const deltaLovelace = Assets.getLovelace(delta)
+    const isBalanced = deltaLovelace === 0n
 
     yield* Effect.logDebug(
       `[Balance] Inputs: ${formatAssetsForLog(inputAssets)}, ` +
@@ -130,8 +131,6 @@ export const executeBalance = (): Effect.Effect<
     }
 
     // Step 5: Handle imbalance (excess or shortfall)
-    const deltaLovelace = delta.lovelace
-
     // Excess: inputs > outputs + change + fee
     if (deltaLovelace > 0n) {
       // Check if this is expected from burn strategy
@@ -159,8 +158,7 @@ export const executeBalance = (): Effect.Effect<
 
         // Merge delta into target output
         const targetOutput = outputs[drainToIndex]
-        const newLovelace = targetOutput.assets.lovelace + deltaLovelace
-        const newAssets = { ...targetOutput.assets, lovelace: newLovelace }
+        const newAssets = Assets.addLovelace(targetOutput.assets, deltaLovelace)
         const updatedOutput = { ...targetOutput, assets: newAssets }
 
         // Update outputs
@@ -170,7 +168,7 @@ export const executeBalance = (): Effect.Effect<
         // Recalculate totalOutputAssets
         const newTotalOutputAssets = newOutputs.reduce(
           (acc, output) => Assets.merge(acc, output.assets),
-          { lovelace: 0n } as Assets.Assets
+          Assets.empty()
         )
 
         yield* Ref.update(ctx, (s) => ({
@@ -181,7 +179,7 @@ export const executeBalance = (): Effect.Effect<
 
         yield* Effect.logDebug(
           `[Balance] DrainTo mode: Merged ${deltaLovelace} lovelace into output[${drainToIndex}]. ` +
-            `New output value: ${newLovelace}. Transaction balanced.`
+            `New output value: ${Assets.getLovelace(newAssets)}. Transaction balanced.`
         )
         return { next: "complete" as const }
       } else if (isBurnMode) {

@@ -1,11 +1,11 @@
 ---
 title: Address Conversion
-description: Convert between different address formats using Core AddressStructure
+description: Convert between different address formats using Core Address module
 ---
 
 # Address Conversion
 
-The Core `AddressStructure` module provides transformations between different address representations: Bech32 strings, hexadecimal, and raw bytes.
+The Core `Address` module provides transformations between different address representations: Bech32 strings, hexadecimal, and raw bytes.
 
 ## Available Formats
 
@@ -27,124 +27,80 @@ Binary format (Uint8Array), used internally and for serialization.
 
 ## Conversion Examples
 
-### Bech32 ↔ AddressStructure
+### Bech32 ↔ Address
 
 ```typescript twoslash
-import { Address, BaseAddress } from "@evolution-sdk/evolution";
+import { Core } from "@evolution-sdk/evolution";
 
 const bech32 = "addr1qx2kd28nq8ac5prwg32hhvudlwggpgfp8utlyqxu6wqgz62f79qsdmm5dsknt9ecr5w468r9ey0fxwkdrwh08ly3tu9sy0f4qd";
 
 // Parse Bech32 string to address
-const address = Address.fromBech32(bech32) as BaseAddress.BaseAddress;
+const address = Core.Address.fromBech32(bech32);
 
 console.log("Network ID:", address.networkId);
 console.log("Payment credential:", address.paymentCredential);
-console.log("Staking credential:", address.stakeCredential);
+console.log("Staking credential:", address.stakingCredential);
 
 // Convert address back to Bech32
-const encoded = Address.toBech32(address);
+const encoded = Core.Address.toBech32(address);
 console.log("Bech32:", encoded);
 // Same as original: addr1qx2kd28nq8ac5prwg32hhvudlwggpgfp8utlyqxu6wqgz62f79qsdmm5dsknt9ecr5w468r9ey0fxwkdrwh08ly3tu9sy0f4qd
 ```
 
-### Hex ↔ AddressStructure
+### Hex ↔ Address
 
 ```typescript twoslash
-import { Address } from "@evolution-sdk/evolution";
+import { Core } from "@evolution-sdk/evolution";
 
 const hexAddress = "019493315cd92eb5d8c4304e67b7e16ae36d61d34502694657811a2c8e32c728d3861e164cab28cb8f006448139c8f1740ffb8e7aa9e5232dc";
 
 // Parse hex to address
-const address = Address.fromHex(hexAddress);
+const address = Core.Address.fromHex(hexAddress);
 
 console.log("Parsed from hex:", address);
 
 // Convert address to hex
-const hex = Address.toHex(address);
+const hex = Core.Address.toHex(address);
 console.log("Hex:", hex);
 ```
 
-### Bytes ↔ AddressStructure
+### Bytes ↔ Address
 
 ```typescript twoslash
-import { BaseAddress, KeyHash, Address } from "@evolution-sdk/evolution";
+import { Core } from "@evolution-sdk/evolution";
 
 // Create an address structure
-const address = new BaseAddress.BaseAddress({
+const address = new Core.Address.Address({
   networkId: 1,
-  paymentCredential: new KeyHash.KeyHash({
+  paymentCredential: new Core.KeyHash.KeyHash({
     hash: new Uint8Array(28)
   }),
-  stakeCredential: new KeyHash.KeyHash({
+  stakingCredential: new Core.KeyHash.KeyHash({
     hash: new Uint8Array(28)
   })
 });
 
 // Convert to raw bytes
-const bytes = Address.toBytes(address);
+const bytes = Core.Address.toBytes(address);
 console.log("Bytes length:", bytes.length); // 57 for base address
 
 // Parse from bytes
-const decoded = Address.fromBytes(bytes);
+const decoded = Core.Address.fromBytes(bytes);
 console.log("Decoded:", decoded);
 ```
-
-## Chain Conversions
-
-Combine transformations for multi-step conversions:
-
-### Bech32 → Hex
-
-```typescript twoslash
-import { Address } from "@evolution-sdk/evolution";
-
-const bech32 = "addr_test1qz2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzer3jcu5d8ps7zex2k2xt3uqxgjqnnj83ws8lhrn648jjxtwq2ytjqp";
-
-// Parse from Bech32
-const address = Address.fromBech32(bech32);
-
-// Convert to hex
-const hex = Address.toHex(address);
-console.log("Hex:", hex);
-```
-
-### Hex → Bech32
-
-```typescript twoslash
-import { Address } from "@evolution-sdk/evolution";
-
-const hex = "009493315cd92eb5d8c4304e67b7e16ae36d61d34502694657811a2c8e32c728d3861e164cab28cb8f006448139c8f1740ffb8e7aa9e5232dc";
-
-// Parse from hex
-const address = Address.fromHex(hex);
-
-// Convert to Bech32
-const bech32 = Address.toBech32(address);
-console.log("Bech32:", bech32);
-```
-
-## Best Practices
-
-**Use Bech32 for Display**: Always show users Bech32-encoded addresses. They're human-readable and include error detection.
-
-**Use Bytes Internally**: For storage and serialization, raw bytes are most efficient.
-
-**Validate After Conversion**: Always validate addresses after parsing from external sources.
-
-**Network Awareness**: Verify the network ID matches your expected environment (mainnet vs testnet).
 
 ## Error Handling
 
 Conversions can fail with invalid input:
 
 ```typescript twoslash
-import { Address } from "@evolution-sdk/evolution";
+import { Core } from "@evolution-sdk/evolution";
 
 const invalidBech32 = "invalid_address";
 
 // Error handling with try-catch
 try {
-  const address = Address.fromBech32(invalidBech32);
+  const address = Core.Address.fromBech32(invalidBech32);
   console.log("Parsed address:", address);
 } catch (error) {
   console.error("Failed to parse address:", error);
@@ -153,7 +109,6 @@ try {
 
 ## Next Steps
 
-- [Address Validation](/docs/addresses/validation) - Verify address correctness
-- [Address Construction](/docs/addresses/construction) - Build addresses from scratch
-- [Base Addresses](/docs/addresses/base) - Understanding base address structure
-- [Enterprise Addresses](/docs/addresses/enterprise) - Enterprise address format
+- **[Address Validation](/docs/addresses/validation)** - Verify address correctness and handle errors
+- **[Address Types](/docs/addresses/address-types)** - Overview of all Cardano address types
+- **[Core Concepts](/docs/addresses/core-concepts)** - Understanding the two-layer architecture

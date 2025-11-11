@@ -1,23 +1,24 @@
 ---
 title: Franken Addresses
-description: Hybrid addresses combining payment and stake credentials from different sources
+description: A pattern for combining payment and stake credentials from different sources
 ---
 
-# Franken Addresses (Hybrid Addresses)
+# Franken Addresses (Hybrid Pattern)
 
+> **Important**: Franken addresses are **not a separate address type**. They are simply Base addresses where the payment and stake credentials happen to come from different sources. This is a construction pattern, not a distinct address format.
 
-Franken addresses (also called Frankenstein or chimera addresses) are base addresses where the payment credential and stake credential come from **different sources**. They're "assembled" from independent keys, like Frankenstein's monster.
+Franken addresses (also called Frankenstein or chimera addresses) are a way of constructing base addresses where the payment credential and stake credential are **cryptographically independent** - they come from different wallets, smart contracts, or key sources.
 
-## Structure
+## What They Really Are
 
 ```
-Franken Address = Payment Credential (Source A) + Stake Credential (Source B)
+Franken "Address" = Base Address with Independent Credentials
+                 = Payment Credential (Source A) + Stake Credential (Source B)
 ```
 
-**Payment Credential**: From one source - key hash or script hash (controls spending)  
-**Stake Credential**: From different source - key hash or script hash (controls delegation)
-
-The key insight: these credentials are cryptographically independent. Controlling one doesn't give you control over the other. Each credential can be either a key hash or a script hash.
+**On-chain**: These look exactly like regular base addresses (57 bytes, same header, same format)  
+**Wallets**: See them as normal base addresses - no special handling needed  
+**The "Trick"**: The payment and stake credentials don't share a common derivation path or master key
 
 ## Key Properties
 
@@ -26,13 +27,13 @@ The key insight: these credentials are cryptographically independent. Controllin
 **Standard Format**: Still a valid base address - wallets see it as normal  
 **Separate Security**: Compromise of one key doesn't affect the other
 
-## Script Hash Compatibility
+## Credential Combinations
 
-Franken addresses support **both key hashes and script hashes** for payment and stake credentials, enabling many powerful combinations:
+This pattern works with **any combination of key hashes and script hashes** for payment and stake credentials:
 
 | Payment Credential | Stake Credential | Use Case |
 |-------------------|------------------|----------|
-| **Key Hash** | **Key Hash** | Traditional Franken: two different wallets |
+| **Key Hash** | **Key Hash** | Traditional pattern: two different wallets |
 | **Script Hash** | **Key Hash** | Smart contract funds + individual staking control |
 | **Key Hash** | **Script Hash** | Individual payment + DAO-controlled delegation |
 | **Script Hash** | **Script Hash** | Full smart contract control with separation |
@@ -40,202 +41,67 @@ Franken addresses support **both key hashes and script hashes** for payment and 
 **Examples:**
 - **Payment: Script, Stake: Key** - Multi-sig treasury where funds require multiple signatures, but delegation is controlled by a single administrator
 - **Payment: Key, Stake: Script** - Individual controls funds, but staking/delegation follows governance decisions (e.g., DAO votes on pool selection)
-- **Payment: Script A, Stake: Script B** - Different smart contracts control spending vs staking logic (e.g., timelock for payments, voting contract for delegation)
+- **Payment: Script A, Stake: Script B** - Different smart contracts control spending vs staking logic (e.g., time-locked payments, voting contract for delegation)
 
-This flexibility makes Franken addresses ideal for complex custody arrangements, DeFi protocols, and governance systems.
+This flexibility makes the pattern ideal for complex custody arrangements, DeFi protocols, and governance systems.
 
 ## Construction
 
 ### Building Franken Addresses with Core Module
 
-Build directly from two independent key hashes using Core `AddressStructure`:
+Build directly from two independent key hashes using the Core `Address` class:
 
-```typescript
-import { BaseAddress, KeyHash, Address } from "@evolution-sdk/evolution";
+```typescript twoslash
+import { Core } from "@evolution-sdk/evolution";
 
 // Create Franken address with payment from Wallet A, stake from Wallet B
-const frankenAddress = new BaseAddress.BaseAddress({
+const frankenAddress = new Core.Address.Address({
   networkId: 1, // mainnet
-  paymentCredential: new KeyHash.KeyHash({
+  paymentCredential: new Core.KeyHash.KeyHash({
     hash: new Uint8Array(28) // Wallet A's payment key hash
   }),
-  stakeCredential: new KeyHash.KeyHash({
+  stakingCredential: new Core.KeyHash.KeyHash({
     hash: new Uint8Array(28) // Wallet B's stake key hash (different!)
   })
 });
 
 // Convert to Bech32
-const bech32 = Address.toBech32(frankenAddress);
+const bech32 = Core.Address.toBech32(frankenAddress);
 console.log("Franken address:", bech32);
 ```
 
-### Method 2: From Independent Wallets
+## Example Use Case: Custodial Platform
 
-Create from two separate wallet key hashes:
+A common use case is a custodial platform where the platform controls fund management, but users retain control over staking delegation:
 
-```typescript
-import { BaseAddress } from "@evolution-sdk/evolution";
+```typescript twoslash
+import { Core } from "@evolution-sdk/evolution";
 
-// Payment key hash from Wallet A (e.g., from hardware wallet)
-const walletAPaymentHash = "a".repeat(56);
-
-// Stake key hash from Wallet B (e.g., from hot wallet)
-const walletBStakeHash = "b".repeat(56);
-
-// Create Franken address combining both
-const frankenAddress = BaseAddress.make({
-  _tag: "BaseAddress" as const,
-  networkId: 1,
-  paymentCredential: {
-    _tag: "KeyHash" as const,
-    hash: walletAPaymentHash
-  },
-  stakeCredential: {
-    _tag: "KeyHash" as const,
-    hash: walletBStakeHash
-  }
-});
-
-console.log("Franken address:", frankenAddress);
-// addr1... (combines credentials from both wallets)
-```
-
-## Use Cases
-
-### Custodial Platform
-
-Platform controls funds, users control delegation:
-
-```typescript
-import { BaseAddress } from "@evolution-sdk/evolution";
-
+// Platform controls spending (payment credential)
+// User controls delegation (stake credential)
 function createCustodialAddress(
-  platformPaymentKeyHash: string,
-  userStakeKeyHash: string
+  platformPaymentHash: Uint8Array,
+  userStakeHash: Uint8Array
 ) {
-  // Platform controls spending (payment key)
-  // User controls delegation (stake key)
-  return BaseAddress.make({
-    _tag: "BaseAddress" as const,
+  return new Core.Address.Address({
     networkId: 1,
-    paymentCredential: {
-      _tag: "KeyHash" as const,
-      hash: platformPaymentKeyHash
-    },
-    stakeCredential: {
-      _tag: "KeyHash" as const,
-      hash: userStakeKeyHash
-    }
+    paymentCredential: new Core.KeyHash.KeyHash({
+      hash: platformPaymentHash
+    }),
+    stakingCredential: new Core.KeyHash.KeyHash({
+      hash: userStakeHash
+    })
   });
 }
+
+// Usage: Platform derives payment key, user provides their stake key
+// Result: Platform can manage funds, user can delegate to their chosen stake pool
 ```
 
-### Multi-Signature Treasury
-
-Script for payments, key for delegation:
-
-```typescript
-import { BaseAddress, ScriptHash, KeyHash } from "@evolution-sdk/evolution";
-
-// Multi-sig script for payments, individual stake key for delegation
-const frankenAddr = new BaseAddress.BaseAddress({
-  networkId: 1,
-  paymentCredential: new ScriptHash.ScriptHash({
-    hash: new Uint8Array(28) // Multi-sig script hash
-  }),
-  stakeCredential: new KeyHash.KeyHash({
-    hash: new Uint8Array(28) // Administrator's stake key
-  })
-});
-```
-
-### DAO with Governance Staking
-
-Payment controlled by governance, staking follows community votes:
-
-```typescript
-import { BaseAddress, ScriptHash } from "@evolution-sdk/evolution";
-
-// DAO governance script for both payment and staking
-const daoAddress = new BaseAddress.BaseAddress({
-  networkId: 1,
-  paymentCredential: new ScriptHash.ScriptHash({
-    hash: new Uint8Array(28) // DAO treasury script
-  }),
-  stakeCredential: new ScriptHash.ScriptHash({
-    hash: new Uint8Array(28) // Delegation voting script
-  })
-});
-```
-
-## Security Model
-
-### Threat Analysis
-
-| Scenario | Impact |
-|----------|--------|
-| Payment key compromised | ❌ Attacker can spend funds |
-| Stake key compromised | ⚠️ Attacker can change delegation, withdraw rewards |
-| Both keys compromised | ❌ Full control lost |
-| One party malicious | ✅ Other party's rights preserved |
-
-### Best Practices
-
-**Clear Ownership**: Document who controls which credential. Avoid confusion about spending vs delegation authority.
-
-**Key Backup**: Each party must backup their respective key independently. Loss of either key has different consequences.
-
-**Reward Handling**: Clarify who can withdraw rewards (stake key holder). This is separate from spending funds.
-
-**Communication**: Parties should coordinate on delegation strategy if rewards are shared.
-
-## Reward Distribution
-
-Rewards accumulate at the stake credential's reward address:
-
-```typescript
-import { RewardAccount } from "@evolution-sdk/evolution";
-
-// The stake credential holder controls rewards
-const rewardAddress = RewardAccount.make({
-  _tag: "RewardAccount" as const,
-  networkId: 1,
-  stakeCredential: {
-    _tag: "KeyHash" as const,
-    hash: "1".repeat(56) // Stake key from Franken address
-  }
-});
-
-// Stake key holder can withdraw rewards to any address
-// Payment key holder cannot access rewards directly
-```
-
-## Verification
-
-Check if an address is a Franken address:
-
-```typescript
-import { Address } from "@evolution-sdk/evolution";
-
-function isFrankenAddress(addressBech32: string): boolean {
-  const parsed = Address.fromBech32(addressBech32);
-  
-  if (parsed._tag !== "BaseAddress") {
-    return false; // Not even a base address
-  }
-  
-  // A Franken address has independent payment and stake credentials
-  // In practice, you'd check if they come from different derivation paths
-  // or different master keys based on your application logic
-  
-  console.log("Payment credential:", parsed.paymentCredential);
-  console.log("Stake credential:", parsed.stakeCredential);
-  
-  // Your application logic to verify independence goes here
-  // For example: check if credentials come from different derivation paths
-  return true; // Simplified example
-}
-```
+**Benefits of this pattern:**
+- Platform can manage funds without controlling user's staking rewards
+- Users retain autonomy over delegation decisions
+- Clear separation of responsibilities
 
 ## Limitations
 
@@ -249,6 +115,5 @@ function isFrankenAddress(addressBech32: string): boolean {
 
 ## Next Steps
 
-- **[Base Addresses](/docs/addresses/base)** - Understanding the standard format
-- **[Address Construction](/docs/addresses/construction)** - Manual building techniques
+- **[Base Addresses](/docs/addresses/address-types/base)** - Understanding the underlying base address format
 - **[Validation](/docs/addresses/validation)** - Verifying address structure

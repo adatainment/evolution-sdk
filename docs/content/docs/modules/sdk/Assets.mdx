@@ -10,8 +10,22 @@ parent: Modules
 
 <h2 className="text-delta">Table of contents</h2>
 
+- [conversion](#conversion)
+  - [fromMint](#frommint)
+  - [fromValue](#fromvalue)
+  - [toMint](#tomint)
+  - [toValue](#tovalue)
+- [helpers](#helpers)
+  - [addLovelace](#addlovelace)
+  - [getLovelace](#getlovelace)
+  - [setLovelace](#setlovelace)
+  - [subtractLovelace](#subtractlovelace)
+- [schemas](#schemas)
+  - [MintFromAssets](#mintfromassets)
+  - [ValueFromAssets](#valuefromassets)
 - [utils](#utils)
-  - [Assets (interface)](#assets-interface)
+  - [Assets (type alias)](#assets-type-alias)
+  - [AssetsSchema](#assetsschema)
   - [add](#add)
   - [assetsToValue](#assetstovalue)
   - [empty](#empty)
@@ -31,17 +45,181 @@ parent: Modules
 
 ---
 
-# utils
+# conversion
 
-## Assets (interface)
+## fromMint
+
+Convert Core Mint to SDK Assets format (without lovelace).
 
 **Signature**
 
 ```ts
-export interface Assets {
-  lovelace: bigint
-  [key: string]: bigint
-}
+export declare const fromMint: (
+  a: Map<CorePolicyId.PolicyId, Map<AssetName.AssetName, bigint>>,
+  overrideOptions?: ParseOptions
+) => { readonly lovelace?: bigint | undefined } & { readonly [x: string]: bigint }
+```
+
+Added in v2.0.0
+
+## fromValue
+
+Convert Core Value to SDK Assets format.
+
+**Signature**
+
+```ts
+export declare const fromValue: (
+  a: CoreValue.OnlyCoin | CoreValue.WithAssets,
+  overrideOptions?: ParseOptions
+) => { readonly lovelace?: bigint | undefined } & { readonly [x: string]: bigint }
+```
+
+Added in v2.0.0
+
+## toMint
+
+Convert SDK Assets to Core Mint (lovelace key will be rejected).
+
+**Signature**
+
+```ts
+export declare const toMint: (
+  i: { readonly lovelace?: bigint | undefined } & { readonly [x: string]: bigint },
+  overrideOptions?: ParseOptions
+) => Map<CorePolicyId.PolicyId, Map<AssetName.AssetName, bigint>>
+```
+
+Added in v2.0.0
+
+## toValue
+
+Convert SDK Assets to Core Value.
+
+**Signature**
+
+```ts
+export declare const toValue: (
+  i: { readonly lovelace?: bigint | undefined } & { readonly [x: string]: bigint },
+  overrideOptions?: ParseOptions
+) => CoreValue.OnlyCoin | CoreValue.WithAssets
+```
+
+Added in v2.0.0
+
+# helpers
+
+## addLovelace
+
+Add a lovelace amount to Assets.
+
+**Signature**
+
+```ts
+export declare const addLovelace: (assets: Assets, amount: bigint) => Assets
+```
+
+Added in v2.0.0
+
+## getLovelace
+
+Get the lovelace amount from Assets, defaulting to 0n if undefined.
+
+**Signature**
+
+```ts
+export declare const getLovelace: (assets: Assets) => bigint
+```
+
+Added in v2.0.0
+
+## setLovelace
+
+Set the lovelace amount in Assets.
+
+**Signature**
+
+```ts
+export declare const setLovelace: (assets: Assets, amount: bigint) => Assets
+```
+
+Added in v2.0.0
+
+## subtractLovelace
+
+Subtract a lovelace amount from Assets.
+
+**Signature**
+
+```ts
+export declare const subtractLovelace: (assets: Assets, amount: bigint) => Assets
+```
+
+Added in v2.0.0
+
+# schemas
+
+## MintFromAssets
+
+Transform between Assets (SDK-friendly) and Mint (Core).
+
+**Signature**
+
+```ts
+export declare const MintFromAssets: Schema.transformOrFail<
+  Schema.extend<
+    Schema.Struct<{ lovelace: Schema.optional<typeof Schema.BigIntFromSelf> }>,
+    Schema.Record$<typeof Schema.String, typeof Schema.BigIntFromSelf>
+  >,
+  Schema.SchemaClass<
+    Map<CorePolicyId.PolicyId, Map<AssetName.AssetName, bigint>>,
+    Map<CorePolicyId.PolicyId, Map<AssetName.AssetName, bigint>>,
+    never
+  >,
+  never
+>
+```
+
+Added in v2.0.0
+
+## ValueFromAssets
+
+Transform between Assets (SDK-friendly) and Value (Core).
+
+**Signature**
+
+```ts
+export declare const ValueFromAssets: Schema.transformOrFail<
+  Schema.extend<
+    Schema.Struct<{ lovelace: Schema.optional<typeof Schema.BigIntFromSelf> }>,
+    Schema.Record$<typeof Schema.String, typeof Schema.BigIntFromSelf>
+  >,
+  Schema.SchemaClass<CoreValue.OnlyCoin | CoreValue.WithAssets, CoreValue.OnlyCoin | CoreValue.WithAssets, never>,
+  never
+>
+```
+
+Added in v2.0.0
+
+# utils
+
+## Assets (type alias)
+
+**Signature**
+
+```ts
+export type Assets = typeof AssetsSchema.Type
+```
+
+## AssetsSchema
+
+**Signature**
+
+```ts
+export declare const AssetsSchema: Schema.extend<
+  Schema.Struct<{ lovelace: Schema.optional<typeof Schema.BigIntFromSelf> }>,
+  Schema.Record$<typeof Schema.String, typeof Schema.BigIntFromSelf>
+>
 ```
 
 ## add

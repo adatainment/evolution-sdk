@@ -1,6 +1,6 @@
 ---
 title: core/KeyHash.ts
-nav_order: 60
+nav_order: 59
 parent: Modules
 ---
 
@@ -200,7 +200,7 @@ Added in v2.0.0
 **Signature**
 
 ```ts
-toJSON(): string
+toJSON()
 ```
 
 ### toString (method)

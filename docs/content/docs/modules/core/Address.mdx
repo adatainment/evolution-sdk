@@ -1,10 +1,10 @@
 ---
-title: core/AddressStructure.ts
-nav_order: 3
+title: core/Address.ts
+nav_order: 1
 parent: Modules
 ---
 
-## AddressStructure overview
+## Address overview
 
 Added in v1.0.0
 
@@ -17,7 +17,7 @@ Added in v1.0.0
 - [Functions](#functions)
   - [fromBech32](#frombech32)
 - [Schema](#schema)
-  - [AddressStructure (class)](#addressstructure-class)
+  - [Address (class)](#address-class)
     - [toString (method)](#tostring-method)
     - [[Symbol.for("nodejs.util.inspect.custom")] (method)](#symbolfornodejsutilinspectcustom-method)
 - [Transformations](#transformations)
@@ -30,7 +30,7 @@ Added in v1.0.0
   - [hasStakingCredential](#hasstakingcredential)
   - [isEnterprise](#isenterprise)
 - [utils](#utils-1)
-  - [AddressStructureError (class)](#addressstructureerror-class)
+  - [AddressError (class)](#addresserror-class)
   - [Either (namespace)](#either-namespace)
   - [fromBytes](#frombytes-1)
   - [fromHex](#fromhex-1)
@@ -49,7 +49,7 @@ FastCheck arbitrary generator for testing
 **Signature**
 
 ```ts
-export declare const arbitrary: FastCheck.Arbitrary<AddressStructure>
+export declare const arbitrary: FastCheck.Arbitrary<Address>
 ```
 
 Added in v1.0.0
@@ -63,19 +63,19 @@ Sync functions using Function module utilities
 **Signature**
 
 ```ts
-export declare const fromBech32: (input: string) => AddressStructure
+export declare const fromBech32: (input: string) => Address
 ```
 
 Added in v1.0.0
 
 # Schema
 
-## AddressStructure (class)
+## Address (class)
 
 **Signature**
 
 ```ts
-export declare class AddressStructure
+export declare class Address
 ```
 
 Added in v1.0.0
@@ -107,7 +107,7 @@ Transform from Bech32 string to AddressStructure
 ```ts
 export declare const FromBech32: Schema.transformOrFail<
   typeof Schema.String,
-  Schema.SchemaClass<AddressStructure, AddressStructure, never>,
+  Schema.SchemaClass<Address, Address, never>,
   never
 >
 ```
@@ -124,7 +124,7 @@ Handles both BaseAddress (57 bytes) and EnterpriseAddress (29 bytes)
 ```ts
 export declare const FromBytes: Schema.transformOrFail<
   Schema.Union<[Schema.filter<typeof Schema.Uint8ArrayFromSelf>, Schema.filter<typeof Schema.Uint8ArrayFromSelf>]>,
-  Schema.SchemaClass<AddressStructure, AddressStructure, never>,
+  Schema.SchemaClass<Address, Address, never>,
   never
 >
 ```
@@ -142,7 +142,7 @@ export declare const FromHex: Schema.transform<
   Schema.transform<Schema.Schema<string, string, never>, Schema.Schema<Uint8Array, Uint8Array, never>>,
   Schema.transformOrFail<
     Schema.Union<[Schema.filter<typeof Schema.Uint8ArrayFromSelf>, Schema.filter<typeof Schema.Uint8ArrayFromSelf>]>,
-    Schema.SchemaClass<AddressStructure, AddressStructure, never>,
+    Schema.SchemaClass<Address, Address, never>,
     never
   >
 >
@@ -159,7 +159,7 @@ Check if two AddressStructure instances are equal.
 **Signature**
 
 ```ts
-export declare const equals: (a: AddressStructure, b: AddressStructure) => boolean
+export declare const equals: (a: Address, b: Address) => boolean
 ```
 
 Added in v1.0.0
@@ -171,7 +171,7 @@ Get network ID from AddressStructure
 **Signature**
 
 ```ts
-export declare const getNetworkId: (address: AddressStructure) => NetworkId.NetworkId
+export declare const getNetworkId: (address: Address) => NetworkId.NetworkId
 ```
 
 Added in v1.0.0
@@ -183,7 +183,7 @@ Check if AddressStructure has staking credential (BaseAddress-like)
 **Signature**
 
 ```ts
-export declare const hasStakingCredential: (address: AddressStructure) => boolean
+export declare const hasStakingCredential: (address: Address) => boolean
 ```
 
 Added in v1.0.0
@@ -195,19 +195,19 @@ Check if AddressStructure is enterprise-like (no staking credential)
 **Signature**
 
 ```ts
-export declare const isEnterprise: (address: AddressStructure) => boolean
+export declare const isEnterprise: (address: Address) => boolean
 ```
 
 Added in v1.0.0
 
 # utils
 
-## AddressStructureError (class)
+## AddressError (class)
 
 **Signature**
 
 ```ts
-export declare class AddressStructureError
+export declare class AddressError
 ```
 
 ## Either (namespace)
@@ -217,7 +217,7 @@ export declare class AddressStructureError
 **Signature**
 
 ```ts
-export declare const fromBytes: (input: any) => AddressStructure
+export declare const fromBytes: (input: any) => Address
 ```
 
 ## fromHex
@@ -225,7 +225,7 @@ export declare const fromBytes: (input: any) => AddressStructure
 **Signature**
 
 ```ts
-export declare const fromHex: (input: string) => AddressStructure
+export declare const fromHex: (input: string) => Address
 ```
 
 ## toBech32
@@ -233,7 +233,7 @@ export declare const fromHex: (input: string) => AddressStructure
 **Signature**
 
 ```ts
-export declare const toBech32: (input: AddressStructure) => string
+export declare const toBech32: (input: Address) => string
 ```
 
 ## toBytes
@@ -241,7 +241,7 @@ export declare const toBech32: (input: AddressStructure) => string
 **Signature**
 
 ```ts
-export declare const toBytes: (input: AddressStructure) => any
+export declare const toBytes: (input: Address) => any
 ```
 
 ## toHex
@@ -249,5 +249,5 @@ export declare const toBytes: (input: AddressStructure) => any
 **Signature**
 
 ```ts
-export declare const toHex: (input: AddressStructure) => string
+export declare const toHex: (input: Address) => string
 ```

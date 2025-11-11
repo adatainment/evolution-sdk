@@ -1,6 +1,6 @@
 ---
 title: core/Mint.ts
-nav_order: 63
+nav_order: 62
 parent: Modules
 ---
 
@@ -61,9 +61,7 @@ FastCheck arbitrary for generating random Mint instances.
 **Signature**
 
 ```ts
-export declare const arbitrary: FastCheck.Arbitrary<
-  Map<PolicyId.PolicyId, Map<AssetName.AssetName, bigint>> & Brand<"Mint">
->
+export declare const arbitrary: FastCheck.Arbitrary<Map<PolicyId.PolicyId, Map<AssetName.AssetName, bigint>>>
 ```
 
 Added in v2.0.0
@@ -130,7 +128,7 @@ Encode Mint to CBOR bytes.
 
 ```ts
 export declare const toCBORBytes: (
-  input: Map<PolicyId.PolicyId, Map<AssetName.AssetName, bigint>> & Brand<"Mint">,
+  input: Map<PolicyId.PolicyId, Map<AssetName.AssetName, bigint>>,
   options?: CBOR.CodecOptions
 ) => Uint8Array
 ```
@@ -145,7 +143,7 @@ Encode Mint to CBOR hex string.
 
 ```ts
 export declare const toCBORHex: (
-  input: Map<PolicyId.PolicyId, Map<AssetName.AssetName, bigint>> & Brand<"Mint">,
+  input: Map<PolicyId.PolicyId, Map<AssetName.AssetName, bigint>>,
   options?: CBOR.CodecOptions
 ) => string
 ```
@@ -208,7 +206,7 @@ Parse Mint from CBOR bytes.
 export declare const fromCBORBytes: (
   bytes: Uint8Array,
   options?: CBOR.CodecOptions
-) => Map<PolicyId.PolicyId, Map<AssetName.AssetName, bigint>> & Brand<"Mint">
+) => Map<PolicyId.PolicyId, Map<AssetName.AssetName, bigint>>
 ```
 
 Added in v2.0.0
@@ -223,7 +221,7 @@ Parse Mint from CBOR hex string.
 export declare const fromCBORHex: (
   hex: string,
   options?: CBOR.CodecOptions
-) => Map<PolicyId.PolicyId, Map<AssetName.AssetName, bigint>> & Brand<"Mint">
+) => Map<PolicyId.PolicyId, Map<AssetName.AssetName, bigint>>
 ```
 
 Added in v2.0.0
@@ -252,7 +250,7 @@ Check if a value is a valid Mint.
 export declare const is: (
   u: unknown,
   overrideOptions?: ParseOptions | number
-) => u is Map<PolicyId.PolicyId, Map<AssetName.AssetName, bigint>> & Brand<"Mint">
+) => u is Map<PolicyId.PolicyId, Map<AssetName.AssetName, bigint>>
 ```
 
 Added in v2.0.0
@@ -317,8 +315,8 @@ export declare const FromCBORBytes: (
   Schema.transformOrFail<
     Schema.SchemaClass<ReadonlyMap<any, ReadonlyMap<any, bigint>>, ReadonlyMap<any, ReadonlyMap<any, bigint>>, never>,
     Schema.SchemaClass<
-      Map<PolicyId.PolicyId, Map<AssetName.AssetName, bigint>> & Brand<"Mint">,
-      Map<PolicyId.PolicyId, Map<AssetName.AssetName, bigint>> & Brand<"Mint">,
+      Map<PolicyId.PolicyId, Map<AssetName.AssetName, bigint>>,
+      Map<PolicyId.PolicyId, Map<AssetName.AssetName, bigint>>,
       never
     >,
     never
@@ -349,8 +347,8 @@ export declare const FromCBORHex: (
     Schema.transformOrFail<
       Schema.SchemaClass<ReadonlyMap<any, ReadonlyMap<any, bigint>>, ReadonlyMap<any, ReadonlyMap<any, bigint>>, never>,
       Schema.SchemaClass<
-        Map<PolicyId.PolicyId, Map<AssetName.AssetName, bigint>> & Brand<"Mint">,
-        Map<PolicyId.PolicyId, Map<AssetName.AssetName, bigint>> & Brand<"Mint">,
+        Map<PolicyId.PolicyId, Map<AssetName.AssetName, bigint>>,
+        Map<PolicyId.PolicyId, Map<AssetName.AssetName, bigint>>,
         never
       >,
       never
@@ -381,8 +379,8 @@ Where:
 export declare const FromCDDL: Schema.transformOrFail<
   Schema.SchemaClass<ReadonlyMap<any, ReadonlyMap<any, bigint>>, ReadonlyMap<any, ReadonlyMap<any, bigint>>, never>,
   Schema.SchemaClass<
-    Map<PolicyId.PolicyId, Map<AssetName.AssetName, bigint>> & Brand<"Mint">,
-    Map<PolicyId.PolicyId, Map<AssetName.AssetName, bigint>> & Brand<"Mint">,
+    Map<PolicyId.PolicyId, Map<AssetName.AssetName, bigint>>,
+    Map<PolicyId.PolicyId, Map<AssetName.AssetName, bigint>>,
     never
   >,
   never
@@ -406,23 +404,28 @@ The structure is: policy_id => { asset_name => nonZeroInt64 }
 **Signature**
 
 ```ts
-export declare const Mint: Schema.brand<
-  Schema.Map$<
-    typeof PolicyId.PolicyId,
-    Schema.transform<
-      Schema.Array$<
-        Schema.Tuple2<
-          typeof AssetName.AssetName,
-          Schema.Union<[Schema.refine<bigint, typeof Schema.BigInt>, Schema.refine<bigint, typeof Schema.BigInt>]>
+export declare const Mint: Schema.transform<
+  Schema.Array$<
+    Schema.Tuple2<
+      typeof PolicyId.PolicyId,
+      Schema.transform<
+        Schema.Array$<
+          Schema.Tuple2<
+            typeof AssetName.AssetName,
+            Schema.Union<[Schema.refine<bigint, typeof Schema.BigInt>, Schema.refine<bigint, typeof Schema.BigInt>]>
+          >
+        >,
+        Schema.MapFromSelf<
+          Schema.SchemaClass<AssetName.AssetName, AssetName.AssetName, never>,
+          Schema.SchemaClass<bigint, bigint, never>
         >
-      >,
-      Schema.MapFromSelf<
-        Schema.SchemaClass<AssetName.AssetName, AssetName.AssetName, never>,
-        Schema.SchemaClass<bigint, bigint, never>
       >
     >
   >,
-  "Mint"
+  Schema.MapFromSelf<
+    Schema.SchemaClass<PolicyId.PolicyId, PolicyId.PolicyId, never>,
+    Schema.SchemaClass<Map<AssetName.AssetName, bigint>, Map<AssetName.AssetName, bigint>, never>
+  >
 >
 ```
 

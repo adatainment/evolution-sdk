@@ -21,7 +21,7 @@ parent: Modules
 - [model](#model)
   - [AddressEras](#addresseras)
   - [AddressEras (type alias)](#addresseras-type-alias)
-  - [AddressError (class)](#addresserror-class)
+  - [AddressErasError (class)](#addresseraserror-class)
 - [parsing](#parsing)
   - [fromBech32](#frombech32)
   - [fromBytes](#frombytes)
@@ -156,14 +156,14 @@ export type AddressEras = typeof AddressEras.Type
 
 Added in v2.0.0
 
-## AddressError (class)
+## AddressErasError (class)
 
 Error thrown when address operations fail
 
 **Signature**
 
 ```ts
-export declare class AddressError
+export declare class AddressErasError
 ```
 
 Added in v2.0.0

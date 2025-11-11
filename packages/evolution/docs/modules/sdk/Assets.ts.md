@@ -163,11 +163,6 @@ Added in v2.0.0
 
 Transform between Assets (SDK-friendly) and Mint (Core).
 
-Encoded side: Assets format { [unit: string]: bigint } (non-zero values only)
-Type side: Mint (Map<PolicyId, Map<AssetName, NonZeroInt64>>)
-
-Note: Unlike Value.FromAssets, this excludes "lovelace" since you cannot mint/burn ADA.
-
 **Signature**
 
 ```ts
@@ -190,9 +185,6 @@ Added in v2.0.0
 ## ValueFromAssets
 
 Transform between Assets (SDK-friendly) and Value (Core).
-
-Encoded side: Assets format { lovelace?: bigint, [unit: string]: bigint }
-Type side: Value (OnlyCoin | WithAssets)
 
 **Signature**
 

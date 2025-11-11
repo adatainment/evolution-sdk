@@ -1,6 +1,6 @@
 ---
 title: core/NonZeroInt64.ts
-nav_order: 73
+nav_order: 72
 parent: Modules
 ---
 
@@ -14,8 +14,6 @@ parent: Modules
   - [arbitrary](#arbitrary-1)
 - [constants](#constants)
   - [NEG_INT64_MIN](#neg_int64_min)
-- [constructors](#constructors)
-  - [make](#make)
 - [equality](#equality)
   - [equals](#equals)
 - [errors](#errors)
@@ -69,20 +67,6 @@ nonZeroInt64 = negInt64/ posInt64
 
 ```ts
 export declare const NEG_INT64_MIN: -9223372036854775808n
-```
-
-Added in v2.0.0
-
-# constructors
-
-## make
-
-Smart constructor for creating NonZeroInt64 values.
-
-**Signature**
-
-```ts
-export declare const make: (i: string, overrideOptions?: ParseOptions) => bigint
 ```
 
 Added in v2.0.0

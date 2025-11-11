@@ -1,6 +1,6 @@
 ---
 title: core/TransactionBody.ts
-nav_order: 107
+nav_order: 106
 parent: Modules
 ---
 
@@ -272,7 +272,7 @@ export declare const isTransactionBody: (u: unknown, overrideOptions?: ParseOpti
 ```ts
 export declare const make: (
   props: {
-    readonly mint?: (Map<PolicyId, Map<AssetName, bigint>> & Brand<"Mint">) | undefined
+    readonly mint?: Map<PolicyId, Map<AssetName, bigint>> | undefined
     readonly networkId?: number | undefined
     readonly withdrawals?: Withdrawals.Withdrawals | undefined
     readonly fee: bigint

@@ -1,6 +1,6 @@
 ---
 title: core/VotingProcedures.ts
-nav_order: 120
+nav_order: 119
 parent: Modules
 ---
 

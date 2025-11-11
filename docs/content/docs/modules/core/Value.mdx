@@ -1,6 +1,6 @@
 ---
 title: core/Value.ts
-nav_order: 118
+nav_order: 117
 parent: Modules
 ---
 

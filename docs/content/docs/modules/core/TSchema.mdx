@@ -1,6 +1,6 @@
 ---
 title: core/TSchema.ts
-nav_order: 115
+nav_order: 114
 parent: Modules
 ---
 
@@ -191,29 +191,29 @@ export declare const Struct: <Fields extends Schema.Struct.Fields>(
 **Example**
 
 ```typescript
-import { TSchema } from "@evolution-sdk/evolution"
+import { Core } from "@evolution-sdk/evolution"
 
 // Default: nested in Union, index 0
-TSchema.Struct({ name: TSchema.ByteArray, age: TSchema.Integer })
+Core.TSchema.Struct({ name: Core.TSchema.ByteArray, age: Core.TSchema.Integer })
 ```
 
 **Example**
 
 ```typescript
-import { TSchema } from "@evolution-sdk/evolution"
+import { Core } from "@evolution-sdk/evolution"
 
 // Flat union variants with custom indices
-TSchema.Struct({ amount: TSchema.Integer }, { index: 121, flat: true })
-TSchema.Struct({ amount: TSchema.Integer }, { index: 122, flat: true })
+Core.TSchema.Struct({ amount: Core.TSchema.Integer }, { index: 121, flat: true })
+Core.TSchema.Struct({ amount: Core.TSchema.Integer }, { index: 122, flat: true })
 ```
 
 **Example**
 
 ```typescript
-import { TSchema } from "@evolution-sdk/evolution"
+import { Core } from "@evolution-sdk/evolution"
 
 // Custom index but stay nested (advanced use case)
-TSchema.Struct({ data: TSchema.Integer }, { index: 10, flat: false })
+Core.TSchema.Struct({ data: Core.TSchema.Integer }, { index: 10, flat: false })
 ```
 
 Added in v2.0.0
@@ -287,22 +287,22 @@ export declare const Union: <Members extends ReadonlyArray<Schema.Schema.Any>>(.
 **Example**
 
 ```typescript
-import { TSchema } from "@evolution-sdk/evolution"
+import { Core } from "@evolution-sdk/evolution"
 
 // Standard union with auto indices (nested)
-TSchema.Union(TSchema.Struct({ a: TSchema.Integer }), TSchema.Struct({ b: TSchema.Integer }))
+Core.TSchema.Union(Core.TSchema.Struct({ a: Core.TSchema.Integer }), Core.TSchema.Struct({ b: Core.TSchema.Integer }))
 // Encodes to: Constr(0, [Constr(0, [a])]) or Constr(1, [Constr(0, [b])])
 ```
 
 **Example**
 
 ```typescript
-import { TSchema } from "@evolution-sdk/evolution"
+import { Core } from "@evolution-sdk/evolution"
 
 // Union with flat Structs (single-level encoding)
-TSchema.Union(
-  TSchema.Struct({ amount: TSchema.Integer }, { index: 121, flat: true }),
-  TSchema.Struct({ amount: TSchema.Integer }, { index: 122, flat: true })
+Core.TSchema.Union(
+  Core.TSchema.Struct({ amount: Core.TSchema.Integer }, { index: 121, flat: true }),
+  Core.TSchema.Struct({ amount: Core.TSchema.Integer }, { index: 122, flat: true })
 )
 // Encodes to: Constr(121, [amount]) or Constr(122, [amount]) - single level!
 ```
@@ -310,13 +310,13 @@ TSchema.Union(
 **Example**
 
 ```typescript
-import { TSchema } from "@evolution-sdk/evolution"
+import { Core } from "@evolution-sdk/evolution"
 
 // Mixed union: some nested, some flat
-TSchema.Union(
-  TSchema.Struct({ a: TSchema.Integer }), // nested, auto index 0
-  TSchema.Struct({ b: TSchema.Integer }, { flat: true }), // flat, auto index 1
-  TSchema.Struct({ c: TSchema.Integer }, { index: 100, flat: true }) // flat, custom index 100
+Core.TSchema.Union(
+  Core.TSchema.Struct({ a: Core.TSchema.Integer }), // nested, auto index 0
+  Core.TSchema.Struct({ b: Core.TSchema.Integer }, { flat: true }), // flat, auto index 1
+  Core.TSchema.Struct({ c: Core.TSchema.Integer }, { index: 100, flat: true }) // flat, custom index 100
 )
 ```
 

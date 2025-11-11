@@ -14,8 +14,8 @@ parent: Modules
   - [Credential (type alias)](#credential-type-alias)
   - [KeyHash (type alias)](#keyhash-type-alias)
   - [ScriptHash (type alias)](#scripthash-type-alias)
-  - [fromCredentialToJson](#fromcredentialtojson)
-  - [jsonToCredential](#jsontocredential)
+  - [fromCoreCredential](#fromcorecredential)
+  - [toCoreCredential](#tocorecredential)
 
 ---
 
@@ -26,7 +26,7 @@ parent: Modules
 **Signature**
 
 ```ts
-export type Credential = typeof _Credential.CredentialSchema.Encoded
+export type Credential = typeof CoreCredential.CredentialSchema.Encoded
 ```
 
 ## KeyHash (type alias)
@@ -34,7 +34,7 @@ export type Credential = typeof _Credential.CredentialSchema.Encoded
 **Signature**
 
 ```ts
-export type KeyHash = typeof _KeyHash.KeyHash.Encoded
+export type KeyHash = typeof CoreKeyHash.KeyHash.Encoded
 ```
 
 ## ScriptHash (type alias)
@@ -42,27 +42,27 @@ export type KeyHash = typeof _KeyHash.KeyHash.Encoded
 **Signature**
 
 ```ts
-export type ScriptHash = typeof _ScriptHash.ScriptHash.Encoded
+export type ScriptHash = typeof CoreScriptHash.ScriptHash.Encoded
 ```
 
-## fromCredentialToJson
+## fromCoreCredential
 
 **Signature**
 
 ```ts
-export declare const fromCredentialToJson: (
-  a: _KeyHash.KeyHash | _ScriptHash.ScriptHash,
+export declare const fromCoreCredential: (
+  a: CoreKeyHash.KeyHash | CoreScriptHash.ScriptHash,
   overrideOptions?: ParseOptions
 ) => { readonly _tag: "KeyHash"; readonly hash: string } | { readonly _tag: "ScriptHash"; readonly hash: string }
 ```
 
-## jsonToCredential
+## toCoreCredential
 
 **Signature**
 
 ```ts
-export declare const jsonToCredential: (
+export declare const toCoreCredential: (
   i: { readonly _tag: "KeyHash"; readonly hash: string } | { readonly _tag: "ScriptHash"; readonly hash: string },
   overrideOptions?: ParseOptions
-) => _KeyHash.KeyHash | _ScriptHash.ScriptHash
+) => CoreKeyHash.KeyHash | CoreScriptHash.ScriptHash
 ```

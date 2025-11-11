@@ -1,6 +1,6 @@
 ---
-title: core/AddressDetails.ts
-nav_order: 1
+title: sdk/AddressDetails.ts
+nav_order: 125
 parent: Modules
 ---
 
@@ -10,13 +10,6 @@ parent: Modules
 
 <h2 className="text-delta">Table of contents</h2>
 
-- [arbitrary](#arbitrary)
-  - [arbitrary](#arbitrary-1)
-- [constructors](#constructors)
-  - [fromAddress](#fromaddress)
-  - [make](#make)
-- [either](#either)
-  - [Either (namespace)](#either-namespace)
 - [encoding](#encoding)
   - [toBech32](#tobech32)
   - [toHex](#tohex)
@@ -28,59 +21,10 @@ parent: Modules
 - [schemas](#schemas)
   - [AddressDetails (class)](#addressdetails-class)
 - [utils](#utils)
-  - [AddressDetailsError (class)](#addressdetailserror-class)
   - [FromBech32](#frombech32-1)
   - [FromHex](#fromhex-1)
 
 ---
-
-# arbitrary
-
-## arbitrary
-
-FastCheck arbitrary for AddressDetails instances.
-
-**Signature**
-
-```ts
-export declare const arbitrary: Arbitrary<AddressDetails>
-```
-
-Added in v2.0.0
-
-# constructors
-
-## fromAddress
-
-Create AddressDetails from an Address.
-
-**Signature**
-
-```ts
-export declare const fromAddress: (address: AddressEras.AddressEras) => AddressDetails
-```
-
-Added in v2.0.0
-
-## make
-
-Create AddressDetails from an Address instance.
-
-**Signature**
-
-```ts
-export declare const make: <C>(this: C, ...args: ConstructorParameters<C>) => InstanceType<C>
-```
-
-Added in v2.0.0
-
-# either
-
-## Either (namespace)
-
-Either-based error handling variants for functions that can fail.
-
-Added in v2.0.0
 
 # encoding
 
@@ -91,7 +35,7 @@ Convert AddressDetails to Bech32 string.
 **Signature**
 
 ```ts
-export declare const toBech32: (input: AddressDetails) => string
+export declare const toBech32: (a: AddressDetails, overrideOptions?: ParseOptions) => string
 ```
 
 Added in v2.0.0
@@ -103,7 +47,7 @@ Convert AddressDetails to hex string.
 **Signature**
 
 ```ts
-export declare const toHex: (input: AddressDetails) => string
+export declare const toHex: (a: AddressDetails, overrideOptions?: ParseOptions) => string
 ```
 
 Added in v2.0.0
@@ -131,7 +75,7 @@ Parse AddressDetails from Bech32 string.
 **Signature**
 
 ```ts
-export declare const fromBech32: (input: string) => AddressDetails
+export declare const fromBech32: (i: string, overrideOptions?: ParseOptions) => AddressDetails
 ```
 
 Added in v2.0.0
@@ -143,7 +87,7 @@ Parse AddressDetails from hex string.
 **Signature**
 
 ```ts
-export declare const fromHex: (input: string) => AddressDetails
+export declare const fromHex: (i: string, overrideOptions?: ParseOptions) => AddressDetails
 ```
 
 Added in v2.0.0
@@ -164,14 +108,6 @@ export declare class AddressDetails
 Added in v2.0.0
 
 # utils
-
-## AddressDetailsError (class)
-
-**Signature**
-
-```ts
-export declare class AddressDetailsError
-```
 
 ## FromBech32
 

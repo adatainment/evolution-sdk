@@ -1,6 +1,6 @@
 ---
 title: sdk/Delegation.ts
-nav_order: 154
+nav_order: 156
 parent: Modules
 ---
 

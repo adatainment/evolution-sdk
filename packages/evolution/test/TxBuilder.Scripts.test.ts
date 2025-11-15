@@ -267,13 +267,13 @@ describe("TxBuilder Script Handling", () => {
     const collateralReturn = tx.body.collateralReturn!
     
     // Verify lovelace amount in collateralReturn
-    expect(collateralReturn.amount._tag).toBe("WithAssets")
-    if (collateralReturn.amount._tag === "WithAssets") {
-      expect(collateralReturn.amount.coin).toBeGreaterThan(0n)
+    expect(collateralReturn.assets.multiAsset).toBeDefined()
+    if (collateralReturn.assets.multiAsset !== undefined) {
+      expect(collateralReturn.assets.lovelace).toBeGreaterThan(0n)
       
       // Count total number of tokens across all policies
       let totalTokens = 0
-      for (const [_policyId, assetMap] of collateralReturn.amount.assets.map.entries()) {
+      for (const [_policyId, assetMap] of collateralReturn.assets.multiAsset.map.entries()) {
         totalTokens += assetMap.size
       }
       
@@ -281,7 +281,7 @@ describe("TxBuilder Script Handling", () => {
       expect(totalTokens).toBe(10)
       
       // Verify collateralReturn meets minUTxO requirement (with tokens, should be > 1.5 ADA)
-      expect(collateralReturn.amount.coin).toBeGreaterThanOrEqual(1_500_000n)
+      expect(collateralReturn.assets.lovelace).toBeGreaterThanOrEqual(1_500_000n)
     }
   })
   it("should fail when collateral return is below minimum UTxO", async () => {
@@ -552,12 +552,7 @@ describe("TxBuilder Script Handling", () => {
     
     // Get change output (should be the last output)
     const changeOutput = tx.body.outputs[tx.body.outputs.length - 1]
-    let changeAmount = 0n
-    if (changeOutput.amount._tag === "OnlyCoin") {
-      changeAmount = changeOutput.amount.coin
-    } else if (changeOutput.amount._tag === "WithAssets") {
-      changeAmount = changeOutput.amount.coin
-    }
+    const changeAmount = changeOutput.assets.lovelace
 
     // Verify transaction is perfectly balanced
     // With phase reordering (Collateral BEFORE ChangeCreation):
@@ -635,12 +630,10 @@ describe("TxBuilder Script Handling", () => {
     const collateralReturn = tx.body.collateralReturn!
     
     // Verify return amount is the leftover (10 ADA - 5 ADA = 5 ADA)
-    if (collateralReturn.amount._tag === "OnlyCoin") {
-      expect(collateralReturn.amount.coin).toBe(5_000_000n)
-    } else if (collateralReturn.amount._tag === "WithAssets") {
-      expect(collateralReturn.amount.coin).toBe(5_000_000n)
-      // Should be pure ADA (no tokens)
-      expect(collateralReturn.amount.assets.map.size).toBe(0)
+    expect(collateralReturn.assets.lovelace).toBe(5_000_000n)
+    // Should be pure ADA (no tokens)
+    if (collateralReturn.assets.multiAsset !== undefined) {
+      expect(collateralReturn.assets.multiAsset.map.size).toBe(0)
     }
 
     // Verify collateral return address is the change address
@@ -1022,7 +1015,7 @@ describe("TxBuilder Script Handling", () => {
     expect(tx.body.collateralReturn).toBeDefined()
     const collateralReturn = tx.body.collateralReturn!
     expect(collateralReturn.address).toBeDefined()
-    expect(collateralReturn.amount.coin).toBe(1_000_000n)
+    expect(collateralReturn.assets.lovelace).toBe(1_000_000n)
   })
 
   it("should successfully select collateral when exactly 3 inputs are sufficient", async () => {
@@ -1094,11 +1087,7 @@ describe("TxBuilder Script Handling", () => {
     expect(tx.body.collateralReturn).toBeDefined()
     const collateralReturn = tx.body.collateralReturn!
     
-    if (collateralReturn.amount._tag === "OnlyCoin") {
-      expect(collateralReturn.amount.coin).toBe(1_000_000n) // 1 ADA return
-    } else if (collateralReturn.amount._tag === "WithAssets") {
-      expect(collateralReturn.amount.coin).toBe(1_000_000n)
-    }
+    expect(collateralReturn.assets.lovelace).toBe(1_000_000n) // 1 ADA return
   })
 
   it("should fail when max 3 collateral inputs are insufficient to cover target", async () => {

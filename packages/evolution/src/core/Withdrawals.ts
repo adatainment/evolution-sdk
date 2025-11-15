@@ -58,9 +58,13 @@ export class Withdrawals extends Schema.TaggedClass<Withdrawals>()("Withdrawals"
   })
 }) {
   toJSON() {
+    const obj: Record<string, string> = {}
+    for (const [account, coin] of this.withdrawals.entries()) {
+      obj[account.toString()] = coin.toString()
+    }
     return {
       _tag: "Withdrawals" as const,
-      withdrawals: Array.from(this.withdrawals.entries()).map(([account, coin]) => [account, coin])
+      withdrawals: obj
     }
   }
 

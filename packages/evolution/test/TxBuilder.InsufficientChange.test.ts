@@ -2,7 +2,6 @@ import { describe, expect, it } from "@effect/vitest"
 import { FastCheck, Schema } from "effect"
 
 import * as Address from "../src/core/Address.js"
-import * as AddressEras from "../src/core/AddressEras.js"
 import * as KeyHash from "../src/core/KeyHash.js"
 import * as Assets from "../src/sdk/Assets.js"
 import type { TxBuilderConfig } from "../src/sdk/builders/TransactionBuilder.js"
@@ -117,14 +116,14 @@ describe("Fallback Tier 3: onInsufficientChange Strategy", () => {
 
     // Verify: Transaction balances (inputs = outputs + fee)
     // Strict deterministic values
-    expect(tx.body.outputs[0].amount.coin).toBe(2_000_000n) // Payment amount
-    expect(tx.body.fee).toBe(165_369n) // Deterministic fee for this tx size
+    expect(tx.body.outputs[0].assets.lovelace).toBe(2_000_000n) // Payment amount
+    expect(tx.body.fee).toBe(165_281n) // Deterministic fee (uses efficient Shelley format)
 
     // Verify leftover is burned
     const inputTotal = Assets.getLovelace(utxo.assets) // 2_170_000n
-    const outputTotal = tx.body.outputs[0].amount.coin // 2_000_000n
-    const leftover = inputTotal - outputTotal - tx.body.fee // 2_170_000 - 2_000_000 - 165_369 = 4_631
-    expect(leftover).toBe(4_631n) // Exact leftover amount that was "burned" (becomes excess)
+    const outputTotal = tx.body.outputs[0].assets.lovelace // 2_000_000n
+    const leftover = inputTotal - outputTotal - tx.body.fee // 2_170_000 - 2_000_000 - 165_281 = 4_719
+    expect(leftover).toBe(4_719n) // Exact leftover amount that was "burned" (becomes excess)
   })
 })
 
@@ -157,12 +156,12 @@ describe("Fallback Precedence: drainTo before onInsufficientChange", () => {
     // Assert: Transaction succeeds using drainTo
     expect(tx.body.inputs.length).toBe(1)
     expect(tx.body.outputs.length).toBe(1) // Leftover merged into payment output
-    expect(tx.body.fee).toBe(165_369n) // Deterministic fee
+    expect(tx.body.fee).toBe(165_281n) // Deterministic fee (uses efficient Shelley format)
 
     // Verify: Leftover was drained into first output (not burned)
     const firstOutput = tx.body.outputs[0]
-    // Payment (2M) + drained leftover (4_631) = 2_004_631
-    expect(firstOutput.amount.coin).toBe(2_004_631n)
+    // Payment (2M) + drained leftover (4_719) = 2_004_719
+    expect(firstOutput.assets.lovelace).toBe(2_004_719n)
   })
 })
 
@@ -193,16 +192,16 @@ describe("Normal Path: Sufficient Change (No Fallbacks)", () => {
     // Assert: Change output created successfully
     expect(tx.body.inputs.length).toBe(1)
     expect(tx.body.outputs.length).toBe(2) // Payment + change
-    expect(tx.body.fee).toBe(168_317n) // Deterministic fee
+    expect(tx.body.fee).toBe(168_141n) // Deterministic fee (2 outputs with Shelley format)
 
     // Verify outputs
     const paymentOutput = tx.body.outputs[0]
     const changeOutput = tx.body.outputs[1]
 
-    expect(paymentOutput.amount.coin).toBe(10_000_000n)
-    expect(AddressEras.toBech32(changeOutput.address)).toBe(CHANGE_ADDRESS)
-    // Change: 100M - 10M payment - 168,317 fee = 89,831,683
-    expect(changeOutput.amount.coin).toBe(89_831_683n)
+    expect(paymentOutput.assets.lovelace).toBe(10_000_000n)
+    expect(Address.toBech32(changeOutput.address)).toBe(CHANGE_ADDRESS)
+    // Change: 100M - 10M payment - 168_141 fee = 89_831_859
+    expect(changeOutput.assets.lovelace).toBe(89_831_859n)
   })
 
   it("should handle exact amount with drainTo without triggering fallbacks", async () => {
@@ -225,12 +224,12 @@ describe("Normal Path: Sufficient Change (No Fallbacks)", () => {
     // Assert: Single output with drained leftover
     expect(tx.body.inputs.length).toBe(1)
     expect(tx.body.outputs.length).toBe(1) // Payment with drained change
-    expect(tx.body.fee).toBe(165_369n) // Deterministic fee
+    expect(tx.body.fee).toBe(165_281n) // Deterministic fee (uses efficient Shelley format)
 
     // Verify: Output has payment + leftover
     const output = tx.body.outputs[0]
-    // 2_170_000 - 165_369 = 2_004_631
-    expect(output.amount.coin).toBe(2_004_631n)
+    // 2_170_000 - 165_281 = 2_004_719
+    expect(output.assets.lovelace).toBe(2_004_719n)
   })
 })
 
@@ -270,11 +269,11 @@ describe("Edge Cases", () => {
     // Assert: Transaction built successfully with drainTo
     expect(tx.body.inputs.length).toBe(2)
     expect(tx.body.outputs.length).toBe(1) // Drained into output[0]
-    expect(tx.body.fee).toBe(166_953n) // Deterministic fee for 2 inputs, 1 output (drainTo)
+    expect(tx.body.fee).toBe(166_865n) // Deterministic fee for 2 inputs, 1 output (Shelley format)
 
     // Verify the output has the drained amount
-    // Total: 2_200_000 - 166_953 fee = 2_033_047
-    expect(tx.body.outputs[0].amount.coin).toBe(2_033_047n)
+    // Total: 2_200_000 - 166_865 fee = 2_033_135
+    expect(tx.body.outputs[0].assets.lovelace).toBe(2_033_135n)
   })
 
   it("should respect burn strategy with very small leftover amounts", async () => {
@@ -297,10 +296,10 @@ describe("Edge Cases", () => {
 
     // Assert: Success with single output (no change)
     expect(tx.body.outputs.length).toBe(1)
-    expect(tx.body.outputs[0].amount.coin).toBe(2_000_000n)
+    expect(tx.body.outputs[0].assets.lovelace).toBe(2_000_000n)
 
     // Verify: Fee is deterministic
-    expect(tx.body.fee).toBe(165_369n)
+    expect(tx.body.fee).toBe(165_281n) // Uses efficient Shelley format
   })
 })
 
@@ -360,10 +359,10 @@ describe("Multi-Asset minUTxO Calculation", () => {
     // Verify: All 10 native assets are accounted for (not lost)
     let totalTokensSeen = 0
     for (const output of tx.body.outputs) {
-      // Check if this output has native assets (WithAssets type)
-      if (output.amount._tag === "WithAssets") {
+      // Check if this output has native assets (multiAsset present)
+      if (output.assets.multiAsset) {
         // MultiAsset is a Map<PolicyId, Map<AssetName, Amount>>
-        for (const [_policyId, assetMap] of output.amount.assets.map) {
+        for (const [_policyId, assetMap] of output.assets.multiAsset.map) {
           totalTokensSeen += assetMap.size
         }
       }
@@ -373,10 +372,10 @@ describe("Multi-Asset minUTxO Calculation", () => {
     expect(totalTokensSeen).toBe(10)
 
     // Verify: Change output has sufficient lovelace for all assets
-    const changeOutput = tx.body.outputs.find((out) => AddressEras.toBech32(out.address) === CHANGE_ADDRESS)
+    const changeOutput = tx.body.outputs.find((out) => Address.toBech32(out.address) === CHANGE_ADDRESS)
     if (changeOutput) {
       // Change output exists - verify it has sufficient lovelace for all assets
-      const changeLovelace = changeOutput.amount.coin
+      const changeLovelace = changeOutput.assets.lovelace
       expect(changeLovelace).toBeGreaterThan(700_000n)
     }
   })

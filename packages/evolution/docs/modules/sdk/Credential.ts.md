@@ -1,6 +1,6 @@
 ---
 title: sdk/Credential.ts
-nav_order: 152
+nav_order: 154
 parent: Modules
 ---
 

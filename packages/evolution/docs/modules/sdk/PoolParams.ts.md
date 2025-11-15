@@ -1,6 +1,6 @@
 ---
 title: sdk/PoolParams.ts
-nav_order: 162
+nav_order: 164
 parent: Modules
 ---
 

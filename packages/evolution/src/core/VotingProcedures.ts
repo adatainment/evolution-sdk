@@ -482,8 +482,18 @@ export class VotingProcedures extends Schema.Class<VotingProcedures>("VotingProc
   })
 }) {
   toJSON() {
+    const serialized: Array<any> = []
+    for (const [voter, actionMap] of this.procedures.entries()) {
+      const voterJson = voter.toJSON()
+      const actions: Array<any> = []
+      for (const [govActionId, procedure] of actionMap.entries()) {
+        const actionIdJson = govActionId.toJSON()
+        actions.push([actionIdJson, procedure.toJSON()])
+      }
+      serialized.push([voterJson, actions])
+    }
     return {
-      procedures: this.procedures
+      procedures: serialized
     }
   }
 

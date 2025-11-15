@@ -41,6 +41,13 @@ export class ExUnits extends Schema.Class<ExUnits>("Redeemer.ExUnits")({
     description: "CPU steps consumed by script execution"
   })
 }) {
+  toJSON() {
+    return {
+      mem: this.mem.toString(),
+      steps: this.steps.toString()
+    }
+  }
+
   [Equal.symbol](that: unknown): boolean {
     return (
       that instanceof ExUnits &&
@@ -92,9 +99,9 @@ export class Redeemer extends Schema.Class<Redeemer>("Redeemer")({
     return {
       _tag: "Redeemer",
       tag: this.tag,
-      index: this.index,
+      index: this.index.toString(),
       data: this.data,
-      exUnits: this.exUnits
+      exUnits: this.exUnits.toJSON()
     }
   }
 

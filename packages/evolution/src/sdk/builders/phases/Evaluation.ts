@@ -207,10 +207,10 @@ export const executeEvaluation = (): Effect.Effect<
     yield* Effect.logDebug(`[Evaluation] Transaction CBOR length: ${txHex.length} chars`)
     yield* Effect.logDebug(`[Evaluation] Has collateral return: ${!!transaction.body.collateralReturn}`)
     if (transaction.body.collateralReturn) {
-      const amount = transaction.body.collateralReturn.amount
-      yield* Effect.logDebug(`[Evaluation] Collateral return amount type: ${amount._tag}`)
-      if (amount._tag === "WithAssets") {
-        const assetCount = amount.assets.map.size
+      const assets = transaction.body.collateralReturn.assets
+      yield* Effect.logDebug(`[Evaluation] Collateral return lovelace: ${assets.lovelace}`)
+      if (assets.multiAsset) {
+        const assetCount = assets.multiAsset.map.size
         yield* Effect.logDebug(`[Evaluation] Collateral return has ${assetCount} asset policies`)
       }
     }

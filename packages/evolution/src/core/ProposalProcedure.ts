@@ -39,10 +39,10 @@ export class ProposalProcedure extends Schema.Class<ProposalProcedure>("Proposal
   toJSON() {
     return {
       _tag: "ProposalProcedure",
-      deposit: this.deposit,
+      deposit: this.deposit.toString(),
       rewardAccount: this.rewardAccount,
-      governanceAction: this.governanceAction,
-      anchor: this.anchor
+      governanceAction: this.governanceAction.toJSON ? this.governanceAction.toJSON() : this.governanceAction,
+      anchor: this.anchor?.toJSON ? this.anchor.toJSON() : this.anchor
     }
   }
 

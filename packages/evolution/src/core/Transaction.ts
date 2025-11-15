@@ -23,10 +23,10 @@ export class Transaction extends Schema.TaggedClass<Transaction>()("Transaction"
   toJSON() {
     return {
       _tag: this._tag,
-      body: this.body,
-      witnessSet: this.witnessSet,
+      body: this.body.toJSON(),
+      witnessSet: this.witnessSet.toJSON(),
       isValid: this.isValid,
-      auxiliaryData: this.auxiliaryData
+      auxiliaryData: this.auxiliaryData?.toJSON() ?? null
     }
   }
 

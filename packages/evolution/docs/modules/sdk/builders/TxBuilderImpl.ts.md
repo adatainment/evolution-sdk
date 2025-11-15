@@ -1,6 +1,6 @@
 ---
 title: sdk/builders/TxBuilderImpl.ts
-nav_order: 148
+nav_order: 150
 parent: Modules
 ---
 
@@ -350,9 +350,9 @@ Use case: Draining wallet by merging leftover into an existing payment output.
 
 ```ts
 export declare const mergeAssetsIntoOutput: (
-  output: TransactionOutput.TransactionOutput,
+  output: TxOut.TransactionOutput,
   additionalAssets: Assets.Assets
-) => Effect.Effect<TransactionOutput.TransactionOutput, TransactionBuilderError>
+) => Effect.Effect<TxOut.TransactionOutput, TransactionBuilderError>
 ```
 
 Added in v2.0.0

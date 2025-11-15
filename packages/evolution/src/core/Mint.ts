@@ -95,9 +95,17 @@ export class Mint extends Schema.Class<Mint>("Mint")({
    * @category conversions
    */
   toJSON() {
+    const serializedMap: Record<string, Record<string, string>> = {}
+    for (const [policyId, assetMap] of this.map.entries()) {
+      const serializedAssets: Record<string, string> = {}
+      for (const [assetName, quantity] of assetMap.entries()) {
+        serializedAssets[assetName.toString()] = quantity.toString()
+      }
+      serializedMap[policyId.toString()] = serializedAssets
+    }
     return {
       _tag: "Mint",
-      map: this.map
+      map: serializedMap
     }
   }
 

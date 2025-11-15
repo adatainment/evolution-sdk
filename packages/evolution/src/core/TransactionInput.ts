@@ -22,8 +22,8 @@ export class TransactionInput extends Schema.TaggedClass<TransactionInput>()("Tr
   toJSON() {
     return {
       _tag: this._tag,
-      transactionId: this.transactionId,
-      index: this.index
+      transactionId: this.transactionId.toJSON(),
+      index: this.index.toString()
     }
   }
 

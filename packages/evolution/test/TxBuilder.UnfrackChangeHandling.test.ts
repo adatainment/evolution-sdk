@@ -85,23 +85,23 @@ describe("TxBuilder: Unfrack Change Handling Integration", () => {
 
       // Verify payment output is correct
       const paymentOutput = tx.body.outputs[0]
-      expect(paymentOutput.amount.coin).toBe(100_000n)
+      expect(paymentOutput.assets.lovelace).toBe(100_000n)
 
       // Verify all change outputs meet minUTxO
       const changeOutputs = tx.body.outputs.slice(1)
       for (const output of changeOutputs) {
         // Each output should have at least ~289k lovelace (minUTxO for ADA-only or with tokens)
-        expect(output.amount.coin).toBeGreaterThanOrEqual(288_770n)
+        expect(output.assets.lovelace).toBeGreaterThanOrEqual(288_770n)
       }
 
       // Verify token distribution: all 3 tokens should be preserved in change outputs
       let totalTokenTypes = 0
 
       for (const output of changeOutputs) {
-        // Check if this output has native assets (WithAssets type)
-        if (output.amount._tag === "WithAssets") {
+        // Check if this output has native assets
+        if (output.assets.multiAsset !== undefined) {
           // MultiAsset is a Map<PolicyId, Map<AssetName, Amount>>
-          for (const [_policyId, assetMap] of output.amount.assets.map) {
+          for (const [_policyId, assetMap] of output.assets.multiAsset.map) {
             totalTokenTypes += assetMap.size
           }
         }
@@ -160,16 +160,21 @@ describe("TxBuilder: Unfrack Change Handling Integration", () => {
 
       // Verify payment output
       const paymentOutput = tx.body.outputs[0]
-      expect(paymentOutput.amount.coin).toBe(100_000n)
+      expect(paymentOutput.assets.lovelace).toBe(100_000n)
 
-      // Verify change output has all tokens and meets minUTxO
+      // Verify change output has exact correct amount after fee convergence
+      // Input: 1,500,000, Payment: 100,000, Fee: 173,553 (for 1 output)
+      // Expected change: 1,500,000 - 100,000 - 173,553 = 1,226,447
       const changeOutput = tx.body.outputs[1]
-      expect(changeOutput.amount.coin).toBeGreaterThanOrEqual(793_000n) // minUTxO for tokens ~819k, but after fee ~1.226M
+      expect(changeOutput.assets.lovelace).toBe(1_226_447n)
+
+      // Verify fee is correct for single-output transaction
+      expect(tx.body.fee).toBe(173_553n)
 
       // Verify all 3 tokens are in the single change output
       let totalTokenTypes = 0
-      if (changeOutput.amount._tag === "WithAssets") {
-        for (const [_policyId, assetMap] of changeOutput.amount.assets.map) {
+      if (changeOutput.assets.multiAsset !== undefined) {
+        for (const [_policyId, assetMap] of changeOutput.assets.multiAsset.map) {
           totalTokenTypes += assetMap.size
         }
       }
@@ -336,7 +341,7 @@ describe("TxBuilder: Unfrack Change Handling Integration", () => {
 
       expect(tx.body.inputs).toHaveLength(1)
       expect(tx.body.outputs).toHaveLength(1) // Only payment (with drained leftover)
-      expect(tx.body.outputs[0].amount.coin).toBeGreaterThan(100_000n) // Has drained amount
+      expect(tx.body.outputs[0].assets.lovelace).toBeGreaterThan(100_000n) // Has drained amount
     })
   })
 
@@ -376,7 +381,7 @@ describe("TxBuilder: Unfrack Change Handling Integration", () => {
 
       expect(tx.body.inputs).toHaveLength(1)
       expect(tx.body.outputs).toHaveLength(1) // Only payment
-      expect(tx.body.outputs[0].amount.coin).toBe(100_000n) // Payment unchanged (leftover burned as fee)
+      expect(tx.body.outputs[0].assets.lovelace).toBe(100_000n) // Payment unchanged (leftover burned as fee)
     })
   })
 })

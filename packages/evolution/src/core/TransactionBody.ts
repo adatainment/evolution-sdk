@@ -17,7 +17,7 @@ import * as ProposalProcedures from "./ProposalProcedures.js"
 import * as RewardAccount from "./RewardAccount.js"
 import * as ScriptDataHash from "./ScriptDataHash.js"
 import * as TransactionInput from "./TransactionInput.js"
-import * as TransactionOutput from "./TransactionOutput.js"
+import * as TxOut from "./TxOut.js"
 import * as VotingProcedures from "./VotingProcedures.js"
 import * as Withdrawals from "./Withdrawals.js"
 
@@ -75,7 +75,7 @@ const arrayHash = <A>(arr: ReadonlyArray<A> | undefined): number => {
  */
 export class TransactionBody extends Schema.TaggedClass<TransactionBody>()("TransactionBody", {
   inputs: Schema.Array(TransactionInput.TransactionInput), // 0
-  outputs: Schema.Array(TransactionOutput.TransactionOutput), // 1
+  outputs: Schema.Array(TxOut.TransactionOutput), // 1
   fee: Coin.Coin, // 2
   ttl: Schema.optional(Schema.BigIntFromSelf), // 3 - slot_no
   certificates: Schema.optional(Schema.NonEmptyArray(Certificate.Certificate)), // 4
@@ -87,7 +87,7 @@ export class TransactionBody extends Schema.TaggedClass<TransactionBody>()("Tran
   collateralInputs: Schema.optional(Schema.NonEmptyArray(TransactionInput.TransactionInput)), // 13
   requiredSigners: Schema.optional(Schema.NonEmptyArray(KeyHash.KeyHash)), // 14
   networkId: Schema.optional(NetworkId.NetworkId), // 15
-  collateralReturn: Schema.optional(TransactionOutput.TransactionOutput), // 16
+  collateralReturn: Schema.optional(TxOut.TransactionOutput), // 16
   totalCollateral: Schema.optional(Coin.Coin), // 17
   referenceInputs: Schema.optional(Schema.NonEmptyArray(TransactionInput.TransactionInput)), // 18
   votingProcedures: Schema.optional(VotingProcedures.VotingProcedures), // 19
@@ -98,26 +98,26 @@ export class TransactionBody extends Schema.TaggedClass<TransactionBody>()("Tran
   toJSON() {
     return {
       _tag: this._tag,
-      inputs: this.inputs,
-      outputs: this.outputs,
-      fee: this.fee,
-      ttl: this.ttl,
-      certificates: this.certificates,
-      withdrawals: this.withdrawals,
-      auxiliaryDataHash: this.auxiliaryDataHash,
-      validityIntervalStart: this.validityIntervalStart,
-      mint: this.mint,
-      scriptDataHash: this.scriptDataHash,
-      collateralInputs: this.collateralInputs,
+      inputs: this.inputs.map(i => i.toJSON()),
+      outputs: this.outputs.map(o => o.toJSON()),
+      fee: this.fee.toString(),
+      ttl: this.ttl?.toString(),
+      certificates: this.certificates?.map(c => c.toJSON()),
+      withdrawals: this.withdrawals?.toJSON(),
+      auxiliaryDataHash: this.auxiliaryDataHash?.toJSON(),
+      validityIntervalStart: this.validityIntervalStart?.toString(),
+      mint: this.mint?.toJSON(),
+      scriptDataHash: this.scriptDataHash?.toJSON(),
+      collateralInputs: this.collateralInputs?.map(i => i.toJSON()),
       requiredSigners: this.requiredSigners,
       networkId: this.networkId,
-      collateralReturn: this.collateralReturn,
-      totalCollateral: this.totalCollateral,
-      referenceInputs: this.referenceInputs,
-      votingProcedures: this.votingProcedures,
-      proposalProcedures: this.proposalProcedures,
-      currentTreasuryValue: this.currentTreasuryValue,
-      donation: this.donation
+      collateralReturn: this.collateralReturn?.toJSON(),
+      totalCollateral: this.totalCollateral?.toString(),
+      referenceInputs: this.referenceInputs?.map(i => i.toJSON()),
+      votingProcedures: this.votingProcedures?.toJSON(),
+      proposalProcedures: this.proposalProcedures?.toJSON(),
+      currentTreasuryValue: this.currentTreasuryValue?.toString(),
+      donation: this.donation?.toString()
     }
   }
 
@@ -177,8 +177,8 @@ export class TransactionBody extends Schema.TaggedClass<TransactionBody>()("Tran
 // Pre-bind hot ParseResult helpers
 const encodeTxInput = ParseResult.encodeEither(TransactionInput.FromCDDL)
 const decodeTxInput = ParseResult.decodeEither(TransactionInput.FromCDDL)
-const encodeTxOutput = ParseResult.encodeEither(TransactionOutput.FromCDDL)
-const decodeTxOutput = ParseResult.decodeEither(TransactionOutput.FromCDDL)
+const encodeTxOutput = ParseResult.encodeEither(TxOut.FromCDDL)
+const decodeTxOutput = ParseResult.decodeEither(TxOut.FromCDDL)
 const encodeCertificate = ParseResult.encodeEither(Certificate.FromCDDL)
 const decodeCertificate = ParseResult.decodeEither(Certificate.FromCDDL)
 const encodeMint = ParseResult.encodeEither(Mint.FromCDDL)
@@ -329,7 +329,7 @@ export const FromCDDL = Schema.transformOrFail(CDDLSchema, Schema.typeSchema(Tra
       //   inputs[i] = yield* decodeTxInput(inputsArray[i])
       // }
 
-      const outputsArray = fromA.get(1n) as Array<typeof TransactionOutput.CDDLSchema.Type>
+      const outputsArray = fromA.get(1n) as Array<typeof TxOut.CDDLSchema.Type>
       const outputsLen = outputsArray.length
       const outputs = new Array(outputsLen)
       for (let i = 0; i < outputsLen; i++) {
@@ -410,7 +410,7 @@ export const FromCDDL = Schema.transformOrFail(CDDLSchema, Schema.typeSchema(Tra
       }
       const networkIdBigInt = fromA.get(15n) as bigint | undefined
       const networkId = networkIdBigInt !== undefined ? (Number(networkIdBigInt) as NetworkId.NetworkId) : undefined
-      const collateralReturnData = fromA.get(16n) as typeof TransactionOutput.CDDLSchema.Type | undefined
+      const collateralReturnData = fromA.get(16n) as typeof TxOut.CDDLSchema.Type | undefined
       const collateralReturn = collateralReturnData ? yield* decodeTxOutput(collateralReturnData) : undefined
       const totalCollateral = fromA.get(17n) as Coin.Coin | undefined
 
@@ -567,7 +567,7 @@ export const arbitrary: FastCheck.Arbitrary<TransactionBody> =
       maxLength: 5,
       selector: (i) => `${Bytes.toHexUnsafe(i.transactionId.hash)}:${i.index.toString()}`
     }),
-    outputs: FastCheck.array(TransactionOutput.arbitrary, { minLength: 1, maxLength: 5 }),
+    outputs: FastCheck.array(TxOut.arbitrary, { minLength: 1, maxLength: 5 }),
     fee: Coin.arbitrary,
     networkId: FastCheck.option(FastCheck.integer({ min: 0, max: 1 }), { nil: undefined }),
     // Optional extra (added first for iterative hardening)
@@ -614,7 +614,7 @@ export const arbitrary: FastCheck.Arbitrary<TransactionBody> =
       { nil: undefined }
     ),
     // Eleventh optional extra: collateral_return (transaction_output)
-    collateralReturn: FastCheck.option(TransactionOutput.arbitrary, { nil: undefined }),
+    collateralReturn: FastCheck.option(TxOut.arbitrary, { nil: undefined }),
     // Twelfth optional extra: total_collateral (coin)
     totalCollateral: FastCheck.option(Coin.arbitrary, { nil: undefined }),
     // Thirteenth optional extra: voting_procedures

@@ -50,7 +50,7 @@ export class ProposalProcedures extends Schema.TaggedClass<ProposalProcedures>()
   toJSON() {
     return {
       _tag: "ProposalProcedures" as const,
-      procedures: this.procedures
+      procedures: this.procedures.map(p => p.toJSON())
     }
   }
 

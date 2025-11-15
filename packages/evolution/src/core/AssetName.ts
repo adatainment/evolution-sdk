@@ -22,7 +22,7 @@ export class AssetName extends Schema.TaggedClass<AssetName>()("AssetName", {
   toJSON() {
     return {
       _tag: "AssetName",
-      bytes: this.bytes
+      bytes: Bytes.toHexUnsafe(this.bytes)
     }
   }
 

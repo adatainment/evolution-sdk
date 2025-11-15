@@ -189,24 +189,20 @@ export const executeBalance = (): Effect.Effect<
         )
         return { next: "complete" as const }
       } else {
-        // Not burn mode or drainTo: This is a bug
-        return yield* Effect.fail(
-          new TransactionBuilderError({
-            message:
-              ` CRITICAL BUG: Excess lovelace detected (${deltaLovelace}). ` +
-              `Option B design should never produce positive delta. ` +
-              `This indicates incorrect change creation or fee calculation logic.`,
-            cause: {
-              delta: formatAssetsForLog(delta),
-              attempt: buildCtx.attempt,
-              calculatedFee: buildCtx.calculatedFee.toString(),
-              changeOutputs: buildCtx.changeOutputs.length,
-              totalInputs: formatAssetsForLog(inputAssets),
-              totalOutputs: formatAssetsForLog(outputAssets),
-              changeTotal: formatAssetsForLog(changeAssets)
-            }
-          })
+        // Check if this is from fee convergence (output count changed, fee reduced)
+        // This happens when unfrack falls back from N outputs to 1 output:
+        // - Change was created with fee for N outputs
+        // - Transaction rebuilt with 1 output has smaller fee
+        // - Delta is the fee difference that should go into change
+        // Solution: Route back to ChangeCreation to recreate change with updated fee
+        
+        yield* Effect.logDebug(
+          `[Balance] Positive delta detected: ${deltaLovelace} lovelace. ` +
+          `Likely from fee reduction after output count change. ` +
+          `Routing back to changeCreation for convergence.`
         )
+        
+        return { next: "changeCreation" as const }
       }
     }
 

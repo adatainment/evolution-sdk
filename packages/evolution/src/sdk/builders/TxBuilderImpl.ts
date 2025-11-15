@@ -3,6 +3,7 @@ import { Effect, Ref, Schema } from "effect"
 import * as Array from "effect/Array"
 
 // Core imports
+import * as CoreAddress from "../../core/Address.js"
 import * as AddressEras from "../../core/AddressEras.js"
 import * as Bytes32 from "../../core/Bytes32.js"
 import * as PlutusData from "../../core/Data.js"
@@ -16,8 +17,8 @@ import * as Transaction from "../../core/Transaction.js"
 import * as TransactionBody from "../../core/TransactionBody.js"
 import * as TransactionHash from "../../core/TransactionHash.js"
 import * as TransactionInput from "../../core/TransactionInput.js"
-import * as TransactionOutput from "../../core/TransactionOutput.js"
 import * as TransactionWitnessSet from "../../core/TransactionWitnessSet.js"
+import * as TxOut from "../../core/TxOut.js"
 import * as VKey from "../../core/VKey.js"
 // SDK imports
 import * as Address from "../Address.js"
@@ -267,13 +268,13 @@ export const txOutputToTransactionOutput = (params: {
   assets: Assets.Assets
   datum?: Datum.Datum
   scriptRef?: any // TODO: Add ScriptRef type
-}): Effect.Effect<TransactionOutput.TransactionOutput, TransactionBuilderError> =>
+}): Effect.Effect<TxOut.TransactionOutput, TransactionBuilderError> =>
   Effect.gen(function* () {
     // Parse address from bech32 string to core Address type using Schema
-    const address = yield* Schema.decodeUnknown(AddressEras.FromBech32)(params.address)
+    const address = yield* Schema.decodeUnknown(CoreAddress.FromBech32)(params.address)
 
-    // Convert assets to Value (core type)
-    const value = Assets.assetsToValue(params.assets)
+    // Convert SDK Assets to core Assets directly
+    const coreAssets = Assets.toCoreAssets(params.assets)
 
     // Convert datum if provided
     let datumOption: DatumOption.DatumOption | undefined
@@ -281,10 +282,10 @@ export const txOutputToTransactionOutput = (params: {
       datumOption = yield* makeDatumOption(params.datum)
     }
 
-    // Create BabbageTransactionOutput (current era)
-    const output = new TransactionOutput.BabbageTransactionOutput({
+    // Create TransactionOutput (unified format with assets)
+    const output = new TxOut.TransactionOutput({
       address,
-      amount: value,
+      assets: coreAssets,
       datumOption,
       scriptRef: params.scriptRef
     })
@@ -339,36 +340,30 @@ export const mergeAssetsIntoUTxO = (
  * @category helpers
  */
 export const mergeAssetsIntoOutput = (
-  output: TransactionOutput.TransactionOutput,
+  output: TxOut.TransactionOutput,
   additionalAssets: Assets.Assets
-): Effect.Effect<TransactionOutput.TransactionOutput, TransactionBuilderError> =>
+): Effect.Effect<TxOut.TransactionOutput, TransactionBuilderError> =>
   Effect.gen(function* () {
-    // Extract current assets from output
-    const currentAssets = Assets.valueToAssets(output.amount)
+    // Extract current assets from output (core Assets)
+    const currentAssets = output.assets
 
-    // Merge assets
-    const mergedAssets = Assets.add(currentAssets, additionalAssets)
+    // Convert core Assets to SDK assets
+    const sdkCurrentAssets = Assets.fromCoreAssets(currentAssets)
 
-    // Convert merged assets back to Value
-    const newValue = Assets.assetsToValue(mergedAssets)
+    // Merge SDK assets
+    const mergedSDKAssets = Assets.add(sdkCurrentAssets, additionalAssets)
 
-    // Create new output with merged value, preserving type and optional fields
-    if (output instanceof TransactionOutput.BabbageTransactionOutput) {
-      const newOutput = new TransactionOutput.BabbageTransactionOutput({
-        address: output.address,
-        amount: newValue,
-        datumOption: output.datumOption,
-        scriptRef: output.scriptRef
-      })
-      return newOutput
-    } else {
-      // Shelley output
-      const newOutput = new TransactionOutput.ShelleyTransactionOutput({
-        address: output.address,
-        amount: newValue
-      })
-      return newOutput
-    }
+    // Convert merged SDK assets back to core Assets
+    const mergedCoreAssets = Assets.toCoreAssets(mergedSDKAssets)
+
+    // Create new output with merged assets, preserving optional fields
+    const newOutput = new TxOut.TransactionOutput({
+      address: output.address,
+      assets: mergedCoreAssets,
+      datumOption: output.datumOption,
+      scriptRef: output.scriptRef
+    })
+    return newOutput
   }).pipe(
     Effect.mapError(
       (error) =>
@@ -468,7 +463,7 @@ export const assembleTransaction = (
     yield* Effect.logDebug(`[Assembly] Redeemers in state: ${state.redeemers.size}`)
 
     // Convert SDK TxOutput outputs to core TransactionOutputs
-    const transactionOutputs: Array<TransactionOutput.TransactionOutput> = yield* Effect.all(
+    const transactionOutputs: Array<TxOut.TransactionOutput> = yield* Effect.all(
       outputs.map((output) =>
         txOutputToTransactionOutput({
           address: output.address,
@@ -481,7 +476,7 @@ export const assembleTransaction = (
 
     // Build collateral inputs if present
     let collateralInputs: Array.NonEmptyReadonlyArray<TransactionInput.TransactionInput> | undefined
-    let collateralReturn: TransactionOutput.TransactionOutput | undefined
+    let collateralReturn: TxOut.TransactionOutput | undefined
     let totalCollateral: bigint | undefined
 
     if (state.collateral) {
@@ -506,7 +501,7 @@ export const assembleTransaction = (
           scriptRef: state.collateral.returnOutput.scriptRef
         })
         yield* Effect.logDebug(
-          `[Assembly] Collateral return TransactionOutput amount type: ${collateralReturn.amount._tag}`
+          `[Assembly] Collateral return TransactionOutput lovelace: ${collateralReturn.assets.lovelace}`
         )
       }
     }
@@ -884,7 +879,7 @@ export const calculateFeeIteratively = (
     const fakeWitnessSet = yield* buildFakeWitnessSet(inputUtxos)
 
     // Convert SDK TxOutput outputs to core TransactionOutputs once
-    const transactionOutputs: Array<TransactionOutput.TransactionOutput> = yield* Effect.all(
+    const transactionOutputs: Array<TxOut.TransactionOutput> = yield* Effect.all(
       outputs.map((output) =>
         txOutputToTransactionOutput({
           address: output.address,
@@ -1125,7 +1120,7 @@ export const calculateMinimumUtxoLovelace = (params: {
 
     // Encode to CBOR bytes to get the actual size
     const cborBytes = yield* Effect.try({
-      try: () => TransactionOutput.toCBORBytes(tempOutput),
+      try: () => TxOut.toCBORBytes(tempOutput),
       catch: (error) =>
         new TransactionBuilderError({
           message: "Failed to encode output to CBOR for min UTxO calculation",

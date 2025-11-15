@@ -100,9 +100,18 @@ export class MultiAsset extends Schema.Class<MultiAsset>("MultiAsset")({
    * @category conversions
    */
   toJSON() {
+    // Convert the nested Map<PolicyId, Map<AssetName, bigint>> to a serializable format
+    const serializedMap: Record<string, Record<string, string>> = {}
+    for (const [policyId, assetMap] of this.map.entries()) {
+      const serializedAssets: Record<string, string> = {}
+      for (const [assetName, quantity] of assetMap.entries()) {
+        serializedAssets[Bytes.toHexUnsafe(assetName.bytes)] = quantity.toString()
+      }
+      serializedMap[Bytes.toHexUnsafe(policyId.hash)] = serializedAssets
+    }
     return {
       _tag: "MultiAsset" as const,
-      map: this.map
+      map: serializedMap
     }
   }
 

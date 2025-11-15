@@ -1,6 +1,6 @@
 ---
 title: sdk/RewardAddress.ts
-nav_order: 170
+nav_order: 172
 parent: Modules
 ---
 

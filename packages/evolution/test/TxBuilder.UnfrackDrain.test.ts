@@ -160,17 +160,17 @@ describe("TxBuilder Unfrack + DrainTo Integration", () => {
       // Coin selection picks only the first UTxO (200 ADA) since it's sufficient
       expect(tx.body.inputs.length).toBe(1)
       expect(tx.body.outputs.length).toBe(4) // Exact: 1 payment + 3 subdivided change outputs
-      expect(tx.body.fee).toBe(174_213n) // Exact deterministic fee (428 bytes * 44 + 155_381)
+      expect(tx.body.fee).toBe(173_861n) // Exact deterministic fee (420 bytes * 44 + 155_381, 4 outputs save 8 bytes)
       
       // Verify exact output amounts (from 200 ADA input - 1 ADA payment - fee)
-      expect(tx.body.outputs[0].amount.coin).toBe(1_000_000n) // Payment
-      expect(tx.body.outputs[1].amount.coin).toBe(99_412_893n) // 50% of 198,825,787 change
-      expect(tx.body.outputs[2].amount.coin).toBe(59_647_736n) // 30% of 198,825,787 change
-      expect(tx.body.outputs[3].amount.coin).toBe(39_765_158n) // 20% of 198,825,787 change
+      expect(tx.body.outputs[0].assets.lovelace).toBe(1_000_000n) // Payment
+      expect(tx.body.outputs[1].assets.lovelace).toBe(99_413_069n) // 50% of 198,826,139 change
+      expect(tx.body.outputs[2].assets.lovelace).toBe(59_647_841n) // 30% of 198,826,139 change (rounding)
+      expect(tx.body.outputs[3].assets.lovelace).toBe(39_765_229n) // 20% of 198,826,139 change (rounding)
 
       // Verify all outputs are ADA-only (no tokens)
       tx.body.outputs.forEach((output) => {
-        expect(output.amount._tag).toBe("OnlyCoin")
+        expect(output.assets.multiAsset).toBeUndefined()
       })
     })
 
@@ -215,15 +215,15 @@ describe("TxBuilder Unfrack + DrainTo Integration", () => {
       // Coin selection picks only first UTxO (50 ADA) since it's sufficient
       expect(tx.body.inputs.length).toBe(1)
       expect(tx.body.outputs.length).toBe(2) // Exact: 1 payment + 1 change (no subdivision)
-      expect(tx.body.fee).toBe(168_317n) // Exact deterministic fee (294 bytes * 44 + 155_381)
+      expect(tx.body.fee).toBe(168_141n) // Exact deterministic fee (290 bytes * 44 + 155_381, 2 outputs save 4 bytes)
       
       // Verify exact output amounts (from 50 ADA input - 1 ADA payment - fee)
-      expect(tx.body.outputs[0].amount.coin).toBe(1_000_000n) // Payment
-      expect(tx.body.outputs[1].amount.coin).toBe(48_831_683n) // Change (50M - 1M - fee)
+      expect(tx.body.outputs[0].assets.lovelace).toBe(1_000_000n) // Payment
+      expect(tx.body.outputs[1].assets.lovelace).toBe(48_831_859n) // Change (50M - 1M - fee)
       
       // All outputs should be ADA-only
       tx.body.outputs.forEach((output) => {
-        expect(output.amount._tag).toBe("OnlyCoin")
+        expect(output.assets.multiAsset).toBeUndefined()
       })
     })
   })
@@ -265,11 +265,11 @@ describe("TxBuilder Unfrack + DrainTo Integration", () => {
       // Strict deterministic expectations
       expect(tx.body.inputs.length).toBe(6)
       expect(tx.body.outputs.length).toBe(12) // Exact: 1 payment + 11 unfracked change outputs
-      expect(tx.body.fee).toBe(214_825n) // Exact deterministic fee (1351 bytes * 44 + 155_381)
+      expect(tx.body.fee).toBe(213_769n) // Exact deterministic fee (1327 bytes * 44 + 155_381, 12 outputs save 24 bytes)
 
       // Verify we have both token outputs and ADA-only outputs
       const tokenOutputs = tx.body.outputs.filter(
-        (output) => output.amount._tag === "WithAssets"
+        (output) => output.assets.multiAsset !== undefined
       )
       expect(tokenOutputs.length).toBe(4) // Exact: 4 token bundle outputs
     })
@@ -307,11 +307,11 @@ describe("TxBuilder Unfrack + DrainTo Integration", () => {
       // Strict deterministic expectations
       expect(tx.body.inputs.length).toBe(6)
       expect(tx.body.outputs.length).toBe(12) // Exact: 1 payment + 11 unfracked change outputs
-      expect(tx.body.fee).toBe(214_825n) // Exact deterministic fee (1351 bytes * 44 + 155_381)
+      expect(tx.body.fee).toBe(213_769n) // Exact deterministic fee (1327 bytes * 44 + 155_381, 12 outputs save 24 bytes)
 
       // Verify separate outputs for fungibles vs NFTs
       const tokenOutputs = tx.body.outputs.filter(
-        (output) => output.amount._tag === "WithAssets"
+        (output) => output.assets.multiAsset !== undefined
       )
       expect(tokenOutputs.length).toBe(4) // Exact: 4 token bundle outputs
     })
@@ -349,11 +349,11 @@ describe("TxBuilder Unfrack + DrainTo Integration", () => {
       // Strict deterministic expectations
       expect(tx.body.inputs.length).toBe(6)
       expect(tx.body.outputs.length).toBe(12) // Exact: 1 payment + 11 unfracked change outputs
-      expect(tx.body.fee).toBe(214_825n) // Exact deterministic fee (1351 bytes * 44 + 155_381)
+      expect(tx.body.fee).toBe(213_769n) // Exact deterministic fee (1327 bytes * 44 + 155_381, 12 outputs save 24 bytes)
 
       // NFTs from the same policy should be in the same output
       const tokenOutputs = tx.body.outputs.filter(
-        (output) => output.amount._tag === "WithAssets"
+        (output) => output.assets.multiAsset !== undefined
       )
       expect(tokenOutputs.length).toBe(4) // Exact: 4 token bundle outputs
     })
@@ -393,14 +393,14 @@ describe("TxBuilder Unfrack + DrainTo Integration", () => {
       // Strict deterministic expectations - full optimization
       expect(tx.body.inputs.length).toBe(6) // All 6 UTxOs consumed
       expect(tx.body.outputs.length).toBe(10) // Exact: 1 payment + 9 unfracked change outputs
-      expect(tx.body.fee).toBe(208_929n) // Exact deterministic fee (1217 bytes * 44 + 155_381)
+      expect(tx.body.fee).toBe(208_049n) // Exact deterministic fee (1197 bytes * 44 + 155_381, 10 outputs save 20 bytes)
 
       // Count output types
       const adaOnlyOutputs = tx.body.outputs.filter(
-        (output) => output.amount._tag === "OnlyCoin"
+        (output) => output.assets.multiAsset === undefined
       )
       const tokenOutputs = tx.body.outputs.filter(
-        (output) => output.amount._tag === "WithAssets"
+        (output) => output.assets.multiAsset !== undefined
       )
 
       expect(adaOnlyOutputs.length).toBe(6) // Exact: 1 payment + 5 ADA subdivisions
@@ -442,14 +442,14 @@ describe("TxBuilder Unfrack + DrainTo Integration", () => {
       expect(tx.body.fee).toBeGreaterThan(0n) // Fee must be positive
 
       const totalInput = utxos.reduce((sum, utxo) => sum + Assets.getLovelace(utxo.assets), 0n)
-      const totalOutput = tx.body.outputs.reduce((sum, output) => sum + output.amount.coin, 0n)
+      const totalOutput = tx.body.outputs.reduce((sum, output) => sum + output.assets.lovelace, 0n)
       
       // Verify balance: inputs = outputs + fee
       expect(totalInput).toBe(totalOutput + tx.body.fee)
 
       // All outputs should be ADA-only in this test
       tx.body.outputs.forEach((output) => {
-        expect(output.amount._tag).toBe("OnlyCoin")
+        expect(output.assets.multiAsset).toBeUndefined()
       })
     })
 
@@ -486,11 +486,11 @@ describe("TxBuilder Unfrack + DrainTo Integration", () => {
       // Strict deterministic expectations - ADA subdivision only (no tokens)
       expect(tx.body.inputs.length).toBe(2)
       expect(tx.body.outputs.length).toBe(3) // Exact: 1 payment + 2 subdivided change outputs (60%, 40%)
-      expect(tx.body.fee).toBe(172_849n) // Exact deterministic fee (397 bytes * 44 + 155_381)
+      expect(tx.body.fee).toBe(172_585n) // Exact deterministic fee (391 bytes * 44 + 155_381, 3 outputs save 6 bytes)
 
       // All outputs should be ADA-only
       tx.body.outputs.forEach((output) => {
-        expect(output.amount._tag).toBe("OnlyCoin")
+        expect(output.assets.multiAsset).toBeUndefined()
       })
     })
 
@@ -536,14 +536,14 @@ describe("TxBuilder Unfrack + DrainTo Integration", () => {
       // Strict deterministic expectations - small leftover, no subdivision
       expect(tx.body.inputs.length).toBe(2)
       expect(tx.body.outputs.length).toBe(2) // Exact: 1 payment + 1 change (no subdivision)
-      expect(tx.body.fee).toBe(169_901n) // Exact deterministic fee (330 bytes * 44 + 155_381)
+      expect(tx.body.fee).toBe(169_725n) // Exact deterministic fee (326 bytes * 44 + 155_381, 2 outputs save 4 bytes)
 
       // Verify exact total output
       const totalOutput = tx.body.outputs.reduce(
-        (sum, output) => sum + output.amount.coin,
+        (sum, output) => sum + output.assets.lovelace,
         0n
       )
-      expect(totalOutput).toBe(14_830_099n) // 15M - fee (15,000,000 - 169,901)
+      expect(totalOutput).toBe(14_830_275n) // 15M - fee (15,000,000 - 169,725)
     })
 
     it("should work with multiple payment outputs and drainTo", async () => {
@@ -582,14 +582,14 @@ describe("TxBuilder Unfrack + DrainTo Integration", () => {
       // Strict deterministic expectations - multiple payments with unfracked change
       expect(tx.body.inputs.length).toBe(6)
       expect(tx.body.outputs.length).toBe(13) // Exact: 2 payments + 11 unfracked change outputs
-      expect(tx.body.fee).toBe(217_773n) // Exact deterministic fee (1418 bytes * 44 + 155_381)
+      expect(tx.body.fee).toBe(216_629n) // Exact deterministic fee (1392 bytes * 44 + 155_381, 13 outputs save 26 bytes)
 
       // Verify exact total output
       const totalOutput = tx.body.outputs.reduce(
-        (sum, output) => sum + output.amount.coin,
+        (sum, output) => sum + output.assets.lovelace,
         0n
       )
-      expect(totalOutput).toBe(539_782_227n) // 540M - fee (540,000,000 - 217,773)
+      expect(totalOutput).toBe(539_783_371n) // 540M - fee (540,000,000 - 216,629)
     })
 
     it("should respect minimum UTxO requirements when subdividing small amounts", async () => {
@@ -632,14 +632,14 @@ describe("TxBuilder Unfrack + DrainTo Integration", () => {
       // Strict deterministic expectations - respects min UTxO when subdividing small amounts
       expect(tx.body.inputs.length).toBe(1)
       expect(tx.body.outputs.length).toBe(5) // Exact: 1 payment + 4 subdivided outputs
-      expect(tx.body.fee).toBe(177_161n) // Exact deterministic fee (495 bytes * 44 + 155_381)
+      expect(tx.body.fee).toBe(176_721n) // Exact deterministic fee (485 bytes * 44 + 155_381, 5 outputs save 10 bytes)
       
       // Calculate actual minimum UTxO for ADA-only output
       const actualMinUtxo = 172_400n
       
       // All outputs should meet minimum
       tx.body.outputs.forEach((output) => {
-        expect(output.amount.coin).toBeGreaterThanOrEqual(actualMinUtxo)
+        expect(output.assets.lovelace).toBeGreaterThanOrEqual(actualMinUtxo)
       })
     })
   })
@@ -685,12 +685,12 @@ describe("TxBuilder Unfrack + DrainTo Integration", () => {
       // Strict deterministic expectations - full wallet optimization
       expect(tx.body.inputs.length).toBe(6) // All fragments consumed
       expect(tx.body.outputs.length).toBe(9) // Exact: 1 payment + 8 unfracked change outputs
-      expect(tx.body.fee).toBe(205_981n) // Exact deterministic fee (1150 bytes * 44 + 155_381)
+      expect(tx.body.fee).toBe(205_189n) // Exact deterministic fee (1132 bytes * 44 + 155_381, 9 outputs save 18 bytes)
 
       // Verify we have a good mix of outputs
-      const adaOnly = tx.body.outputs.filter((o) => o.amount._tag === "OnlyCoin")
+      const adaOnly = tx.body.outputs.filter((o) => o.assets.multiAsset === undefined)
       const withTokens = tx.body.outputs.filter(
-        (o) => o.amount._tag === "WithAssets"
+        (o) => o.assets.multiAsset !== undefined
       )
 
       expect(adaOnly.length).toBe(5) // Exact: 1 payment + 4 ADA subdivisions
@@ -732,11 +732,11 @@ describe("TxBuilder Unfrack + DrainTo Integration", () => {
       // Strict deterministic expectations - wallet migration with full optimization
       expect(tx.body.inputs.length).toBe(6) // All source UTxOs
       expect(tx.body.outputs.length).toBe(10) // Exact: 1 payment + 9 change outputs  
-      expect(tx.body.fee).toBe(208_929n) // Exact deterministic fee (1217 bytes * 44 + 155_381)
+      expect(tx.body.fee).toBe(208_049n) // Exact deterministic fee (1197 bytes * 44 + 155_381, 10 outputs save 20 bytes)
 
             // Verify balance: total input (540M ADA) = outputs + fee
       const totalOutput = tx.body.outputs.reduce(
-        (sum, output) => sum + output.amount.coin,
+        (sum, output) => sum + output.assets.lovelace,
         0n
       )
       

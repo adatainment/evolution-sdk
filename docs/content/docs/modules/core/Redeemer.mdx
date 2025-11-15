@@ -1,6 +1,6 @@
 ---
 title: core/Redeemer.ts
-nav_order: 92
+nav_order: 93
 parent: Modules
 ---
 
@@ -21,10 +21,11 @@ parent: Modules
   - [arbitraryRedeemerTag](#arbitraryredeemertag)
 - [model](#model)
   - [ExUnits (class)](#exunits-class)
+    - [toJSON (method)](#tojson-method)
     - [[Equal.symbol] (method)](#equalsymbol-method)
     - [[Hash.symbol] (method)](#hashsymbol-method)
   - [Redeemer (class)](#redeemer-class)
-    - [toJSON (method)](#tojson-method)
+    - [toJSON (method)](#tojson-method-1)
     - [toString (method)](#tostring-method)
     - [[Inspectable.NodeInspectSymbol] (method)](#inspectablenodeinspectsymbol-method)
     - [[Equal.symbol] (method)](#equalsymbol-method-1)
@@ -156,6 +157,14 @@ export declare class ExUnits
 ```
 
 Added in v2.0.0
+
+### toJSON (method)
+
+**Signature**
+
+```ts
+toJSON()
+```
 
 ### [Equal.symbol] (method)
 

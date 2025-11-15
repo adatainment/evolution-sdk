@@ -1,14 +1,13 @@
-import { Effect as Eff, Option, ParseResult, Schema } from "effect"
+import { Effect as Eff, ParseResult, Schema } from "effect"
 import * as Equal from "effect/Equal"
 
 import * as AssetName from "../core/AssetName.js"
-import * as Coin from "../core/Coin.js"
+import * as CoreAssets from "../core/Assets.js"
 import * as CoreMint from "../core/Mint.js"
 import * as MultiAsset from "../core/MultiAsset.js"
 import * as NonZeroInt64 from "../core/NonZeroInt64.js"
 import * as CorePolicyId from "../core/PolicyId.js"
 import * as PositiveCoin from "../core/PositiveCoin.js"
-import * as CoreValue from "../core/Value.js"
 import * as Unit from "./Unit.js"
 
 export const AssetsSchema = Schema.Struct({
@@ -256,24 +255,24 @@ export const addLovelace = (assets: Assets, amount: bigint): Assets => ({
 })
 
 /**
- * Convert a core Value to the Assets interface format.
+ * Convert core Assets (lovelace + optional MultiAsset) to SDK Assets format.
+ * 
+ * @since 2.0.0
+ * @category conversion
  */
-export const valueToAssets = (value: CoreValue.Value): Assets => {
+export const fromCoreAssets = (coreAssets: CoreAssets.Assets): Assets => {
   const assets: Record<string, bigint> = {}
 
-  // Add ADA (lovelace) from the Value
-  const adaAmount = CoreValue.getAda(value)
-  assets.lovelace = BigInt(adaAmount.toString())
+  // Add lovelace
+  assets.lovelace = coreAssets.lovelace
 
-  // Get MultiAsset if it exists
-  const multiAsset = CoreValue.getAssets(value)
-  if (Option.isSome(multiAsset)) {
-    // Iterate through all policy IDs
-    const policyIds = MultiAsset.getPolicyIds(multiAsset.value)
+  // Add native assets from MultiAsset if present
+  if (coreAssets.multiAsset !== undefined) {
+    const policyIds = MultiAsset.getPolicyIds(coreAssets.multiAsset)
 
     for (const policyId of policyIds) {
       const policyIdStr = CorePolicyId.toHex(policyId)
-      const assetsByPolicy = MultiAsset.getAssetsByPolicy(multiAsset.value, policyId)
+      const assetsByPolicy = MultiAsset.getAssetsByPolicy(coreAssets.multiAsset, policyId)
 
       for (const [assetName, amount] of assetsByPolicy) {
         const assetNameStr = AssetName.toHex(assetName)
@@ -287,22 +286,24 @@ export const valueToAssets = (value: CoreValue.Value): Assets => {
 }
 
 /**
- * Convert Assets interface format to a core Value.
+ * Convert SDK Assets format to core Assets (lovelace + optional MultiAsset).
+ * 
+ * @since 2.0.0
+ * @category conversion
  */
-export const assetsToValue = (assets: Assets): CoreValue.Value => {
+export const toCoreAssets = (assets: Assets): CoreAssets.Assets => {
   // Extract ADA amount (lovelace key)
-  const adaAmount = assets.lovelace || BigInt(0)
-  const coin = Coin.Coin.make(adaAmount)
+  const lovelace = assets.lovelace || 0n
 
   // Filter out ADA to get only native assets
   const nativeAssets = Object.entries(assets).filter(([unit]) => unit !== "lovelace")
 
   if (nativeAssets.length === 0) {
-    // Only ADA, return OnlyCoin
-    return CoreValue.onlyCoin(coin)
+    // Only ADA, no MultiAsset
+    return CoreAssets.fromLovelace(lovelace)
   }
 
-  // Build MultiAsset map (not a MultiAsset instance yet, to avoid schema validation issues)
+  // Build MultiAsset map
   const multiAssetMap = new Map<CorePolicyId.PolicyId, Map<AssetName.AssetName, PositiveCoin.PositiveCoin>>()
 
   for (const [unit, amount] of nativeAssets) {
@@ -334,15 +335,9 @@ export const assetsToValue = (assets: Assets): CoreValue.Value => {
     policyMap.set(coreAssetName, positiveAmount)
   }
 
-  // Check if multiAssetMap is empty after processing
-  if (multiAssetMap.size === 0) {
-    return CoreValue.onlyCoin(coin)
-  }
-
-  // Create the MultiAsset only if we have assets
+  // Create the MultiAsset and return with lovelace
   const multiAsset = new MultiAsset.MultiAsset({ map: multiAssetMap })
-
-  return CoreValue.withAssets(coin, multiAsset)
+  return CoreAssets.withMultiAsset(lovelace, multiAsset)
 }
 
 // ============================================================================
@@ -350,26 +345,25 @@ export const assetsToValue = (assets: Assets): CoreValue.Value => {
 // ============================================================================
 
 /**
- * Transform between Assets (SDK-friendly) and Value (Core).
+ * Transform between Assets (SDK-friendly) and core Assets.
  *
  * @since 2.0.0
  * @category schemas
  */
-export const ValueFromAssets = Schema.transformOrFail(
+export const CoreAssetsFromAssets = Schema.transformOrFail(
   AssetsSchema, // Encoded: Assets format
-  Schema.typeSchema(CoreValue.Value), // Type: Core Value
+  Schema.typeSchema(CoreAssets.Assets), // Type: Core Assets
   {
     strict: true,
     decode: (assets) =>
       Eff.gen(function* () {
-        // Assets → Value
+        // Assets → Core Assets
         const lovelace = assets.lovelace ?? 0n
-        const coin = lovelace
 
         const nativeAssets = Object.entries(assets).filter(([unit]) => unit !== "lovelace")
 
         if (nativeAssets.length === 0) {
-          return CoreValue.onlyCoin(coin)
+          return CoreAssets.fromLovelace(lovelace)
         }
 
         const multiAssetMap = MultiAsset.empty()
@@ -398,25 +392,23 @@ export const ValueFromAssets = Schema.transformOrFail(
           policyMap.set(coreAssetName, amount)
         }
 
-        return CoreValue.withAssets(coin, multiAssetMap as MultiAsset.MultiAsset)
+        return CoreAssets.withMultiAsset(lovelace, multiAssetMap as MultiAsset.MultiAsset)
       }),
-    encode: (value) =>
+    encode: (coreAssets) =>
       Eff.gen(function* () {
-        // Value → Assets
+        // Core Assets → SDK Assets
         const assets: Record<string, bigint> = {}
 
-        const adaAmount = CoreValue.getAda(value)
-        if (adaAmount !== 0n) {
-          assets.lovelace = adaAmount
+        if (coreAssets.lovelace !== 0n) {
+          assets.lovelace = coreAssets.lovelace
         }
 
-        const multiAsset = CoreValue.getAssets(value)
-        if (Option.isSome(multiAsset)) {
-          const policyIds = MultiAsset.getPolicyIds(multiAsset.value)
+        if (coreAssets.multiAsset !== undefined) {
+          const policyIds = MultiAsset.getPolicyIds(coreAssets.multiAsset)
 
           for (const policyId of policyIds) {
             const policyIdStr = CorePolicyId.toHex(policyId)
-            const assetsByPolicy = MultiAsset.getAssetsByPolicy(multiAsset.value, policyId)
+            const assetsByPolicy = MultiAsset.getAssetsByPolicy(coreAssets.multiAsset, policyId)
 
             for (const [assetName, amount] of assetsByPolicy) {
               const assetNameStr = AssetName.toHex(assetName)
@@ -430,9 +422,9 @@ export const ValueFromAssets = Schema.transformOrFail(
       })
   }
 ).annotations({
-  identifier: "Value.FromAssets",
-  title: "Value from Assets",
-  description: "Transform between Assets format and Value"
+  identifier: "CoreAssets.FromAssets",
+  title: "Core Assets from SDK Assets",
+  description: "Transform between SDK Assets format and Core Assets"
 })
 
 // ============================================================================
@@ -506,20 +498,20 @@ export const MintFromAssets = Schema.transformOrFail(
 // ============================================================================
 
 /**
- * Convert Core Value to SDK Assets format.
+ * Convert Core Assets to SDK Assets format.
  *
  * @since 2.0.0
  * @category conversion
  */
-export const fromValue = Schema.encodeSync(ValueFromAssets)
+export const fromCoreAssetsSchema = Schema.encodeSync(CoreAssetsFromAssets)
 
 /**
- * Convert SDK Assets to Core Value.
+ * Convert SDK Assets to Core Assets.
  *
  * @since 2.0.0
  * @category conversion
  */
-export const toValue = Schema.decodeSync(ValueFromAssets)
+export const toCoreAssetsSchema = Schema.decodeSync(CoreAssetsFromAssets)
 
 /**
  * Convert Core Mint to SDK Assets format (without lovelace).

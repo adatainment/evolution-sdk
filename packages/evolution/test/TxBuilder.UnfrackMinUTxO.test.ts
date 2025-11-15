@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 
-import * as AddressEras from "../src/core/AddressEras.js"
+import * as Address from "../src/core/Address.js"
 import * as Assets from "../src/sdk/Assets.js"
 import type { TxBuilderConfig } from "../src/sdk/builders/TransactionBuilder.js"
 import { makeTxBuilder } from "../src/sdk/builders/TransactionBuilder.js"
@@ -104,22 +104,22 @@ describe.concurrent("TxBuilder - Unfrack MinUTxO", () => {
     
     // Find change outputs (unfrack may create multiple)
     const changeOutputs = tx.body.outputs.filter(
-      (out) => AddressEras.toBech32(out.address) === CHANGE_ADDRESS
+      (out) => Address.toBech32(out.address) === CHANGE_ADDRESS
     )
     
     expect(changeOutputs.length).toBeGreaterThanOrEqual(1)
     
     // Verify at least one change output has native assets
     const hasNativeAssets = changeOutputs.some((out) => 
-      "assets" in out.amount && out.amount.assets && out.amount.assets.map.size > 0
+      out.assets.multiAsset !== undefined && out.assets.multiAsset.map.size > 0
     )
     expect(hasNativeAssets).toBe(true)
     
     // Verify total tokens across all change outputs
     let totalTokens = 0
     for (const out of changeOutputs) {
-      if ("assets" in out.amount && out.amount.assets) {
-        for (const [_policyId, assetNames] of out.amount.assets.map) {
+      if (out.assets.multiAsset !== undefined) {
+        for (const [_policyId, assetNames] of out.assets.multiAsset.map) {
           totalTokens += assetNames.size
         }
       }
@@ -201,7 +201,7 @@ describe.concurrent("TxBuilder - Unfrack MinUTxO", () => {
 
     // Assert: Should have payment + 3 unfrack bundles (15 tokens with bundleSize=5)
     const changeOutputs = tx.body.outputs.filter(
-      (out) => AddressEras.toBech32(out.address) === CHANGE_ADDRESS
+      (out) => Address.toBech32(out.address) === CHANGE_ADDRESS
     )
 
     expect(changeOutputs.length).toBeGreaterThanOrEqual(2) // At least 2 bundles (may merge some)
@@ -211,10 +211,10 @@ describe.concurrent("TxBuilder - Unfrack MinUTxO", () => {
     let totalLovelace = 0n
     
     for (const out of changeOutputs) {
-      totalLovelace += out.amount.coin
+      totalLovelace += out.assets.lovelace
       
-      if ("assets" in out.amount && out.amount.assets) {
-        for (const [_policyId, assetNames] of out.amount.assets.map) {
+      if (out.assets.multiAsset !== undefined) {
+        for (const [_policyId, assetNames] of out.assets.multiAsset.map) {
           totalTokens += assetNames.size
         }
       }
@@ -269,7 +269,7 @@ describe.concurrent("TxBuilder - Unfrack MinUTxO", () => {
     // Verify native asset is preserved (either in payment or change)
     let totalAssets = 0
     for (const output of tx.body.outputs) {
-      if ("assets" in output.amount && output.amount.assets) {
+      if (output.assets.multiAsset !== undefined) {
         totalAssets += 1
       }
     }

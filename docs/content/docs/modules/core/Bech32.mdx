@@ -1,6 +1,6 @@
 ---
 title: core/Bech32.ts
-nav_order: 9
+nav_order: 10
 parent: Modules
 ---
 

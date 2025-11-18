@@ -4,7 +4,7 @@ import type { NonEmptyReadonlyArray } from "effect/Array"
 
 import * as Data from "./Data.js"
 
-export interface ByteArray extends Schema.Schema<string, string, never> {}
+export interface ByteArray extends Schema.Schema<Uint8Array, Uint8Array, never> {}
 
 /**
  * Schema transformations between TypeScript types and Plutus Data
@@ -12,42 +12,21 @@ export interface ByteArray extends Schema.Schema<string, string, never> {}
  * This module provides bidirectional transformations:
  * 1. TypeScript types => Plutus Data type => CBOR hex
  * 2. CBOR hex => Plutus Data type => TypeScript types
+ * 
+ * It also exports utility functions for working with schemas:
+ * - `equivalence`: Creates optimized equality comparison functions
+ * - `is`: Type guard for schema validation
+ * - `compose`: Combines schemas
+ * - `filter`: Adds refinements to schemas
  */
 
 /**
- * ByteArray schema for PlutusData hex strings.
- * Since Data.ByteArray is now hex string based, this is just an alias to it.
+ * ByteArray schema for PlutusData - runtime Uint8Array, encoded as hex string.
  *
  * @since 2.0.0
  * @category schemas
  */
-export const ByteArray: ByteArray = Data.ByteArray
-
-/**
- * HexString schema that transforms hex string to ByteArray for PlutusData.
- * This transforms from hex string to Uint8Array (runtime Data type) and back.
- *
- * @since 2.0.0
- * @category schemas
- */
-export const HexString = Schema.transform(Schema.Uint8ArrayFromSelf, Schema.String, {
-  strict: true,
-  encode: (hex: string) => {
-    // Convert hex string to Uint8Array
-    if (hex.length % 2 !== 0) {
-      throw new Error("Invalid hex string length")
-    }
-    const bytes = new Uint8Array(hex.length / 2)
-    for (let i = 0; i < hex.length; i += 2) {
-      bytes[i / 2] = parseInt(hex.substr(i, 2), 16)
-    }
-    return bytes
-  },
-  decode: (bytes: Uint8Array) => {
-    // Convert Uint8Array to hex string
-    return globalThis.Array.from(bytes, (byte: number) => byte.toString(16).padStart(2, "0")).join("")
-  }
-})
+export const ByteArray: ByteArray = Schema.typeSchema(Data.ByteArray)
 
 export interface Integer extends Schema.SchemaClass<bigint, bigint, never> {}
 
@@ -60,7 +39,7 @@ export interface Integer extends Schema.SchemaClass<bigint, bigint, never> {}
  */
 export const Integer: Integer = Schema.typeSchema(Data.IntSchema)
 
-interface Literal<Literals extends NonEmptyReadonlyArray<SchemaAST.LiteralValue>>
+export interface Literal<Literals extends NonEmptyReadonlyArray<SchemaAST.LiteralValue>>
   extends Schema.transform<Schema.SchemaClass<Data.Constr, Data.Constr, never>, Schema.Literal<[...Literals]>> {}
 
 /**
@@ -77,7 +56,7 @@ export const Literal = <Literals extends NonEmptyReadonlyArray<Exclude<SchemaAST
     decode: (value) => self[Number(value.index)]
   })
 
-interface OneLiteral<Single extends Exclude<SchemaAST.LiteralValue, null | bigint>>
+export interface OneLiteral<Single extends Exclude<SchemaAST.LiteralValue, null | bigint>>
   extends Schema.transform<Schema.SchemaClass<Data.Constr, Data.Constr, never>, Schema.Literal<[Single]>> {}
 
 export const OneLiteral = <Single extends Exclude<SchemaAST.LiteralValue, null | bigint>>(
@@ -91,7 +70,7 @@ export const OneLiteral = <Single extends Exclude<SchemaAST.LiteralValue, null |
     decode: (_value) => self
   })
 
-interface Array<S extends Schema.Schema.Any> extends Schema.Array$<S> {}
+export interface Array<S extends Schema.Schema.Any> extends Schema.Array$<S> {}
 
 /**
  * Creates a schema for arrays - just passes through to Schema.Array directly
@@ -100,9 +79,9 @@ interface Array<S extends Schema.Schema.Any> extends Schema.Array$<S> {}
  */
 export const Array = <S extends Schema.Schema.Any>(items: S): Array<S> => Schema.Array(items)
 
-interface Map<K extends Schema.Schema.Any, V extends Schema.Schema.Any>
+export interface Map<K extends Schema.Schema.Any, V extends Schema.Schema.Any>
   extends Schema.transform<
-    Schema.SchemaClass<ReadonlyMap<Data.Data, Data.Data>, ReadonlyMap<Data.Data, Data.Data>, never>,
+    Schema.SchemaClass<globalThis.Map<Data.Data, Data.Data>, globalThis.Map<Data.Data, Data.Data>, never>,
     Schema.MapFromSelf<K, V>
   > {}
 
@@ -119,7 +98,7 @@ export const Map = <K extends Schema.Schema.Any, V extends Schema.Schema.Any>(ke
     encode: (tsMap) => {
       // Transform TypeScript Map<K_TS, V_TS> to Data Map<K_Data, V_Data>
       // The individual key/value transformations are handled by the schema framework
-      return new globalThis.Map([...tsMap]) as ReadonlyMap<Data.Data, Data.Data>
+      return new globalThis.Map([...tsMap])
     },
     decode: (dataMap) => {
       // Transform Data Map<K_Data, V_Data> to TypeScript Map<K_TS, V_TS>
@@ -128,7 +107,7 @@ export const Map = <K extends Schema.Schema.Any, V extends Schema.Schema.Any>(ke
     }
   })
 
-interface NullOr<S extends Schema.Schema.All>
+export interface NullOr<S extends Schema.Schema.All>
   extends Schema.transform<Schema.SchemaClass<Data.Constr, Data.Constr, never>, Schema.NullOr<S>> {}
 
 /**
@@ -147,7 +126,7 @@ export const NullOr = <S extends Schema.Schema.All>(self: S): NullOr<S> =>
     decode: (value) => (value.index === 1n ? null : (value.fields[0] as Schema.Schema.Type<S>))
   })
 
-interface UndefineOr<S extends Schema.Schema.Any>
+export interface UndefineOr<S extends Schema.Schema.Any>
   extends Schema.transform<Schema.SchemaClass<Data.Constr, Data.Constr, never>, Schema.UndefinedOr<S>> {}
 
 /**
@@ -168,7 +147,7 @@ export const UndefinedOr = <S extends Schema.Schema.Any>(self: S): UndefineOr<S>
     decode: (value) => (value.index === 1n ? undefined : (value.fields[0] as Schema.Schema.Type<S>))
   })
 
-interface Boolean
+export interface Boolean
   extends Schema.transform<Schema.SchemaClass<Data.Constr, Data.Constr, never>, typeof Schema.Boolean> {}
 
 /**
@@ -201,7 +180,7 @@ export const Boolean: Boolean = Schema.transform(
   identifier: "TSchema.BooleanFromConstr"
 })
 
-interface Struct<Fields extends Schema.Struct.Fields>
+export interface Struct<Fields extends Schema.Struct.Fields>
   extends Schema.transform<Schema.SchemaClass<Data.Constr, Data.Constr, never>, Schema.Struct<Fields>> {}
 
 /**
@@ -217,7 +196,7 @@ export interface StructOptions {
    * When used in a Union, controls whether this Struct should be "flattened" (unwrapped).
    * - true: Encodes as Constr(index, [fields]) directly
    * - false: Encodes as Constr(unionPos, [Constr(index, [fields])]) (nested)
-   * 
+   *
    * Default: true when index is specified, false otherwise
    */
   flat?: boolean
@@ -234,9 +213,9 @@ export const Struct = <Fields extends Schema.Struct.Fields>(
   options: StructOptions = {}
 ): Struct<Fields> => {
   const { flat, index = 0 } = options
-  
+
   // Default: flat is true when index is explicitly set, false otherwise
-  const isFlat = flat ?? (options.index !== undefined)
+  const isFlat = flat ?? options.index !== undefined
 
   return Schema.transform(Schema.typeSchema(Data.Constr), Schema.Struct(fields), {
     strict: false,
@@ -265,7 +244,7 @@ export const Struct = <Fields extends Schema.Struct.Fields>(
   })
 }
 
-interface Union<Members extends ReadonlyArray<Schema.Schema.Any>>
+export interface Union<Members extends ReadonlyArray<Schema.Schema.Any>>
   extends Schema.transformOrFail<
     Schema.SchemaClass<Data.Constr, Data.Constr, never>,
     Schema.SchemaClass<Schema.Schema.Type<[...Members][number]>, Schema.Schema.Type<[...Members][number]>, never>,
@@ -286,12 +265,12 @@ export const Union = <Members extends ReadonlyArray<Schema.Schema.Any>>(...membe
   const memberInfos = members.map((member, position) => {
     const customIndex = member.ast.annotations?.["TSchema.customIndex"] as number | undefined
     const isFlat = (member.ast.annotations?.["TSchema.flat"] as boolean | undefined) ?? false
-    
+
     return {
       schema: member,
-      position,           // Position in the members array
-      customIndex,        // Custom index if set, undefined otherwise
-      isFlat              // Whether this member should be flat in the union
+      position, // Position in the members array
+      customIndex, // Custom index if set, undefined otherwise
+      isFlat // Whether this member should be flat in the union
     }
   })
 
@@ -309,7 +288,7 @@ export const Union = <Members extends ReadonlyArray<Schema.Schema.Any>>(...membe
   memberInfos.forEach((member1, pos1) => {
     if (member1.isFlat) {
       const index1 = member1.customIndex ?? member1.position
-      
+
       // Check for flat-to-nested collisions
       memberInfos.forEach((member2, pos2) => {
         if (!member2.isFlat && index1 === member2.position) {
@@ -321,7 +300,7 @@ export const Union = <Members extends ReadonlyArray<Schema.Schema.Any>>(...membe
           })
         }
       })
-      
+
       // Check for flat-to-flat collisions (only check positions after current to avoid duplicates)
       memberInfos.forEach((member2, pos2) => {
         if (pos2 > pos1 && member2.isFlat) {
@@ -484,7 +463,7 @@ export const Union = <Members extends ReadonlyArray<Schema.Schema.Any>>(...membe
   }) as Union<Members>
 }
 
-interface Tuple<Elements extends Schema.TupleType.Elements> extends Schema.Tuple<Elements> {}
+export interface Tuple<Elements extends Schema.TupleType.Elements> extends Schema.Tuple<Elements> {}
 /**
  * Creates a schema for tuple types - just passes through to Schema.Tuple directly
  *
@@ -500,3 +479,14 @@ export const compose = Schema.compose
 export const filter = Schema.filter
 
 export const is = Schema.is
+
+/**
+ * Creates an equivalence function for a schema that can compare two values for equality.
+ * 
+ * This leverages Effect Schema's built-in equivalence generation, which creates
+ * optimized equality checks based on the schema structure.
+ * 
+ * @since 2.0.0
+ * @category combinators
+ */
+export const equivalence = Schema.equivalence

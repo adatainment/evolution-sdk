@@ -32,7 +32,7 @@ export const MetadataLabel = Numeric.Uint8Schema.annotations({
  * @since 2.0.0
  * @category schemas
  */
-export const Metadata = Schema.MapFromSelf({
+export const Metadata = Schema.Map({
   key: MetadataLabel,
   value: TransactionMetadatum.TransactionMetadatumVariants
 }).annotations({
@@ -49,7 +49,7 @@ export type Metadata = typeof Metadata.Type
  * @category schemas
  */
 export const CDDLSchema = Schema.MapFromSelf({
-  key: Schema.BigIntFromSelf,
+  key: CBOR.Integer,
   value: TransactionMetadatum.CDDLSchema
 })
 

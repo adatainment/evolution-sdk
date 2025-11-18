@@ -201,7 +201,7 @@ Encoded type for transaction metadata (wire format with string for bigint)
 export type TransactionMetadatumVariantsEncoded =
   | { readonly _tag: "TextMetadatum"; readonly value: string }
   | { readonly _tag: "IntMetadatum"; readonly value: string }
-  | { readonly _tag: "BytesMetadatum"; readonly value: Uint8Array }
+  | { readonly _tag: "BytesMetadatum"; readonly value: string }
   | {
       readonly _tag: "MetadatumMap"
       readonly value: ReadonlyArray<readonly [TransactionMetadatumVariantsEncoded, TransactionMetadatumVariantsEncoded]>

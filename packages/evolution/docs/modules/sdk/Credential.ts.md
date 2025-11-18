@@ -53,7 +53,7 @@ export type ScriptHash = typeof CoreScriptHash.ScriptHash.Encoded
 export declare const fromCoreCredential: (
   a: CoreKeyHash.KeyHash | CoreScriptHash.ScriptHash,
   overrideOptions?: ParseOptions
-) => { readonly _tag: "KeyHash"; readonly hash: string } | { readonly _tag: "ScriptHash"; readonly hash: string }
+) => { readonly hash: string; readonly _tag: "KeyHash" } | { readonly hash: string; readonly _tag: "ScriptHash" }
 ```
 
 ## toCoreCredential
@@ -62,7 +62,7 @@ export declare const fromCoreCredential: (
 
 ```ts
 export declare const toCoreCredential: (
-  i: { readonly _tag: "KeyHash"; readonly hash: string } | { readonly _tag: "ScriptHash"; readonly hash: string },
+  i: { readonly hash: string; readonly _tag: "KeyHash" } | { readonly hash: string; readonly _tag: "ScriptHash" },
   overrideOptions?: ParseOptions
 ) => CoreKeyHash.KeyHash | CoreScriptHash.ScriptHash
 ```

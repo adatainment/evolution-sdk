@@ -299,12 +299,24 @@ Represents: metadata = {* transaction_metadatum_label => transaction_metadatum}
 **Signature**
 
 ```ts
-export declare const Metadata: Schema.MapFromSelf<
-  Schema.refine<bigint, typeof Schema.BigInt>,
-  Schema.Schema<
-    TransactionMetadatum.TransactionMetadatumVariants,
-    TransactionMetadatum.TransactionMetadatumVariantsEncoded,
-    never
+export declare const Metadata: Schema.transform<
+  Schema.Array$<
+    Schema.Tuple2<
+      Schema.refine<bigint, typeof Schema.BigInt>,
+      Schema.Schema<
+        TransactionMetadatum.TransactionMetadatumVariants,
+        TransactionMetadatum.TransactionMetadatumVariantsEncoded,
+        never
+      >
+    >
+  >,
+  Schema.MapFromSelf<
+    Schema.SchemaClass<bigint, bigint, never>,
+    Schema.SchemaClass<
+      TransactionMetadatum.TransactionMetadatumVariants,
+      TransactionMetadatum.TransactionMetadatumVariants,
+      never
+    >
   >
 >
 ```

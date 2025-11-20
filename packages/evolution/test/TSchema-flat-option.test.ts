@@ -5,7 +5,7 @@ import { fromHex } from "../src/core/Bytes.js"
 import * as Data from "../src/core/Data.js"
 import * as TSchema from "../src/core/TSchema.js"
 
-describe("TSchema.Struct with flat option", () => {
+describe("TSchema.Struct with flatInUnion option", () => {
   describe("Default behavior (nested)", () => {
     it("should round-trip correctly with default nested behavior", () => {
       const MyUnion = TSchema.Union(
@@ -45,9 +45,9 @@ describe("TSchema.Struct with flat option", () => {
     })
   })
 
-  describe("Explicit flat: true with custom index", () => {
-    it("should round-trip correctly with explicit flat and custom index", () => {
-      const MyUnion = TSchema.Union(TSchema.Struct({ amount: TSchema.Integer }, { index: 122, flat: true }))
+  describe("Explicit flatInUnion: true with custom index", () => {
+    it("should round-trip correctly with explicit flatInUnion and custom index", () => {
+      const MyUnion = TSchema.Union(TSchema.Struct({ amount: TSchema.Integer }, { index: 122, flatInUnion: true }))
 
       const value = { amount: 500n }
       const encoded = Data.withSchema(MyUnion).toCBORHex(value)
@@ -62,9 +62,9 @@ describe("TSchema.Struct with flat option", () => {
     })
   })
 
-  describe("Explicit flat: false with custom index", () => {
-    it("should round-trip correctly when flat is explicitly disabled", () => {
-      const MyUnion = TSchema.Union(TSchema.Struct({ data: TSchema.Integer }, { index: 10, flat: false }))
+  describe("Explicit flatInUnion: false with custom index", () => {
+    it("should round-trip correctly when flatInUnion is explicitly disabled", () => {
+      const MyUnion = TSchema.Union(TSchema.Struct({ data: TSchema.Integer }, { index: 10, flatInUnion: false }))
 
       const value = { data: 777n }
       const encoded = Data.withSchema(MyUnion).toCBORHex(value)
@@ -81,11 +81,11 @@ describe("TSchema.Struct with flat option", () => {
     })
   })
 
-  describe("Just flat: true without index", () => {
-    it("should round-trip correctly with flat: true and auto-index", () => {
+  describe("Just flatInUnion: true without index", () => {
+    it("should round-trip correctly with flatInUnion: true and auto-index", () => {
       const MyUnion = TSchema.Union(
         TSchema.Struct({ other: TSchema.Integer }), // position 0, nested
-        TSchema.Struct({ info: TSchema.Integer }, { flat: true }) // position 1, flat
+        TSchema.Struct({ info: TSchema.Integer }, { flatInUnion: true }) // position 1, flat
       )
 
       const value = { info: 333n }
@@ -105,8 +105,8 @@ describe("TSchema.Struct with flat option", () => {
     it("should round-trip all variants correctly in mixed union", () => {
       const MixedUnion = TSchema.Union(
         TSchema.Struct({ nested: TSchema.Integer }), // position 0, nested
-        TSchema.Struct({ flatAuto: TSchema.Integer }, { flat: true }), // position 1, flat auto
-        TSchema.Struct({ flatCustom: TSchema.Integer }, { index: 121, flat: true }) // flat custom 121
+        TSchema.Struct({ flatAuto: TSchema.Integer }, { flatInUnion: true }), // position 1, flat auto
+        TSchema.Struct({ flatCustom: TSchema.Integer }, { index: 121, flatInUnion: true }) // flat custom 121
       )
 
       // Test nested member
@@ -146,7 +146,7 @@ describe("TSchema.Struct with flat option", () => {
       expect(() => {
         TSchema.Union(
           TSchema.Struct({ nested: TSchema.Integer }), // position 0
-          TSchema.Struct({ flat: TSchema.Integer }, { index: 0, flat: true }) // collision with position 0
+          TSchema.Struct({ flat: TSchema.Integer }, { index: 0, flatInUnion: true }) // collision with position 0
         )
       }).toThrow(/Index collision detected/)
     })
@@ -156,7 +156,7 @@ describe("TSchema.Struct with flat option", () => {
         TSchema.Union(
           TSchema.Struct({ first: TSchema.Integer }), // position 0
           TSchema.Struct({ second: TSchema.Integer }), // position 1
-          TSchema.Struct({ flat: TSchema.Integer }, { index: 1, flat: true }) // collision with position 1
+          TSchema.Struct({ flat: TSchema.Integer }, { index: 1, flatInUnion: true }) // collision with position 1
         )
       }).toThrow(/Index collision detected/)
     })
@@ -164,8 +164,8 @@ describe("TSchema.Struct with flat option", () => {
     it("should NOT throw when both members use custom indices without collision", () => {
       expect(() => {
         TSchema.Union(
-          TSchema.Struct({ first: TSchema.Integer }, { index: 10, flat: false }), // nested with custom index 10
-          TSchema.Struct({ second: TSchema.Integer }, { index: 20, flat: true }) // flat with custom index 20
+          TSchema.Struct({ first: TSchema.Integer }, { index: 10, flatInUnion: false }), // nested with custom index 10
+          TSchema.Struct({ second: TSchema.Integer }, { index: 20, flatInUnion: true }) // flat with custom index 20
         )
       }).not.toThrow()
     })
@@ -175,8 +175,8 @@ describe("TSchema.Struct with flat option", () => {
       // Constr(100, [...]), making it impossible to distinguish them during decoding
       expect(() => {
         TSchema.Union(
-          TSchema.Struct({ first: TSchema.Integer }, { index: 100, flat: true }),
-          TSchema.Struct({ second: TSchema.Integer }, { index: 100, flat: true })
+          TSchema.Struct({ first: TSchema.Integer }, { index: 100, flatInUnion: true }),
+          TSchema.Struct({ second: TSchema.Integer }, { index: 100, flatInUnion: true })
         )
       }).toThrow(/Index collision detected/)
     })
@@ -205,7 +205,7 @@ describe("TSchema.Struct with flat option", () => {
 
     it("should produce smaller CBOR for flat encoding", () => {
       const NestedUnion = TSchema.Union(TSchema.Struct({ value: TSchema.Integer }))
-      const FlatUnion = TSchema.Union(TSchema.Struct({ value: TSchema.Integer }, { flat: true }))
+      const FlatUnion = TSchema.Union(TSchema.Struct({ value: TSchema.Integer }, { flatInUnion: true }))
 
       const value1 = { value: 42n }
       const value2 = { value: 42n }
@@ -259,9 +259,9 @@ describe("TSchema.Struct with flat option", () => {
 
     it("should handle script purposes pattern", () => {
       const ScriptPurpose = TSchema.Union(
-        TSchema.Struct({ minting: TSchema.ByteArray }, { index: 0, flat: true }),
-        TSchema.Struct({ spending: TSchema.ByteArray }, { index: 1, flat: true }),
-        TSchema.Struct({ rewarding: TSchema.ByteArray }, { index: 2, flat: true })
+        TSchema.Struct({ minting: TSchema.ByteArray }, { index: 0, flatInUnion: true }),
+        TSchema.Struct({ spending: TSchema.ByteArray }, { index: 1, flatInUnion: true }),
+        TSchema.Struct({ rewarding: TSchema.ByteArray }, { index: 2, flatInUnion: true })
       )
 
       // Test minting
@@ -321,7 +321,7 @@ describe("TSchema.Struct with flat option", () => {
             field2: TSchema.ByteArray,
             field3: TSchema.Boolean
           },
-          { index: 100, flat: true }
+          { index: 100, flatInUnion: true }
         )
       )
 

@@ -50,6 +50,26 @@ To run only tests matching the string `foo`, do:
 aiken check -m foo
 ```
 
+### CBOR Encoding Tests
+
+The `lib/cbor_encoding_spec.ak` file contains comprehensive tests to document Aiken's CBOR encoding behavior. These tests verify the exact CBOR hex output for various PlutusData types:
+
+- **Primitives**: Int, ByteArray, Bool
+- **Lists**: Empty, single-item, multi-item, nested, mixed types
+- **Tuples**: Pairs, triples, nested structures
+- **Maps**: Empty, single-entry, multi-entry
+- **Options**: Some/None with constructor tags
+- **Custom Types**: Multi-constructor types with fields
+- **Edge Cases**: Deeply nested structures, large values
+
+Run these tests to verify encoding compatibility:
+
+```sh
+aiken check -m cbor_encoding
+```
+
+The test output shows the actual CBOR hex values Aiken produces, which helps maintain compatibility between the Aiken compiler and TypeScript CBOR encoder in the Evolution SDK.
+
 ## Documentation
 
 If you're writing a library, you might want to generate an HTML documentation for it.

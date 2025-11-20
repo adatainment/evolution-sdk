@@ -4,6 +4,54 @@ import type { NonEmptyReadonlyArray } from "effect/Array"
 
 import * as Data from "./Data.js"
 
+/**
+ * Known tag field names for auto-detection in discriminated unions.
+ * Fields with these names containing Literal values will be automatically
+ * stripped during encoding and injected during decoding.
+ */
+const KNOWN_TAG_FIELDS = ["_tag", "type", "kind", "variant"] as const
+
+/**
+ * Helper to detect if a schema field contains a Literal value
+ * Used for auto-detection of tag fields in discriminated unions
+ */
+const getLiteralFieldValue = (schema: Schema.Schema.Any, fieldName: string): any | undefined => {
+  const ast = schema.ast
+
+  // Check if this is a Struct (TypeLiteral or Transformation to TypeLiteral)
+  let typeLiteral: any
+  if (ast._tag === "TypeLiteral") {
+    typeLiteral = ast
+  } else if (ast._tag === "Transformation" && (ast as any).to._tag === "TypeLiteral") {
+    typeLiteral = (ast as any).to
+  } else {
+    return undefined
+  }
+
+  // Find the property signature for this field name
+  const propertySignatures = typeLiteral.propertySignatures || []
+  const propSig = propertySignatures.find((sig: any) => sig.name === fieldName)
+  if (!propSig) return undefined
+
+  // Check if the property type is a Literal or a Transformation to Literal
+  const propType = propSig.type
+
+  // Direct Literal (Schema.Literal)
+  if (propType._tag === "Literal") {
+    return (propType as any).literal
+  }
+
+  // TSchema.Literal (Transformation from Constr to Literal)
+  if (propType._tag === "Transformation") {
+    const transformTo = (propType as any).to
+    if (transformTo._tag === "Literal") {
+      return (transformTo as any).literal
+    }
+  }
+
+  return undefined
+}
+
 export interface ByteArray extends Schema.Schema<Uint8Array, Uint8Array, never> {}
 
 /**
@@ -12,7 +60,7 @@ export interface ByteArray extends Schema.Schema<Uint8Array, Uint8Array, never> 
  * This module provides bidirectional transformations:
  * 1. TypeScript types => Plutus Data type => CBOR hex
  * 2. CBOR hex => Plutus Data type => TypeScript types
- * 
+ *
  * It also exports utility functions for working with schemas:
  * - `equivalence`: Creates optimized equality comparison functions
  * - `is`: Type guard for schema validation
@@ -199,7 +247,31 @@ export interface StructOptions {
    *
    * Default: true when index is specified, false otherwise
    */
-  flat?: boolean
+  flatInUnion?: boolean
+  /**
+   * When used as a field in a parent Struct, controls whether this Struct's fields
+   * should be spread (merged) into the parent's field array.
+   * - true: Inner Struct fields are merged directly into parent
+   * - false: Inner Struct is kept as a nested Constr
+   *
+   * Default: false
+   *
+   * Note: This only applies when the Struct is a field value, not when used in Union.
+   */
+  flatFields?: boolean
+  /**
+   * Name of a field to treat as a discriminant tag (e.g., "_tag", "type").
+   *
+   * Auto-detection: Fields named "_tag", "type", "kind", or "variant" containing
+   * Literal values are automatically stripped from CBOR encoding and injected during decoding.
+   *
+   * This option allows you to:
+   * - Explicitly specify a custom tag field name
+   * - Disable auto-detection with `tagField: false`
+   *
+   * Default: auto-detect from KNOWN_TAG_FIELDS
+   */
+  tagField?: string | false
 }
 
 /**
@@ -208,30 +280,156 @@ export interface StructOptions {
  *
  * @since 2.0.0
  */
-export const Struct = <Fields extends Schema.Struct.Fields>(
+export function Struct<Fields extends Schema.Struct.Fields>(
   fields: Fields,
   options: StructOptions = {}
-): Struct<Fields> => {
-  const { flat, index = 0 } = options
+): Struct<Fields> {
+  const { flatFields, flatInUnion, index = 0, tagField } = options
 
-  // Default: flat is true when index is explicitly set, false otherwise
-  const isFlat = flat ?? options.index !== undefined
+  // flatInUnion defaults to true when index is specified
+  const isFlatInUnion = flatInUnion ?? options.index !== undefined
+  const isFlatFields = flatFields ?? false
+
+  // Auto-detect tag field: find a field with a known tag name that contains a Literal
+  let detectedTagField: string | undefined
+  if (tagField !== false) {
+    const explicitTag = typeof tagField === "string" ? tagField : undefined
+    if (explicitTag) {
+      detectedTagField = explicitTag
+    } else {
+      // Auto-detect from known tag field names
+      for (const knownTag of KNOWN_TAG_FIELDS) {
+        const fieldSchema = (fields as any)[knownTag]
+        if (fieldSchema) {
+          // Check if this field is a Literal (either TSchema.Literal or Schema.Literal)
+          const ast = fieldSchema.ast
+          if (ast._tag === "Literal") {
+            detectedTagField = knownTag
+            break
+          }
+          // Also check for transformed literals (TSchema.Literal)
+          if (ast._tag === "Transformation") {
+            const toAST = (ast as any).to
+            if (toAST._tag === "Literal") {
+              detectedTagField = knownTag
+              break
+            }
+          }
+        }
+      }
+    }
+  }
 
   return Schema.transform(Schema.typeSchema(Data.Constr), Schema.Struct(fields), {
     strict: false,
     encode: (encodedStruct) => {
       // encodedStruct is the result of Schema.Struct(fields), which has already transformed all fields
-      return new Data.Constr({
+
+      // Filter out the tag field if detected (it's metadata, not data)
+      const fieldEntries = Object.entries(encodedStruct).filter(([key]) => key !== detectedTagField)
+      const fieldValues = fieldEntries.map(([_, value]) => value) as ReadonlyArray<Data.Data>
+
+      // Check if any field values are Constrs with flatFields:true
+      // If so, spread their fields into this Struct's field array
+      const finalFields = new globalThis.Array<Data.Data>()
+
+      for (const fieldValue of fieldValues) {
+        // Check if this field is a Constr from a flatFields Struct
+        if (fieldValue instanceof Data.Constr && (fieldValue as any)["__flatFields__"] === true) {
+          // Spread its fields into the parent
+          finalFields.push(...fieldValue.fields)
+        } else {
+          finalFields.push(fieldValue)
+        }
+      }
+
+      const constr = new Data.Constr({
         index: BigInt(index),
-        fields: Object.values(encodedStruct)
+        fields: finalFields
       })
+
+      // Mark this Constr if it was created with flatFields so parent can detect it
+      if (isFlatFields) {
+        ;(constr as any)["__flatFields__"] = true
+      }
+
+      return constr
     },
     decode: (fromA) => {
       const keys = Object.keys(fields)
+      const fieldSchemas = Object.values(fields) as ReadonlyArray<Schema.Schema.Any>
       const result = {} as Record<string, Data.Data>
-      keys.forEach((key, index) => {
-        result[key] = fromA.fields[index]
+
+      let fieldIndex = 0
+      keys.forEach((key, keyIndex) => {
+        // Skip the tag field during decoding - we'll inject it after
+        if (key === detectedTagField) {
+          return
+        }
+
+        const fieldSchema = fieldSchemas[keyIndex]
+        const fieldAnnotations = fieldSchema.ast.annotations
+
+        // Check if this field is a flatFields Struct
+        const isFieldFlat = fieldAnnotations?.["TSchema.flatFields"] === true
+
+        if (isFieldFlat && fieldSchema.ast._tag === "Transformation") {
+          // This is a flat Struct - we need to reconstruct it from multiple fields
+          // Get the inner Struct fields count
+          const transformAST = fieldSchema.ast as any
+          const toAST = transformAST.to
+
+          // For a Struct, the number of fields is the number of property signatures
+          const propertySignatures = (
+            toAST._tag === "TypeLiteral" ? toAST.propertySignatures : []
+          ) as ReadonlyArray<any>
+          const numInnerFields = propertySignatures.length
+
+          // Extract the fields for this nested Struct
+          const nestedFields = fromA.fields.slice(fieldIndex, fieldIndex + numInnerFields)
+
+          // Reconstruct as a Constr for the nested Struct to decode
+          const nestedConstr = new Data.Constr({
+            index: 0n, // flatFields Structs don't preserve their index
+            fields: nestedFields
+          })
+
+          result[key] = nestedConstr
+          fieldIndex += numInnerFields
+        } else {
+          // Regular field - take one value from the fields array
+          result[key] = fromA.fields[fieldIndex]
+          fieldIndex++
+        }
       })
+
+      // Inject the tag field if detected
+      // We need to inject it as the ENCODED form (Constr), not the decoded form (literal string),
+      // because Effect Schema will decode it using the field schema
+      if (detectedTagField && fields[detectedTagField]) {
+        const tagSchema = fields[detectedTagField]
+        const ast = tagSchema.ast
+
+        // Extract the Literal value and convert it to its encoded Constr form
+        let literalValue: any
+        if (ast._tag === "Literal") {
+          // Schema.Literal
+          literalValue = (ast as any).literal
+        } else if (ast._tag === "Transformation") {
+          // TSchema.Literal (transform from Constr to Literal)
+          const toAST = (ast as any).to
+          if (toAST._tag === "Literal") {
+            literalValue = (toAST as any).literal
+          }
+        }
+
+        // Encode the literal value as a Constr - TSchema.Literal encodes to Constr(index: 0, fields: [])
+        // Schema.Literal would also encode the same way (for a single literal value)
+        if (literalValue !== undefined) {
+          result[detectedTagField] = new Data.Constr({ index: 0n, fields: [] })
+        }
+      }
+
       return result as { [K in keyof Schema.Struct.Encoded<Fields>]: Schema.Struct.Encoded<Fields>[K] }
     }
   }).annotations({
@@ -239,15 +437,17 @@ export const Struct = <Fields extends Schema.Struct.Fields>(
     // Store the custom index in annotations so Union can detect it
     // Store explicitly even if index is 0, to distinguish from default
     ["TSchema.customIndex"]: options.index !== undefined ? index : undefined,
-    // Store flat setting so Union knows whether to unwrap this Struct
-    ["TSchema.flat"]: isFlat
+    // Store flatInUnion setting so Union knows whether to unwrap this Struct
+    ["TSchema.flatInUnion"]: isFlatInUnion,
+    // Store flatFields for recursive detection
+    ["TSchema.flatFields"]: isFlatFields
   })
 }
 
 export interface Union<Members extends ReadonlyArray<Schema.Schema.Any>>
   extends Schema.transformOrFail<
     Schema.SchemaClass<Data.Constr, Data.Constr, never>,
-    Schema.SchemaClass<Schema.Schema.Type<[...Members][number]>, Schema.Schema.Type<[...Members][number]>, never>,
+    Schema.SchemaClass<Schema.Schema.Type<Members[number]>, Schema.Schema.Type<Members[number]>, never>,
     never
   > {}
 
@@ -261,16 +461,67 @@ export interface Union<Members extends ReadonlyArray<Schema.Schema.Any>>
  * @since 2.0.0
  */
 export const Union = <Members extends ReadonlyArray<Schema.Schema.Any>>(...members: Members): Union<Members> => {
+  // Auto-detect tag field from KNOWN_TAG_FIELDS
+  let detectedTagField: string | undefined
+  const tagValues = new globalThis.Map<string, { value: any; memberIndex: number }>()
+
+  for (const tagFieldName of KNOWN_TAG_FIELDS) {
+    let allHaveTag = true
+    const currentTagValues = new globalThis.Map<string, { value: any; memberIndex: number }>()
+
+    for (let i = 0; i < members.length; i++) {
+      const literalValue = getLiteralFieldValue(members[i], tagFieldName)
+      if (literalValue === undefined) {
+        allHaveTag = false
+        break
+      }
+
+      // Check for duplicate tag values
+      const literalKey = JSON.stringify(literalValue)
+      if (currentTagValues.has(literalKey)) {
+        const existing = currentTagValues.get(literalKey)!
+        throw new Error(
+          `Union members must have unique tag values. Duplicate value ${literalKey} found in field "${tagFieldName}" at member indices ${existing.memberIndex} and ${i}.`
+        )
+      }
+      currentTagValues.set(literalKey, { value: literalValue, memberIndex: i })
+    }
+
+    if (allHaveTag) {
+      detectedTagField = tagFieldName
+      tagValues.clear()
+      currentTagValues.forEach((v: { value: any; memberIndex: number }, k: string) => tagValues.set(k, v))
+      break
+    }
+  }
+
+  // If members use different tag field names, that's an error
+  if (!detectedTagField) {
+    const usedTagFields = new Set<string>()
+    for (const member of members) {
+      for (const tagFieldName of KNOWN_TAG_FIELDS) {
+        if (getLiteralFieldValue(member, tagFieldName) !== undefined) {
+          usedTagFields.add(tagFieldName)
+        }
+      }
+    }
+    if (usedTagFields.size > 1) {
+      throw new Error(
+        `Union members must use the same tag field name. Found multiple: ${globalThis.Array.from(usedTagFields).join(", ")}`
+      )
+    }
+  }
+
   // Extract member metadata from annotations
   const memberInfos = members.map((member, position) => {
     const customIndex = member.ast.annotations?.["TSchema.customIndex"] as number | undefined
-    const isFlat = (member.ast.annotations?.["TSchema.flat"] as boolean | undefined) ?? false
+    const isFlatInUnion = (member.ast.annotations?.["TSchema.flatInUnion"] as boolean | undefined) ?? false
 
     return {
       schema: member,
       position, // Position in the members array
       customIndex, // Custom index if set, undefined otherwise
-      isFlat // Whether this member should be flat in the union
+      isFlat: isFlatInUnion // Whether this member should be flat in the union
     }
   })
 
@@ -353,7 +604,7 @@ export const Union = <Members extends ReadonlyArray<Schema.Schema.Any>>(...membe
     strict: false,
     encode: (value) =>
       Effect.gen(function* () {
-        // Find which member matches this value
+        // Find which member matches this value (WITH tag field - schemas expect it)
         const matchedIndex = members.findIndex((schema) => Schema.is(schema)(value))
 
         if (matchedIndex === -1) {
@@ -361,7 +612,7 @@ export const Union = <Members extends ReadonlyArray<Schema.Schema.Any>>(...membe
           const actualType =
             typeof value === "bigint"
               ? "bigint"
-              : typeof value === "object" && value !== null && (value as unknown) instanceof Map
+              : typeof value === "object" && value !== null && (value as unknown) instanceof globalThis.Map
                 ? "Map"
                 : typeof value === "object" && value !== null && globalThis.Array.isArray(value)
                   ? "array"
@@ -371,25 +622,43 @@ export const Union = <Members extends ReadonlyArray<Schema.Schema.Any>>(...membe
             new ParseResult.Type(
               Schema.Union(...members).ast,
               value,
-              `Invalid value for Union: received ${actualType} (${JSON.stringify(value)}), expected ${memberNames.join(" or ")}`
+              `Invalid value for Union: received ${actualType} (${String(value)}), expected ${memberNames.join(" or ")}`
             )
           )
         }
 
         const memberInfo = memberInfos[matchedIndex]
+
+        // Encode the full value - if members are Structs with tag fields,
+        // they will handle filtering out the tag field themselves
         const encodedValue = yield* ParseResult.encode(memberInfo.schema as Schema.Schema<any, any, never>)(value)
 
         // If the member is flat, use its encoded value directly (unwrap the Constr)
         if (memberInfo.isFlat && encodedValue instanceof Data.Constr) {
-          // If the member has no custom index, we need to use the auto index
-          if (memberInfo.customIndex === undefined) {
-            return new Data.Constr({
-              index: BigInt(memberInfo.position),
-              fields: encodedValue.fields
-            })
+          // Recursively unwrap nested flat Constrs (for nested flatFields support)
+          const unwrapNestedFlat = (constr: Data.Constr): Data.Constr => {
+            // If this Constr has exactly one field and that field is also a flat Constr, unwrap it
+            if (
+              constr.fields.length === 1 &&
+              constr.fields[0] instanceof Data.Constr &&
+              (constr.fields[0] as any)["__flatFields__"] === true
+            ) {
+              // Recursively unwrap
+              return unwrapNestedFlat(constr.fields[0] as Data.Constr)
+            }
+            return constr
           }
-          // Return the encoded Constr as-is (it already has the custom index)
-          return encodedValue
+
+          const unwrapped = unwrapNestedFlat(encodedValue)
+
+          // If the member has a custom index, use it; otherwise use position
+          const customIdx = memberInfo.customIndex
+          const finalIndex = customIdx !== undefined ? BigInt(customIdx) : BigInt(memberInfo.position)
+
+          return new Data.Constr({
+            index: finalIndex,
+            fields: unwrapped.fields
+          })
         }
 
         // Otherwise, wrap in Union's Constr with auto index (position)
@@ -408,7 +677,22 @@ export const Union = <Members extends ReadonlyArray<Schema.Schema.Any>>(...membe
 
       if (flatMember) {
         // This is a flat Struct, decode it directly (no unwrapping needed)
-        return ParseResult.decode(flatMember.schema)(value)
+        return Effect.gen(function* () {
+          const decoded = yield* ParseResult.decode(flatMember.schema)(value)
+
+          // Inject tag field if detected
+          if (detectedTagField && typeof decoded === "object" && decoded !== null) {
+            const tagValue = getLiteralFieldValue(flatMember.schema, detectedTagField)
+            if (tagValue !== undefined) {
+              return {
+                ...decoded,
+                [detectedTagField]: tagValue
+              }
+            }
+          }
+
+          return decoded
+        })
       }
 
       // Otherwise, use standard Union decoding with auto index
@@ -431,18 +715,34 @@ export const Union = <Members extends ReadonlyArray<Schema.Schema.Any>>(...membe
       // If the member schema expects a Data.Constr (like Boolean),
       // we need to reconstruct the original Constr structure
       // For primitive types, we use the first field
-      if (value.fields.length === 0) {
-        // This is likely a Boolean-like case where the original Constr had no fields
-        // Reconstruct the original Constr structure
-        return ParseResult.decode(member)(new Data.Constr({ index: 0n, fields: [] }))
-      } else if (value.fields.length === 1) {
-        // This could be either a primitive value or a Constr that was flattened
-        return ParseResult.decode(member)(value.fields[0])
-      } else {
-        // Multiple fields - reconstruct as a Constr with index 0
-        // This handles cases where the original Constr had multiple fields
-        return ParseResult.decode(member)(new Data.Constr({ index: 0n, fields: [...value.fields] }))
-      }
+      return Effect.gen(function* () {
+        let decoded
+        if (value.fields.length === 0) {
+          // This is likely a Boolean-like case where the original Constr had no fields
+          // Reconstruct the original Constr structure
+          decoded = yield* ParseResult.decode(member)(new Data.Constr({ index: 0n, fields: [] }))
+        } else if (value.fields.length === 1) {
+          // This could be either a primitive value or a Constr that was flattened
+          decoded = yield* ParseResult.decode(member)(value.fields[0])
+        } else {
+          // Multiple fields - reconstruct as a Constr with index 0
+          // This handles cases where the original Constr had multiple fields
+          decoded = yield* ParseResult.decode(member)(new Data.Constr({ index: 0n, fields: [...value.fields] }))
+        }
+
+        // Inject tag field if detected
+        if (detectedTagField && typeof decoded === "object" && decoded !== null) {
+          const tagValue = getLiteralFieldValue(member, detectedTagField)
+          if (tagValue !== undefined) {
+            return {
+              ...decoded,
+              [detectedTagField]: tagValue
+            }
+          }
+        }
+
+        return decoded
+      })
     }
   }).annotations({
     identifier: "TSchema.Union",
@@ -452,13 +752,20 @@ export const Union = <Members extends ReadonlyArray<Schema.Schema.Any>>(...membe
       const actualType =
         typeof actual === "bigint"
           ? "bigint"
-          : typeof actual === "object" && actual !== null && (actual as unknown) instanceof Map
+          : typeof actual === "object" && actual !== null && actual instanceof globalThis.Map
             ? "Map"
             : typeof actual === "object" && actual !== null && globalThis.Array.isArray(actual)
               ? "array"
               : typeof actual
 
-      return `Invalid value for Union: received ${actualType} (${JSON.stringify(actual)}), expected ${memberNames.join(" or ")}`
+      const actualStr =
+        typeof actual === "bigint"
+          ? String(actual)
+          : typeof actual === "object"
+            ? String(actual)
+            : JSON.stringify(actual)
+
+      return `Invalid value for Union: received ${actualType} (${actualStr}), expected ${memberNames.join(" or ")}`
     }
   }) as Union<Members>
 }
@@ -474,6 +781,73 @@ export const Tuple = <Elements extends Schema.TupleType.Elements>(element: [...E
     identifier: "Tuple"
   }) as Tuple<Elements>
 
+/**
+ * Creates a variant (tagged union) schema for Aiken-style enum types.
+ *
+ * This is a convenience helper that creates properly discriminated TypeScript types
+ * while maintaining single-level CBOR encoding compatible with Aiken.
+ *
+ * @param variants - Object mapping variant names to their field schemas
+ * @returns Union schema with discriminated types
+ *
+ * @since 2.0.0
+ * @category constructors
+ */
+export function Variant<const Variants extends Record<PropertyKey, Schema.Struct.Fields>>(
+  variants: Variants
+): Union<
+  ReadonlyArray<
+    {
+      [K in keyof Variants]: Struct<{ readonly [P in K]: Struct<Variants[K]> }>
+    }[keyof Variants]
+  >
+> {
+  return Union(
+    ...Object.entries(variants).map(([name, fields], index) =>
+      Struct(
+        {
+          [name]: Struct(fields, { flatFields: true })
+        } as any,
+        { flatInUnion: true, index }
+      )
+    ) as any
+  )
+}
+
+/**
+ * Creates a tagged struct - a shortcut for creating a Struct with a Literal tag field.
+ *
+ * This is a convenience helper that makes it easy to create structs with discriminator fields,
+ * commonly used in discriminated unions.
+ *
+ * @param tagValue - The literal value for the tag (e.g., "Circle", "User")
+ * @param fields - The struct fields (excluding the tag field)
+ * @param options - Struct options (tagField defaults to "_tag", plus flatInUnion, index, etc.)
+ * @returns Struct schema with the tag field
+ *
+ * @since 2.0.0
+ * @category constructors
+ */
+export const TaggedStruct = <
+  TagValue extends string,
+  Fields extends Schema.Struct.Fields,
+  TagField extends string = "_tag"
+>(
+  tagValue: TagValue,
+  fields: Fields,
+  options?: StructOptions & { tagField?: TagField }
+): Struct<{ [K in TagField]: OneLiteral<TagValue> } & Fields> => {
+  const tagField = (options?.tagField ?? "_tag") as TagField
+
+  return Struct(
+    {
+      [tagField]: Literal(tagValue),
+      ...fields
+    } as { [K in TagField]: OneLiteral<TagValue> } & Fields,
+    { ...options, tagField }
+  )
+}
+
 export const compose = Schema.compose
 
 export const filter = Schema.filter
@@ -482,10 +856,10 @@ export const is = Schema.is
 
 /**
  * Creates an equivalence function for a schema that can compare two values for equality.
- * 
+ *
  * This leverages Effect Schema's built-in equivalence generation, which creates
  * optimized equality checks based on the schema structure.
- * 
+ *
  * @since 2.0.0
  * @category combinators
  */

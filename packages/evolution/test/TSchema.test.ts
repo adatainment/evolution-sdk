@@ -403,7 +403,7 @@ describe("TypeTaggedSchema Tests", () => {
 
       const invalidData = "d87a9f010203d87a9f010203" // Invalid ByteArray
 
-      expect(() => Data.withSchema(TestStruct).fromCBORHex(invalidData)).toThrow(Data.DataError)
+      expect(() => Data.withSchema(TestStruct).fromCBORHex(invalidData)).toThrow()
     })
 
     it("should throw comprehensible errors for schema mismatches", () => {

@@ -2,7 +2,6 @@ import { Data as EffectData, Effect, Equal, FastCheck, Hash, ParseResult, Schema
 
 import * as Bytes from "./Bytes.js"
 import * as CBOR from "./CBOR.js"
-import * as Function from "./Function.js"
 import * as Numeric from "./Numeric.js"
 
 /**
@@ -195,6 +194,8 @@ export const ByteArray = Schema.Uint8ArrayFromHex.annotations({
 })
 export type ByteArray = typeof ByteArray.Type
 
+export interface DataSchema extends Schema.SchemaClass<Data, DataEncoded> {}
+
 /**
  * Combined schema for PlutusData type with proper recursion
  *
@@ -202,7 +203,7 @@ export type ByteArray = typeof ByteArray.Type
  *
  * @since 2.0.0
  */
-export const DataSchema: Schema.Schema<Data, DataEncoded> = Schema.Union(
+export const DataSchema: DataSchema = Schema.Union(
   // Map: ReadonlyArray<[DataEncoded, DataEncoded]> <-> Map<Data, Data>
   MapSchema,
 
@@ -861,82 +862,14 @@ export const FromCBORHex = (options: CBOR.CodecOptions = CBOR.CML_DATA_DEFAULT_O
     description: "Transforms CBOR hex string to Data using CDDL encoding"
   })
 
-// ============================================================================
-// Either Namespace
-// ============================================================================
-
-/**
- * Either-based variants for functions that can fail.
- *
- * @since 2.0.0
- * @category either
- */
-export namespace Either {
-  /**
-   * Encode PlutusData to CBOR bytes with Either error handling
-   *
-   * @since 2.0.0
-   * @category transformation
-   */
-  export const toCBORBytes = Function.makeCBOREncodeEither(FromCDDL, DataError, CBOR.CML_DATA_DEFAULT_OPTIONS)
-
-  /**
-   * Encode PlutusData to CBOR hex string with Either error handling
-   *
-   * @since 2.0.0
-   * @category transformation
-   */
-  export const toCBORHex = Function.makeCBOREncodeHexEither(FromCDDL, DataError, CBOR.CML_DATA_DEFAULT_OPTIONS)
-
-  /**
-   * Decode PlutusData from CBOR bytes with Either error handling
-   *
-   * @since 2.0.0
-   * @category transformation
-   */
-  export const fromCBORBytes = Function.makeCBORDecodeEither(FromCDDL, DataError, CBOR.CML_DATA_DEFAULT_OPTIONS)
-
-  /**
-   * Decode PlutusData from CBOR hex string with Effect error handling
-   *
-   * @since 2.0.0
-   * @category transformation
-   */
-  export const fromCBORHex = Function.makeCBORDecodeHexEither(FromCDDL, DataError, CBOR.CML_DATA_DEFAULT_OPTIONS)
-
-  /**
-   * Create a schema that transforms from a custom type to Data and provides CBOR encoding
-   *
-   * @since 2.0.0
-   * @category combinators
-   */
-  export const withSchema = <A, I extends Data>(
-    schema: Schema.Schema<A, I>,
-    options: CBOR.CodecOptions = CBOR.CML_DATA_DEFAULT_OPTIONS
-  ) => {
-    return {
-      toData: Function.makeEncodeEither(schema, DataError),
-      fromData: Function.makeDecodeEither(schema, DataError),
-      toCBORHex: Function.makeCBOREncodeHexEither(FromCDDL, DataError, options),
-      toCBORBytes: Function.makeCBOREncodeEither(FromCDDL, DataError, options),
-      fromCBORHex: Function.makeCBORDecodeHexEither(FromCDDL, DataError, options),
-      fromCBORBytes: Function.makeCBORDecodeEither(FromCDDL, DataError, options)
-    }
-  }
-}
-
 /**
  * Encode PlutusData to CBOR bytes
  *
  * @since 2.0.0
  * @category transformation
  */
-export const toCBORBytes = Function.makeCBOREncodeSync(
-  FromCDDL,
-  DataError,
-  "Data.toCBORBytes",
-  CBOR.CML_DATA_DEFAULT_OPTIONS
-)
+export const toCBORBytes = (data: Data, options: CBOR.CodecOptions = CBOR.CML_DATA_DEFAULT_OPTIONS) =>
+  Schema.encodeSync(FromCBORBytes(options))(data)
 
 /**
  * Encode PlutusData to CBOR hex string
@@ -944,12 +877,8 @@ export const toCBORBytes = Function.makeCBOREncodeSync(
  * @since 2.0.0
  * @category transformation
  */
-export const toCBORHex = Function.makeCBOREncodeHexSync(
-  FromCDDL,
-  DataError,
-  "Data.toCBORHex",
-  CBOR.CML_DATA_DEFAULT_OPTIONS
-)
+export const toCBORHex = (data: Data, options: CBOR.CodecOptions = CBOR.CML_DATA_DEFAULT_OPTIONS) =>
+  Schema.encodeSync(FromCBORHex(options))(data)
 
 /**
  * Decode PlutusData from CBOR bytes
@@ -957,12 +886,8 @@ export const toCBORHex = Function.makeCBOREncodeHexSync(
  * @since 2.0.0
  * @category transformation
  */
-export const fromCBORBytes = Function.makeCBORDecodeSync(
-  FromCDDL,
-  DataError,
-  "Data.fromCBORBytes",
-  CBOR.CML_DATA_DEFAULT_OPTIONS
-)
+export const fromCBORBytes = (bytes: Uint8Array, options: CBOR.CodecOptions = CBOR.CML_DATA_DEFAULT_OPTIONS): Data =>
+  Schema.decodeSync(FromCBORBytes(options))(bytes)
 
 /**
  * Decode PlutusData from CBOR hex string
@@ -970,19 +895,9 @@ export const fromCBORBytes = Function.makeCBORDecodeSync(
  * @since 2.0.0
  * @category transformation
  */
-export const fromCBORHex = Function.makeCBORDecodeHexSync(
-  FromCDDL,
-  DataError,
-  "Data.fromCBORHex",
-  CBOR.CML_DATA_DEFAULT_OPTIONS
-)
+export const fromCBORHex = (hex: string, options: CBOR.CodecOptions = CBOR.CML_DATA_DEFAULT_OPTIONS): Data =>
+  Schema.decodeSync(FromCBORHex(options))(hex)
 
-/**
- * Transform data to Data using a schema
- *
- * @since 2.0.0
- * @category transformation
- */
 /**
  * Create a schema that transforms from a custom type to Data and provides CBOR encoding
  *
@@ -994,31 +909,11 @@ export const withSchema = <A, I extends Data>(
   options: CBOR.CodecOptions = DEFAULT_CBOR_OPTIONS
 ) => {
   return {
-    toData: Function.makeEncodeSync(schema, DataError, "withSchema.toData"),
-    fromData: Function.makeDecodeSync(schema, DataError, "withSchema.fromData"),
-    toCBORHex: Function.makeCBOREncodeHexSync(
-      Schema.compose(FromCDDL, schema),
-      DataError,
-      "withSchema.toCBORHex",
-      options
-    ),
-    toCBORBytes: Function.makeCBOREncodeSync(
-      Schema.compose(FromCDDL, schema),
-      DataError,
-      "withSchema.toCBORBytes",
-      options
-    ),
-    fromCBORHex: Function.makeCBORDecodeHexSync(
-      Schema.compose(FromCDDL, schema),
-      DataError,
-      "withSchema.fromCBORHex",
-      options
-    ),
-    fromCBORBytes: Function.makeCBORDecodeSync(
-      Schema.compose(FromCDDL, schema),
-      DataError,
-      "withSchema.fromCBORBytes",
-      options
-    )
+    toData: Schema.encodeSync(schema),
+    fromData: Schema.decodeSync(schema),
+    toCBORHex: Schema.encodeSync(Schema.compose(FromCBORHex(options), schema)),
+    toCBORBytes: Schema.encodeSync(Schema.compose(FromCBORBytes(options), schema)),
+    fromCBORHex: Schema.decodeSync(Schema.compose(FromCBORHex(options), schema)),
+    fromCBORBytes: Schema.decodeSync(Schema.compose(FromCBORBytes(options), schema))
   }
 }

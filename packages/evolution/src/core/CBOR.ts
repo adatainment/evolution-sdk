@@ -67,6 +67,7 @@ export type CodecOptions =
   | {
       readonly mode: "canonical"
       readonly mapsAsObjects?: boolean
+      readonly encodeMapAsPairs?: boolean
     }
   | {
       readonly mode: "custom"
@@ -76,6 +77,7 @@ export type CodecOptions =
       readonly sortMapKeys: boolean
       readonly useMinimalEncoding: boolean
       readonly mapsAsObjects?: boolean
+      readonly encodeMapAsPairs?: boolean
     }
 
 /**
@@ -118,6 +120,29 @@ export const CML_DATA_DEFAULT_OPTIONS: CodecOptions = {
   sortMapKeys: false,
   useMinimalEncoding: true,
   mapsAsObjects: false
+} as const
+
+/**
+ * Aiken-compatible CBOR encoding options
+ * 
+ * Matches the encoding used by Aiken's cbor.serialise():
+ * - Indefinite-length arrays (9f...ff)
+ * - Maps encoded as arrays of pairs (not CBOR maps)
+ * - Strings as bytearrays (major type 2, not 3)
+ * - Constructor tags: 121-127 for indices 0-6, then 1280+ for 7+
+ *
+ * @since 2.0.0
+ * @category constants
+ */
+export const AIKEN_DEFAULT_OPTIONS: CodecOptions = {
+  mode: "custom",
+  useIndefiniteArrays: true,
+  useIndefiniteMaps: true,
+  useDefiniteForEmpty: false,
+  sortMapKeys: false,
+  useMinimalEncoding: true,
+  mapsAsObjects: false,
+  encodeMapAsPairs: true
 } as const
 
 /**
@@ -877,6 +902,13 @@ const encodeMapEntriesSync = (pairs: Array<[CBOR, CBOR]>, options: CodecOptions)
   const useMinimal = options.mode === "canonical" || (options.mode === "custom" && options.useMinimalEncoding)
   const sortKeys = options.mode === "canonical" || (options.mode === "custom" && options.sortMapKeys)
   const useIndefinite = options.mode === "custom" && options.useIndefiniteMaps && length > 0
+  const encodeAsPairs = options.encodeMapAsPairs === true
+
+  // If encoding as array of pairs (Aiken/Plutus style), delegate to array encoding
+  if (encodeAsPairs) {
+    const pairArrays = pairs.map(([k, v]) => [k, v] as CBOR)
+    return encodeArraySync(pairArrays, options)
+  }
 
   // Fast path for empty maps
   if (length === 0) {

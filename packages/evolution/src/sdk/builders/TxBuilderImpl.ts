@@ -627,7 +627,7 @@ export const assembleTransaction = (
     const plutusDataArray: Array<PlutusData.Data> = []
     for (const utxo of state.selectedUtxos) {
       if (utxo.datumOption?.type === "inlineDatum") {
-        const datum = yield* PlutusData.Either.fromCBORHex(utxo.datumOption.inline)
+        const datum = yield* Schema.decode(PlutusData.FromCBORHex())(utxo.datumOption.inline)
         plutusDataArray.push(datum)
         yield* Effect.logDebug(`[Assembly] Extracted inline datum from UTxO`)
       }

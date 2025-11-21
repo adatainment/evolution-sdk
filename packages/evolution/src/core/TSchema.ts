@@ -280,10 +280,10 @@ export interface StructOptions {
  *
  * @since 2.0.0
  */
-export function Struct<Fields extends Schema.Struct.Fields>(
+export const Struct = <Fields extends Schema.Struct.Fields>(
   fields: Fields,
   options: StructOptions = {}
-): Struct<Fields> {
+): Struct<Fields> => {
   const { flatFields, flatInUnion, index = 0, tagField } = options
 
   // flatInUnion defaults to true when index is specified
@@ -325,9 +325,10 @@ export function Struct<Fields extends Schema.Struct.Fields>(
     encode: (encodedStruct) => {
       // encodedStruct is the result of Schema.Struct(fields), which has already transformed all fields
 
-      // Filter out the tag field if detected (it's metadata, not data)
-      const fieldEntries = Object.entries(encodedStruct).filter(([key]) => key !== detectedTagField)
-      const fieldValues = fieldEntries.map(([_, value]) => value) as ReadonlyArray<Data.Data>
+      // Use Object.keys(fields) to preserve schema definition order
+      // (Object.entries doesn't guarantee property order)
+      const orderedKeys = Object.keys(fields).filter((key) => key !== detectedTagField)
+      const fieldValues = orderedKeys.map((key) => encodedStruct[key as keyof typeof encodedStruct]) as ReadonlyArray<Data.Data>
 
       // Check if any field values are Constrs with flatFields:true
       // If so, spread their fields into this Struct's field array
@@ -793,7 +794,7 @@ export const Tuple = <Elements extends Schema.TupleType.Elements>(element: [...E
  * @since 2.0.0
  * @category constructors
  */
-export function Variant<const Variants extends Record<PropertyKey, Schema.Struct.Fields>>(
+export const Variant = <const Variants extends Record<PropertyKey, Schema.Struct.Fields>>(
   variants: Variants
 ): Union<
   ReadonlyArray<
@@ -801,16 +802,16 @@ export function Variant<const Variants extends Record<PropertyKey, Schema.Struct
       [K in keyof Variants]: Struct<{ readonly [P in K]: Struct<Variants[K]> }>
     }[keyof Variants]
   >
-> {
+> => {
   return Union(
-    ...Object.entries(variants).map(([name, fields], index) =>
+    ...(Object.entries(variants).map(([name, fields], index) =>
       Struct(
         {
           [name]: Struct(fields, { flatFields: true })
         } as any,
         { flatInUnion: true, index }
       )
-    ) as any
+    ) as any)
   )
 }
 

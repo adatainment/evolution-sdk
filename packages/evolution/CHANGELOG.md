@@ -1,5 +1,11 @@
 # @evolution-sdk/evolution
 
+## 0.2.5
+
+### Patch Changes
+
+- [#70](https://github.com/IntersectMBO/evolution-sdk/pull/70) [`ea9ffbe`](https://github.com/IntersectMBO/evolution-sdk/commit/ea9ffbe11a8b6a8e97c1531c108d5467a7eda6a8) Thanks [@solidsnakedev](https://github.com/solidsnakedev)! - add blueprint module
+
 ## 0.2.4
 
 ### Patch Changes

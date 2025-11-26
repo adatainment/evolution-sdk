@@ -49,7 +49,7 @@ const genesisConfig = {
   initialFunds: {
     [addressHex]: 1_000_000_000_000 // 1 million ADA (in lovelace)
   }
-};
+} satisfies DevnetDefault.ShelleyGenesis;
 
 // Create cluster with custom genesis
 const cluster = await Devnet.Cluster.make({
@@ -100,7 +100,7 @@ const genesisConfig = {
     [address1]: 500_000_000_000, // 500K ADA
     [address2]: 300_000_000_000  // 300K ADA
   }
-};
+} satisfies DevnetDefault.ShelleyGenesis;
 
 const cluster = await Devnet.Cluster.make({
   clusterName: "multi-user-devnet",
@@ -128,7 +128,7 @@ const genesisConfig = {
   initialFunds: {
     [addressHex]: 1_000_000_000_000
   }
-};
+} satisfies DevnetDefault.ShelleyGenesis;
 
 // Calculate UTxOs before starting the cluster
 const genesisUtxos = await Devnet.Genesis.calculateUtxosFromConfigOrThrow(genesisConfig);
@@ -253,7 +253,7 @@ const genesisConfig = {
   initialFunds: {
     [addressHex]: 100_000_000_000
   }
-};
+} satisfies DevnetDefault.ShelleyGenesis;
 
 const cluster = await Devnet.Cluster.make({
   clusterName: "fast-devnet",
@@ -288,7 +288,7 @@ const genesisConfig = {
   initialFunds: {
     [addressHex]: 100_000_000_000
   }
-};
+} satisfies DevnetDefault.ShelleyGenesis;
 ```
 
 - **securityParam (k)**: Blocks before finality. Lower values (10) allow faster testing of chain reorganizations. Default 2160 matches mainnet.
@@ -348,14 +348,13 @@ const genesisConfig = {
     minFeeA: 40,           // Lower fees for testing
     minFeeB: 150000,
     maxTxSize: 32768,      // Larger transactions allowed
-    maxBlockBodySize: 131072, // Larger blocks for throughput
-    coinsPerUTxOByte: "4310"
+    maxBlockBodySize: 131072 // Larger blocks for throughput
   },
   
   // Faster key evolution for staking tests
   maxKESEvolutions: 60,
   slotsPerKESPeriod: 3600
-};
+} satisfies DevnetDefault.ShelleyGenesis;
 
 // Create cluster with full services
 const cluster = await Devnet.Cluster.make({

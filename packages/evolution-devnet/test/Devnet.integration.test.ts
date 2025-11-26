@@ -1,13 +1,12 @@
 import { afterAll, describe, expect, it } from "@effect/vitest"
+import * as Devnet from "@evolution-sdk/devnet/Devnet"
+import * as AddressEras from "@evolution-sdk/evolution/core/AddressEras"
+import * as EnterpriseAddress from "@evolution-sdk/evolution/core/EnterpriseAddress"
+import * as KeyHash from "@evolution-sdk/evolution/core/KeyHash"
+import * as PrivateKey from "@evolution-sdk/evolution/core/PrivateKey"
+import * as VKey from "@evolution-sdk/evolution/core/VKey"
 import Docker from "dockerode"
 import { Effect } from "effect"
-
-import * as AddressEras from "../src/core/AddressEras.js"
-import * as EnterpriseAddress from "../src/core/EnterpriseAddress.js"
-import * as KeyHash from "../src/core/KeyHash.js"
-import * as PrivateKey from "../src/core/PrivateKey.js"
-import * as VKey from "../src/core/VKey.js"
-import * as Devnet from "../src/sdk/Devnet/Devnet.js"
 
 /**
  * Fast Shelley genesis config for testing.

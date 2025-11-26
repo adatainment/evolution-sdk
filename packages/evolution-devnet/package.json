@@ -1,0 +1,87 @@
+{
+  "name": "@evolution-sdk/devnet",
+  "version": "0.2.5",
+  "description": "Local Cardano devnet for testing and development with Docker",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": [],
+  "tags": [
+    "typescript",
+    "cardano",
+    "blockchain",
+    "devnet",
+    "docker",
+    "testing"
+  ],
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts",
+    "./internal/*": null,
+    "./*/index": null
+  },
+  "files": [
+    "src/**/*.ts",
+    "dist/**/*.js",
+    "dist/**/*.js.map",
+    "dist/**/*.d.ts",
+    "dist/**/*.d.ts.map"
+  ],
+  "scripts": {
+    "build": "tsc -b tsconfig.build.json && babel dist --plugins annotate-pure-calls --out-dir dist --source-maps",
+    "dev": "tsc -b tsconfig.build.json --watch",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint \"src/**/*.{ts,mjs}\" \"test/**/*.{ts,mjs}\"",
+    "test": "vitest run",
+    "clean": "rm -rf dist .turbo"
+  },
+  "devDependencies": {
+    "@types/dockerode": "^3.3.43",
+    "tsx": "^4.20.4",
+    "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "dockerode": "^4.0.7"
+  },
+  "peerDependencies": {
+    "@evolution-sdk/evolution": "workspace:*",
+    "@effect/platform": "^0.90.10",
+    "@effect/platform-node": "^0.96.1",
+    "@noble/hashes": "^1.8.0",
+    "effect": "^3.19.3"
+  },
+  "keywords": [
+    "cardano",
+    "blockchain",
+    "devnet",
+    "docker",
+    "testing",
+    "development",
+    "local-network",
+    "typescript",
+    "sdk"
+  ],
+  "homepage": "https://github.com/IntersectMBO/evolution-sdk",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/IntersectMBO/evolution-sdk.git",
+    "directory": "packages/evolution-devnet"
+  },
+  "bugs": {
+    "url": "https://github.com/IntersectMBO/evolution-sdk/issues"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true,
+    "exports": {
+      "./package.json": "./package.json",
+      ".": "./dist/index.js",
+      "./*": "./dist/*.js",
+      "./internal/*": null,
+      "./*/index": null
+    }
+  }
+}

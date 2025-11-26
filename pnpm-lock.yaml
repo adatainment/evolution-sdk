@@ -220,28 +220,34 @@ importers:
 
   packages/evolution-devnet:
     dependencies:
+      '@effect/platform':
+        specifier: ^0.90.10
+        version: 0.90.10(effect@3.19.3)
+      '@effect/platform-node':
+        specifier: ^0.96.1
+        version: 0.96.1(@effect/cluster@0.48.2(@effect/platform@0.90.10(effect@3.19.3))(@effect/rpc@0.69.1(@effect/platform@0.90.10(effect@3.19.3))(effect@3.19.3))(@effect/sql@0.44.2(@effect/experimental@0.54.6(@effect/platform@0.90.10(effect@3.19.3))(effect@3.19.3))(@effect/platform@0.90.10(effect@3.19.3))(effect@3.19.3))(@effect/workflow@0.9.2(@effect/platform@0.90.10(effect@3.19.3))(@effect/rpc@0.69.1(@effect/platform@0.90.10(effect@3.19.3))(effect@3.19.3))(effect@3.19.3))(effect@3.19.3))(@effect/platform@0.90.10(effect@3.19.3))(@effect/rpc@0.69.1(@effect/platform@0.90.10(effect@3.19.3))(effect@3.19.3))(@effect/sql@0.44.2(@effect/experimental@0.54.6(@effect/platform@0.90.10(effect@3.19.3))(effect@3.19.3))(@effect/platform@0.90.10(effect@3.19.3))(effect@3.19.3))(effect@3.19.3)
       '@evolution-sdk/evolution':
         specifier: workspace:*
         version: link:../evolution
+      '@noble/hashes':
+        specifier: ^1.8.0
+        version: 1.8.0
       dockerode:
         specifier: ^4.0.7
         version: 4.0.7
       effect:
-        specifier: ^3.11.7
+        specifier: ^3.19.3
         version: 3.19.3
     devDependencies:
-      '@babel/cli':
-        specifier: ^7.26.4
-        version: 7.28.3(@babel/core@7.28.3)
       '@types/dockerode':
-        specifier: ^3.3.31
+        specifier: ^3.3.43
         version: 3.3.43
-      babel-plugin-annotate-pure-calls:
-        specifier: ^0.4.0
-        version: 0.4.0(@babel/core@7.28.3)
+      tsx:
+        specifier: ^4.20.4
+        version: 4.20.4
       typescript:
-        specifier: ~5.7.2
-        version: 5.7.3
+        specifier: ^5.9.2
+        version: 5.9.2
 
 packages:
 
@@ -2488,11 +2494,6 @@ packages:
   available-typed-arrays@1.0.7:
     resolution: {integrity: sha512-wvUjBtSGN7+7SjNpq/9M2Tg350UZD3q62IFZLbRAR1bSMlCo1ZaeW+BJ+D090e4hIIZLBcTDWe4Mh4jvUDajzQ==}
     engines: {node: '>= 0.4'}
-
-  babel-plugin-annotate-pure-calls@0.4.0:
-    resolution: {integrity: sha512-oi4M/PWUJOU9ZyRGoPTfPMqdyMp06jbJAomd3RcyYuzUtBOddv98BqLm96Lucpi2QFoQHkdGQt0ACvw7VzVEQA==}
-    peerDependencies:
-      '@babel/core': ^6.0.0-0 || 7.x
 
   babel-plugin-annotate-pure-calls@0.5.0:
     resolution: {integrity: sha512-bWlaZl2qsJKHv9BJgF1g6bQ04wK/7Topq9g59I795W9jpx9lNs9N5LK5NjlEBCDhHncrO0vcoAMuHJR3oWnTeQ==}
@@ -5780,11 +5781,6 @@ packages:
   typedarray@0.0.6:
     resolution: {integrity: sha512-/aCDEGatGvZ2BIk+HmLf4ifCJFwvKFNb9/JeZPMulfgFracn9QFcAf5GO8B/mweUjSoblS5In0cWhqpfs/5PQA==}
 
-  typescript@5.7.3:
-    resolution: {integrity: sha512-84MVSjMEHP+FQRPy3pX9sTVV/INIex71s9TL2Gm5FG/WG1SqXeKyZ0k7/blY/4FdOzI12CBy1vGc4og/eus0fw==}
-    engines: {node: '>=14.17'}
-    hasBin: true
-
   typescript@5.9.2:
     resolution: {integrity: sha512-CWBzXQrc/qOkhidw1OzBTQuYRbfyxDXJMVJ1XNwUHGROVmuaeiEm3OslpZ1RV96d7SKKjZKrSJu3+t/xlw3R9A==}
     engines: {node: '>=14.17'}
@@ -8507,10 +8503,6 @@ snapshots:
   available-typed-arrays@1.0.7:
     dependencies:
       possible-typed-array-names: 1.1.0
-
-  babel-plugin-annotate-pure-calls@0.4.0(@babel/core@7.28.3):
-    dependencies:
-      '@babel/core': 7.28.3
 
   babel-plugin-annotate-pure-calls@0.5.0(@babel/core@7.28.3):
     dependencies:
@@ -12544,8 +12536,6 @@ snapshots:
       reflect.getprototypeof: 1.0.10
 
   typedarray@0.0.6: {}
-
-  typescript@5.7.3: {}
 
   typescript@5.9.2: {}
 

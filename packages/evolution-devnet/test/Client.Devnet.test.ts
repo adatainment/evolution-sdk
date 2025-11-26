@@ -1,13 +1,12 @@
 import { describe, expect, it } from "@effect/vitest"
+import * as Devnet from "@evolution-sdk/devnet/Devnet"
+import * as DevnetDefault from "@evolution-sdk/devnet/DevnetDefault"
+import * as Address from "@evolution-sdk/evolution/core/AddressEras"
+import * as Assets from "@evolution-sdk/evolution/sdk/Assets"
+import { createClient } from "@evolution-sdk/evolution/sdk/client/ClientImpl"
+import type { ProtocolParameters } from "@evolution-sdk/evolution/sdk/ProtocolParameters"
+import type { UTxO } from "@evolution-sdk/evolution/sdk/UTxO"
 import { afterAll, beforeAll } from "vitest"
-
-import * as Address from "../src/core/AddressEras.js"
-import * as Assets from "../src/sdk/Assets.js"
-import { createClient } from "../src/sdk/client/ClientImpl.js"
-import * as Devnet from "../src/sdk/Devnet/Devnet.js"
-import * as DevnetDefault from "../src/sdk/Devnet/DevnetDefault.js"
-import type { ProtocolParameters } from "../src/sdk/ProtocolParameters.js"
-import type { UTxO } from "../src/sdk/UTxO.js"
 
 /**
  * Client integration tests with local Devnet

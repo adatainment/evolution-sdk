@@ -1,8 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
+import * as Devnet from "@evolution-sdk/devnet/Devnet"
+import * as DevnetDefault from "@evolution-sdk/devnet/DevnetDefault"
 import { afterAll, beforeAll } from "vitest"
-
-import * as Devnet from "../src/sdk/Devnet/Devnet.js"
-import * as DevnetDefault from "../src/sdk/Devnet/DevnetDefault.js"
 
 /**
  * Tests for Devnet.Genesis module

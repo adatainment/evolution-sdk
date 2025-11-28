@@ -28,10 +28,10 @@ A devnet cluster is the foundation of your local blockchain environment. The clu
 Creating a minimal cluster requires only a name and port configuration. The SDK handles Docker image pulling, container creation, volume management, and genesis file generation automatically.
 
 ```typescript twoslash
-import { Devnet } from "@evolution-sdk/devnet";
+import { Cluster } from "@evolution-sdk/devnet";
 
 // Create a basic devnet cluster
-const cluster = await Devnet.Cluster.make({
+const cluster = await Cluster.make({
   clusterName: "my-first-devnet",
   ports: { node: 3001, submit: 3002 }
 });
@@ -46,11 +46,11 @@ The `make` function returns a cluster configuration containing container referen
 Once created, start the cluster to begin block production:
 
 ```typescript twoslash
-import { Devnet } from "@evolution-sdk/devnet";
-const cluster = await Devnet.Cluster.make()
+import { Cluster } from "@evolution-sdk/devnet";
+const cluster = await Cluster.make()
 
 // Start all containers in the cluster
-await Devnet.Cluster.start(cluster);
+await Cluster.start(cluster);
 
 console.log("Devnet is now producing blocks");
 
@@ -65,11 +65,11 @@ The node begins producing blocks immediately using the default genesis configura
 Monitor individual container states to verify the cluster is running correctly:
 
 ```typescript twoslash
-import { Devnet } from "@evolution-sdk/devnet";
-const cluster = await Devnet.Cluster.make()
+import { Cluster, Container } from "@evolution-sdk/devnet";
+const cluster = await Cluster.make()
 
 // Get detailed container status
-const status = await Devnet.Container.getStatus(cluster.cardanoNode);
+const status = await Container.getStatus(cluster.cardanoNode);
 
 console.log("Container state:", status?.State.Status); // "running"
 console.log("Container health:", status?.State.Health?.Status); // "healthy"
@@ -82,16 +82,16 @@ The status object includes full Docker inspect output: state, network settings, 
 Clean up resources when testing is complete:
 
 ```typescript twoslash
-import { Devnet } from "@evolution-sdk/devnet";
-const cluster = await Devnet.Cluster.make()
+import { Cluster } from "@evolution-sdk/devnet";
+const cluster = await Cluster.make()
 
 // Stop all containers gracefully
-await Devnet.Cluster.stop(cluster);
+await Cluster.stop(cluster);
 
 console.log("Cluster stopped");
 
 // Remove containers and networks
-await Devnet.Cluster.remove(cluster);
+await Cluster.remove(cluster);
 
 console.log("Cluster removed");
 ```
@@ -105,9 +105,9 @@ Most applications need more than just a cardano-node. Kupo provides fast UTxO in
 Enable both services when creating the cluster:
 
 ```typescript twoslash
-import { Devnet } from "@evolution-sdk/devnet";
+import { Cluster, Container } from "@evolution-sdk/devnet";
 
-const cluster = await Devnet.Cluster.make({
+const cluster = await Cluster.make({
   clusterName: "full-stack-devnet",
   ports: { node: 3001, submit: 3002 },
   kupo: {
@@ -123,20 +123,20 @@ const cluster = await Devnet.Cluster.make({
 });
 
 // Start all three containers
-await Devnet.Cluster.start(cluster);
+await Cluster.start(cluster);
 
 // Wait for services to initialize
 await new Promise(resolve => setTimeout(resolve, 5000));
 
 // Check Kupo status
 if (cluster.kupo) {
-  const kupoStatus = await Devnet.Container.getStatus(cluster.kupo);
+  const kupoStatus = await Container.getStatus(cluster.kupo);
   console.log("Kupo status:", kupoStatus?.State.Status);
 }
 
 // Check Ogmios status
 if (cluster.ogmios) {
-  const ogmiosStatus = await Devnet.Container.getStatus(cluster.ogmios);
+  const ogmiosStatus = await Container.getStatus(cluster.ogmios);
   console.log("Ogmios status:", ogmiosStatus?.State.Status);
 }
 ```
@@ -152,25 +152,25 @@ The log levels control output verbosity:
 Fine-grained control over containers enables testing failure scenarios and resource management:
 
 ```typescript twoslash 
-import { Devnet } from "@evolution-sdk/devnet";
-const cluster = await Devnet.Cluster.make()
+import { Cluster, Container } from "@evolution-sdk/devnet";
+const cluster = await Cluster.make()
 
 // Stop just the cardano-node
-await Devnet.Container.stop(cluster.cardanoNode);
+await Container.stop(cluster.cardanoNode);
 
 console.log("Node stopped, Kupo and Ogmios still running");
 
 // Check stopped status
-const stoppedStatus = await Devnet.Container.getStatus(cluster.cardanoNode);
+const stoppedStatus = await Container.getStatus(cluster.cardanoNode);
 console.log("Status:", stoppedStatus?.State.Status); // "exited"
 
 // Restart the node
-await Devnet.Container.start(cluster.cardanoNode);
+await Container.start(cluster.cardanoNode);
 
 await new Promise(resolve => setTimeout(resolve, 2000));
 
 // Verify running again
-const runningStatus = await Devnet.Container.getStatus(cluster.cardanoNode);
+const runningStatus = await Container.getStatus(cluster.cardanoNode);
 console.log("Status:", runningStatus?.State.Status); // "running"
 ```
 
@@ -181,11 +181,11 @@ Individual operations work on any container in the cluster. Kupo and Ogmios depe
 Putting it all together, here's a typical development session:
 
 ```typescript twoslash
-import { Devnet } from "@evolution-sdk/devnet";
+import { Cluster, Container } from "@evolution-sdk/devnet";
 
 async function runDevnetSession() {
   // Create cluster with full stack
-  const cluster = await Devnet.Cluster.make({
+  const cluster = await Cluster.make({
     clusterName: "dev-session",
     ports: { node: 3001, submit: 3002 },
     kupo: { enabled: true, port: 1442 },
@@ -194,19 +194,19 @@ async function runDevnetSession() {
 
   try {
     // Start the environment
-    await Devnet.Cluster.start(cluster);
+    await Cluster.start(cluster);
     console.log("✓ Devnet started");
 
     // Wait for initialization
     await new Promise(resolve => setTimeout(resolve, 5000));
 
     // Verify all services are healthy
-    const nodeStatus = await Devnet.Container.getStatus(cluster.cardanoNode);
+    const nodeStatus = await Container.getStatus(cluster.cardanoNode);
     const kupoStatus = cluster.kupo 
-      ? await Devnet.Container.getStatus(cluster.kupo)
+      ? await Container.getStatus(cluster.kupo)
       : null;
     const ogmiosStatus = cluster.ogmios
-      ? await Devnet.Container.getStatus(cluster.ogmios)
+      ? await Container.getStatus(cluster.ogmios)
       : null;
 
     console.log("✓ Node:", nodeStatus?.State.Status);
@@ -224,8 +224,8 @@ async function runDevnetSession() {
 
   } finally {
     // Always clean up
-    await Devnet.Cluster.stop(cluster);
-    await Devnet.Cluster.remove(cluster);
+    await Cluster.stop(cluster);
+    await Cluster.remove(cluster);
     console.log("\n✓ Devnet stopped and removed");
   }
 }

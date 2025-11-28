@@ -51,10 +51,10 @@ The SDK handles image pulling, container lifecycle, network creation, and health
 Create a devnet cluster with funded addresses:
 
 ```typescript twoslash
-import { Devnet } from "@evolution-sdk/devnet";
+import { Cluster } from "@evolution-sdk/devnet";
 
 // Create cluster with custom genesis
-const cluster = await Devnet.Cluster.make({
+const cluster = await Cluster.make({
   clusterName: "my-devnet",
   ports: { node: 3001, submit: 3002 },
   shelleyGenesis: {
@@ -66,14 +66,14 @@ const cluster = await Devnet.Cluster.make({
 });
 
 // Start the network
-await Devnet.Cluster.start(cluster);
+await Cluster.start(cluster);
 
 // Network is ready for transactions
 console.log("Devnet running on port", 3001);
 
 // Cleanup when done
-await Devnet.Cluster.stop(cluster);
-await Devnet.Cluster.remove(cluster);
+await Cluster.stop(cluster);
+await Cluster.remove(cluster);
 ```
 
 ## Prerequisites

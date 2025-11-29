@@ -4,10 +4,25 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import type { VM } from "@stackblitz/sdk"
 import { StackBlitzPlayground } from "../../components/playground/StackBlitzPlayground"
 
-const encodeCode = (code: string) => btoa(encodeURIComponent(code))
-const decodeCode = (encoded: string) => {
+// Encode/decode code for URL sharing - handles Unicode properly with base64url
+const encodeCode = (code: string): string => {
+	const bytes = new TextEncoder().encode(code)
+	const binString = Array.from(bytes, (byte) => String.fromCodePoint(byte)).join("")
+	return btoa(binString)
+		.replace(/\+/g, "-")
+		.replace(/\//g, "_")
+		.replace(/=+$/, "")
+}
+
+const decodeCode = (encoded: string): string | null => {
 	try {
-		return decodeURIComponent(atob(encoded))
+		const base64 = encoded
+			.replace(/-/g, "+")
+			.replace(/_/g, "/")
+		const padded = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, "=")
+		const binString = atob(padded)
+		const bytes = Uint8Array.from(binString, (char) => char.codePointAt(0)!)
+		return new TextDecoder().decode(bytes)
 	} catch {
 		return null
 	}

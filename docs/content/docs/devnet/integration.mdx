@@ -27,7 +27,7 @@ This guide demonstrates these patterns with complete, runnable examples.
 This example shows the full cycle from cluster creation to confirmed transaction:
 
 ```typescript twoslash
-import { Devnet, DevnetDefault } from "@evolution-sdk/devnet";
+import { Cluster, Config, Genesis } from "@evolution-sdk/devnet";
 import { Core, createClient } from "@evolution-sdk/evolution";
 import * as Assets from "@evolution-sdk/evolution/sdk/Assets";
 
@@ -47,7 +47,7 @@ async function completeWorkflow() {
 
   // Step 2: Create genesis configuration with funded address
   const genesisConfig = {
-    ...DevnetDefault.DEFAULT_SHELLEY_GENESIS,
+    ...Config.DEFAULT_SHELLEY_GENESIS,
     slotLength: 0.1,     // 100ms blocks
     epochLength: 100,
     initialFunds: {
@@ -56,7 +56,7 @@ async function completeWorkflow() {
   };
 
   // Step 3: Create and start devnet cluster
-  const cluster = await Devnet.Cluster.make({
+  const cluster = await Cluster.make({
     clusterName: "integration-example",
     ports: { node: 3001, submit: 3002 },
     shelleyGenesis: genesisConfig,
@@ -64,7 +64,7 @@ async function completeWorkflow() {
     ogmios: { enabled: true, port: 1337, logLevel: "info" }
   });
 
-  await Devnet.Cluster.start(cluster);
+  await Cluster.start(cluster);
   
   // Wait for Kupo and Ogmios to fully initialize
   await new Promise(resolve => setTimeout(resolve, 8000));
@@ -93,7 +93,7 @@ async function completeWorkflow() {
   });
 
   // Step 6: Calculate genesis UTxOs
-  const genesisUtxos = await Devnet.Genesis.calculateUtxosFromConfigOrThrow(genesisConfig);
+  const genesisUtxos = await Genesis.calculateUtxosFromConfig(genesisConfig);
   
   console.log("Genesis UTxOs:", genesisUtxos.length);
   console.log("Initial balance:", genesisUtxos[0]?.assets.lovelace, "lovelace");
@@ -139,8 +139,8 @@ async function completeWorkflow() {
   console.log("Fee paid:", genesisUtxos[0]?.assets.lovelace! - totalBalance - 10_000_000n, "lovelace");
 
   // Step 12: Clean up
-  await Devnet.Cluster.stop(cluster);
-  await Devnet.Cluster.remove(cluster);
+  await Cluster.stop(cluster);
+  await Cluster.remove(cluster);
   console.log("Devnet stopped and removed");
 }
 
@@ -155,9 +155,9 @@ The genesis UTxO calculation provides the initial funds for transaction building
 
 Three key integration points connect devnet to the Evolution SDK:
 
-**Genesis to UTxO**: The `calculateUtxosFromConfigOrThrow` function converts genesis configuration into queryable UTxO objects. These UTxOs can be used as transaction inputs immediately after cluster start.
+**Genesis to UTxO**: The `calculateUtxosFromConfig` function converts genesis configuration into queryable UTxO objects. These UTxOs can be used as transaction inputs immediately after cluster start.
 
-**Critical: Genesis UTxOs and Kupo**: Genesis UTxOs do NOT appear in Kupo's index. Kupo reads chain events starting from the first block, but genesis UTxOs are created in the genesis block itself (block 0), which has no transaction events. You MUST use `calculateUtxosFromConfigOrThrow` to derive genesis UTxOs and explicitly inject them into your transaction builder using the `availableUtxos` parameter. Once you spend a genesis UTxO in a transaction, the resulting outputs WILL be indexed by Kupo and can be queried normally.
+**Critical: Genesis UTxOs and Kupo**: Genesis UTxOs do NOT appear in Kupo's index. Kupo reads chain events starting from the first block, but genesis UTxOs are created in the genesis block itself (block 0), which has no transaction events. You MUST use `calculateUtxosFromConfig` to derive genesis UTxOs and explicitly inject them into your transaction builder using the `availableUtxos` parameter. Once you spend a genesis UTxO in a transaction, the resulting outputs WILL be indexed by Kupo and can be queried normally.
 
 **Provider Configuration**: The client's provider configuration points to the devnet's Kupo and Ogmios services. This enables all blockchain queries (UTxOs, protocol parameters, tip) to target the local network.
 
@@ -168,15 +168,15 @@ Three key integration points connect devnet to the Evolution SDK:
 Not all workflows require a wallet. Query blockchain state using a provider-only client:
 
 ```typescript twoslash
-import { Devnet, DevnetDefault } from "@evolution-sdk/devnet";
+import { Cluster, Config, Genesis } from "@evolution-sdk/devnet";
 import { createClient } from "@evolution-sdk/evolution";
 
 // Start devnet with funded address
-const cluster = await Devnet.Cluster.make({
+const cluster = await Cluster.make({
   clusterName: "query-example",
   ports: { node: 3001, submit: 3002 },
   shelleyGenesis: {
-    ...DevnetDefault.DEFAULT_SHELLEY_GENESIS,
+    ...Config.DEFAULT_SHELLEY_GENESIS,
     initialFunds: {
       "address_hex_here": 100_000_000_000
     }
@@ -185,7 +185,7 @@ const cluster = await Devnet.Cluster.make({
   ogmios: { enabled: true, port: 1337 }
 });
 
-await Devnet.Cluster.start(cluster);
+await Cluster.start(cluster);
 await new Promise(resolve => setTimeout(resolve, 6000));
 
 // Provider-only client (no wallet configured)
@@ -206,8 +206,8 @@ console.log("UTxOs at address:", utxos.length);
 const params = await providerClient.getProtocolParameters();
 console.log("Max transaction size:", params.maxTxSize);
 
-await Devnet.Cluster.stop(cluster);
-await Devnet.Cluster.remove(cluster);
+await Cluster.stop(cluster);
+await Cluster.remove(cluster);
 ```
 
 Provider-only clients are ideal for blockchain explorers, monitoring tools, and backend services that query multiple addresses without signing transactions.
@@ -218,13 +218,13 @@ Provider-only clients are ideal for blockchain explorers, monitoring tools, and 
 
 ```typescript twoslash
 import { describe, it, beforeAll, afterAll, expect } from "vitest";
-import { Devnet, DevnetDefault } from "@evolution-sdk/devnet";
+import { Cluster, Config, Genesis } from "@evolution-sdk/devnet";
 import { Core, createClient, type SigningClient } from "@evolution-sdk/evolution";
 import * as Assets from "@evolution-sdk/evolution/sdk/Assets";
 import type * as UTxO from "@evolution-sdk/evolution/sdk/UTxO";
 
 describe("Transaction Tests", () => {
-  let cluster: Devnet.DevNetCluster;
+  let cluster: Cluster.Cluster;
   let client: SigningClient;
   let genesisUtxos: readonly UTxO.UTxO[];
 
@@ -242,13 +242,13 @@ describe("Transaction Tests", () => {
     );
 
     const genesisConfig = {
-      ...DevnetDefault.DEFAULT_SHELLEY_GENESIS,
+      ...Config.DEFAULT_SHELLEY_GENESIS,
       slotLength: 0.02, // Fast blocks for quick tests
       epochLength: 50,
       initialFunds: { [addressHex]: 10_000_000_000_000 }
     };
 
-    cluster = await Devnet.Cluster.make({
+    cluster = await Cluster.make({
       clusterName: "test-suite-" + Date.now(),
       ports: { node: 3001, submit: 3002 },
       shelleyGenesis: genesisConfig,
@@ -256,7 +256,7 @@ describe("Transaction Tests", () => {
       ogmios: { enabled: true, port: 1337 }
     });
 
-    await Devnet.Cluster.start(cluster);
+    await Cluster.start(cluster);
     await new Promise(resolve => setTimeout(resolve, 8000));
 
     client = createClient({
@@ -269,14 +269,14 @@ describe("Transaction Tests", () => {
       wallet: { type: "seed", mnemonic, accountIndex: 0 }
     });
 
-    genesisUtxos = await Devnet.Genesis.calculateUtxosFromConfigOrThrow(
+    genesisUtxos = await Genesis.calculateUtxosFromConfig(
       genesisConfig
     );
   }, 180_000); // Extended timeout for cluster startup
 
   afterAll(async () => {
-    await Devnet.Cluster.stop(cluster);
-    await Devnet.Cluster.remove(cluster);
+    await Cluster.stop(cluster);
+    await Cluster.remove(cluster);
   }, 60_000);
 
   it("should submit simple payment", async () => {
@@ -326,7 +326,7 @@ The `beforeAll` setup ensures all tests share the same devnet instance, reducing
 Test multi-party protocols by funding multiple addresses in genesis:
 
 ```typescript twoslash
-import { Devnet, DevnetDefault } from "@evolution-sdk/devnet";
+import { Cluster, Config, Genesis } from "@evolution-sdk/devnet";
 import { Core, createClient } from "@evolution-sdk/evolution";
 import * as Assets from "@evolution-sdk/evolution/sdk/Assets";
 
@@ -356,7 +356,7 @@ async function multiWalletExample() {
 
 // Fund both in genesis
 const genesisConfig = {
-  ...DevnetDefault.DEFAULT_SHELLEY_GENESIS,
+  ...Config.DEFAULT_SHELLEY_GENESIS,
   slotLength: 0.1,
   initialFunds: {
     [addr1]: 500_000_000_000,
@@ -364,7 +364,7 @@ const genesisConfig = {
   }
 };
 
-const cluster = await Devnet.Cluster.make({
+const cluster = await Cluster.make({
   clusterName: "multi-wallet",
   ports: { node: 3001, submit: 3002 },
   shelleyGenesis: genesisConfig,
@@ -372,7 +372,7 @@ const cluster = await Devnet.Cluster.make({
   ogmios: { enabled: true, port: 1337 }
 });
 
-await Devnet.Cluster.start(cluster);
+await Cluster.start(cluster);
 await new Promise(resolve => setTimeout(resolve, 8000));
 
 // Create connected clients for both wallets
@@ -405,7 +405,7 @@ const client2 = createClient({
 });
 
   // Wallet 1 sends to Wallet 2
-  const utxos1 = await Devnet.Genesis.calculateUtxosFromConfigOrThrow(genesisConfig);
+  const utxos1 = await Genesis.calculateUtxosFromConfig(genesisConfig);
   const wallet1Address = await wallet1.address();
   const wallet1Utxo = utxos1.find(u => u.address === wallet1Address)!;
 
@@ -429,8 +429,8 @@ const client2 = createClient({
     console.log("Wallet 2 received:", Assets.getAsset(receivedUtxo.assets, "lovelace"), "lovelace");
   }
 
-  await Devnet.Cluster.stop(cluster);
-  await Devnet.Cluster.remove(cluster);
+  await Cluster.stop(cluster);
+  await Cluster.remove(cluster);
 }
 ```
 
@@ -441,14 +441,14 @@ This pattern enables testing escrow contracts, multi-signature scenarios, and an
 For interactive development, start devnet once and keep it running:
 
 ```typescript twoslash
-import { Devnet, DevnetDefault } from "@evolution-sdk/devnet";
+import { Cluster, Config, Genesis } from "@evolution-sdk/devnet";
 
 async function startDevSession() {
-  const cluster = await Devnet.Cluster.make({
+  const cluster = await Cluster.make({
     clusterName: "dev-session",
     ports: { node: 3001, submit: 3002 },
     shelleyGenesis: {
-      ...DevnetDefault.DEFAULT_SHELLEY_GENESIS,
+      ...Config.DEFAULT_SHELLEY_GENESIS,
       slotLength: 0.1,
       initialFunds: {
         "your_address_hex_here": 1_000_000_000_000
@@ -458,7 +458,7 @@ async function startDevSession() {
     ogmios: { enabled: true, port: 1337, logLevel: "info" }
   });
 
-  await Devnet.Cluster.start(cluster);
+  await Cluster.start(cluster);
 
   console.log("\n✓ Devnet running");
   console.log("  Ogmios: http://localhost:1337");
@@ -469,8 +469,8 @@ async function startDevSession() {
   // Graceful shutdown
   process.on("SIGINT", async () => {
     console.log("\nStopping devnet...");
-    await Devnet.Cluster.stop(cluster);
-    await Devnet.Cluster.remove(cluster);
+    await Cluster.stop(cluster);
+    await Cluster.remove(cluster);
     console.log("✓ Devnet stopped\n");
     process.exit(0);
   });
@@ -488,7 +488,7 @@ Run this script to start a persistent devnet for manual testing, dApp developmen
 
 **"Cannot connect to provider"**: Ensure sufficient wait time after `Cluster.start()`. Kupo and Ogmios need 6-8 seconds to initialize completely. Increase wait time for slower systems.
 
-**"UTxO not found"**: Remember that genesis UTxOs are NOT indexed by Kupo. Always use `calculateUtxosFromConfigOrThrow` and provide them via `availableUtxos` parameter when building your first transaction. After spending genesis UTxOs, subsequent outputs will be indexed normally.
+**"UTxO not found"**: Remember that genesis UTxOs are NOT indexed by Kupo. Always use `calculateUtxosFromConfig` and provide them via `availableUtxos` parameter when building your first transaction. After spending genesis UTxOs, subsequent outputs will be indexed normally.
 
 **"Transaction submission failed"**: Verify network magic matches between genesis configuration and client. Mismatched magic causes address validation failures.
 

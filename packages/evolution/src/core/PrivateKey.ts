@@ -86,7 +86,9 @@ export const FromBech32 = Schema.transformOrFail(Schema.String, Schema.typeSchem
     E.gen(function* () {
       const privateKeyBytes = yield* ParseResult.encodeEither(FromBytes)(toA)
       const words = bech32.toWords(privateKeyBytes)
-      return bech32.encode("ed25519e_sk", words, 1023)
+      // Auto-select prefix based on key length (32 bytes = normal, 64 bytes = extended)
+      const prefix = privateKeyBytes.length === 32 ? "ed25519_sk" : "ed25519e_sk"
+      return bech32.encode(prefix, words, 1023)
     }),
   decode: (fromA, _, ast) =>
     E.gen(function* () {
@@ -94,15 +96,15 @@ export const FromBech32 = Schema.transformOrFail(Schema.String, Schema.typeSchem
         try: () => bech32.decode(fromA as any, 1023),
         catch: (error) => new ParseResult.Type(ast, fromA, `Failed to decode bech32 string: ${(error as Error).message}`)
       })
-      if (prefix !== "ed25519e_sk") {
-        throw new ParseResult.Type(ast, fromA, `Expected ed25519e_sk prefix, got ${prefix}`)
+      if (prefix !== "ed25519e_sk" && prefix !== "ed25519_sk") {
+        throw new ParseResult.Type(ast, fromA, `Expected ed25519e_sk or ed25519_sk prefix, got ${prefix}`)
       }
       const decoded = bech32.fromWords(words)
       return yield* ParseResult.decodeEither(FromBytes)(decoded)
     })
 }).annotations({
   identifier: "PrivateKey.FromBech32",
-  description: "Transforms Bech32 string (ed25519e_sk1...) to PrivateKey"
+  description: "Transforms Bech32 string (ed25519e_sk1... or ed25519_sk1...) to PrivateKey"
 })
 
 /**
@@ -140,7 +142,8 @@ export const fromHex = Schema.decodeSync(FromHex)
 
 /**
  * Parse a PrivateKey from a Bech32 string.
- * Expected format: ed25519e_sk1...
+ * Supports both extended (ed25519e_sk1...) and normal (ed25519_sk1...) formats.
+ * Compatible with CML.PrivateKey.from_bech32().
  *
  * @since 2.0.0
  * @category parsing
@@ -169,7 +172,10 @@ export const toHex = Schema.encodeSync(FromHex)
 
 /**
  * Convert a PrivateKey to a Bech32 string.
- * Format: ed25519e_sk1...
+ * Automatically selects the appropriate prefix based on key length:
+ * - 32 bytes → ed25519_sk1... (normal key)
+ * - 64 bytes → ed25519e_sk1... (extended key)
+ * Compatible with CML.PrivateKey.to_bech32().
  *
  * @since 2.0.0
  * @category encoding

@@ -7,7 +7,6 @@
 
 import { Equal, Hash, Inspectable, ParseResult, Schema } from "effect"
 
-import * as Bytes from "../Bytes.js"
 import * as CBOR from "../CBOR.js"
 import type { AlgorithmId } from "./Label.js"
 import {
@@ -333,7 +332,7 @@ export const HeaderMapFromCBORBytes = (options: CBOR.CodecOptions = CBOR.CML_DEF
  * @category Schemas
  */
 export const HeaderMapFromCBORHex = (options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTIONS) =>
-  Schema.compose(Bytes.FromHex, HeaderMapFromCBORBytes(options)).annotations({
+  Schema.compose(Schema.Uint8ArrayFromHex, HeaderMapFromCBORBytes(options)).annotations({
     identifier: "HeaderMap.FromCBORHex",
     description: "Transforms CBOR hex string to HeaderMap"
   })

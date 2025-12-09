@@ -118,7 +118,7 @@ export const verifyData = (
 
     // Verify payload matches (allow empty payloads)
     if (coseSign1.payload === undefined) return false
-    if (!Bytes.bytesEquals(coseSign1.payload, payload)) return false
+    if (!Bytes.equals(coseSign1.payload, payload)) return false
 
     // Get protected headers
     const addressLabel = labelFromText("address")

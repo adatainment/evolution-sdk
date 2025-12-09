@@ -258,7 +258,7 @@ export const COSESign1FromCBORBytes = (options: CBOR.CodecOptions = CBOR.CML_DEF
  * @category Schemas
  */
 export const COSESign1FromCBORHex = (options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTIONS) =>
-  Schema.compose(Bytes.FromHex, COSESign1FromCBORBytes(options)).annotations({
+  Schema.compose(Schema.Uint8ArrayFromHex, COSESign1FromCBORBytes(options)).annotations({
     identifier: "COSESign1.FromCBORHex",
     description: "Transforms CBOR hex string to COSESign1"
   })
@@ -302,11 +302,11 @@ export class COSESign1Builder extends Schema.Class<COSESign1Builder>("COSESign1B
   [Equal.symbol](that: unknown): boolean {
     return (
       that instanceof COSESign1Builder &&
-      Bytes.bytesEquals(this.externalAad, that.externalAad) &&
+      Bytes.equals(this.externalAad, that.externalAad) &&
       this.hashPayload === that.hashPayload &&
       Equal.equals(this.headers, that.headers) &&
       this.isPayloadExternal === that.isPayloadExternal &&
-      Bytes.bytesEquals(this.payload, that.payload)
+      Bytes.equals(this.payload, that.payload)
     )
   }
 

@@ -493,16 +493,16 @@ describe("Aiken CBOR Encoding Compatibility", () => {
 
   // Test #56: encode_string_ascii
   it("encode_string_ascii: should encode 'hello' as bytearray", () => {
-    const value = Text.toBytesUnsafe("hello")
+    const value = Text.toBytes("hello")
     const encoded = Data.toCBORHex(value, CBOR.AIKEN_DEFAULT_OPTIONS)
     expect(encoded).toBe("4568656c6c6f")
   })
 
   // Test #57: encode_string_unicode
   it("encode_string_unicode: should encode 'café' as bytearray", () => {
-    const value = Text.toBytesUnsafe("café")
+    const value = Text.toBytes("café")
     const encoded = Data.toCBORHex(value, CBOR.AIKEN_DEFAULT_OPTIONS)
-    expect(encoded).toBe("45636166c3a9")
+    expect(encoded).toBe("45636166c3a9") // UTF-8 encoding of "café"
   })
 
   // Test #58: encode_bool_true

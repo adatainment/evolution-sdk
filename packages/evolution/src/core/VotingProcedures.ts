@@ -1,7 +1,6 @@
 import { Effect as Eff, Equal, FastCheck, Hash, Inspectable, ParseResult, Schema } from "effect"
 
 import * as Anchor from "./Anchor.js"
-import * as Bytes from "./Bytes.js"
 import * as CBOR from "./CBOR.js"
 import * as Credential from "./Credential.js"
 import * as DRep from "./DRep.js"

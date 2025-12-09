@@ -7,7 +7,6 @@
  */
 import { Effect, Equal, Hash, Inspectable, ParseResult, Schema } from "effect"
 
-import * as Bytes from "./Bytes.js"
 import * as CBOR from "./CBOR.js"
 import * as HeaderBody from "./HeaderBody.js"
 import * as KesSignature from "./KesSignature.js"

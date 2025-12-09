@@ -1,6 +1,5 @@
 import { Effect as Eff, Equal, FastCheck, Hash, Inspectable, ParseResult, Schema } from "effect"
 
-import * as Bytes from "./Bytes.js"
 import * as CBOR from "./CBOR.js"
 import * as KeyHash from "./KeyHash.js"
 import * as ScriptHash from "./ScriptHash.js"

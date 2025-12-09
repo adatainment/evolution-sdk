@@ -1,6 +1,5 @@
 import { Effect as Eff, FastCheck, ParseResult, Schema } from "effect"
 
-import * as Bytes from "./Bytes.js"
 import * as CBOR from "./CBOR.js"
 import * as NativeScripts from "./NativeScripts.js"
 import * as PlutusV1 from "./PlutusV1.js"

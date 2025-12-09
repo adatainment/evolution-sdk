@@ -1,6 +1,5 @@
 import { Data as EffectData, Effect, Equal, FastCheck, Hash, ParseResult, Schema } from "effect"
 
-import * as Bytes from "./Bytes.js"
 import * as CBOR from "./CBOR.js"
 import * as Numeric from "./Numeric.js"
 

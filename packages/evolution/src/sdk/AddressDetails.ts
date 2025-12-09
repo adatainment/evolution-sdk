@@ -1,7 +1,6 @@
 import { Effect as Eff, Equal, ParseResult, Schema } from "effect"
 
 import * as AddressEras from "../core/AddressEras.js"
-import * as Bytes from "../core/Bytes.js"
 import * as NetworkId from "../core/NetworkId.js"
 
 /**

@@ -2,7 +2,6 @@ import { Effect as Eff, Equal, FastCheck, Hash, Inspectable, ParseResult, Schema
 
 import * as BlockBodyHash from "./BlockBodyHash.js"
 import * as BlockHeaderHash from "./BlockHeaderHash.js"
-import * as Bytes from "./Bytes.js"
 import * as CBOR from "./CBOR.js"
 import * as Ed25519Signature from "./Ed25519Signature.js"
 import * as KESVkey from "./KESVkey.js"

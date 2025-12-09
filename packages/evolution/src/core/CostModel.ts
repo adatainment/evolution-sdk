@@ -1,6 +1,5 @@
 import { Equal, FastCheck, Hash, Inspectable, Schema } from "effect"
 
-import * as Bytes from "./Bytes.js"
 import * as CBOR from "./CBOR.js"
 
 // Helper for array equality - Equal.equals compares arrays by instance, not content

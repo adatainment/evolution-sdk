@@ -2,7 +2,6 @@ import { Either as E, Equal, FastCheck, Hash, Inspectable, ParseResult, Schema }
 
 import * as Address from "./Address.js"
 import * as Assets from "./Assets.js"
-import * as Bytes from "./Bytes.js"
 import * as CBOR from "./CBOR.js"
 import * as DatumOption from "./DatumOption.js"
 import * as ScriptRef from "./ScriptRef.js"

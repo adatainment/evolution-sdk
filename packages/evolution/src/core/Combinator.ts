@@ -1,6 +1,5 @@
 import { pipe, Schema } from "effect"
 
-import * as Bytes from "./Bytes.js"
 
 /**
  * Regular expression that matches valid hexadecimal strings.

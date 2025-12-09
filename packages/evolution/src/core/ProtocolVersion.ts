@@ -1,6 +1,5 @@
 import { Equal, FastCheck, Function, Hash, Inspectable, Schema } from "effect"
 
-import * as Bytes from "./Bytes.js"
 import * as CBOR from "./CBOR.js"
 import * as Numeric from "./Numeric.js"
 

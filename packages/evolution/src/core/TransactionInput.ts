@@ -1,6 +1,5 @@
 import { Either as E, Equal, FastCheck, Hash, Inspectable, Schema } from "effect"
 
-import * as Bytes from "./Bytes.js"
 import * as CBOR from "./CBOR.js"
 import * as Numeric from "./Numeric.js"
 import * as TransactionHash from "./TransactionHash.js"

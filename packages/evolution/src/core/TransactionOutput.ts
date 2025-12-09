@@ -2,7 +2,6 @@ import { Either as E, Equal, FastCheck, Hash, Inspectable, ParseResult, Schema }
 
 import * as AddressEras from "./AddressEras.js"
 import * as BaseAddress from "./BaseAddress.js"
-import * as Bytes from "./Bytes.js"
 import * as CBOR from "./CBOR.js"
 import * as DatumOption from "./DatumOption.js"
 import * as EnterpriseAddress from "./EnterpriseAddress.js"

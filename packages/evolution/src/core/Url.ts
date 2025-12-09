@@ -1,6 +1,5 @@
 import { Equal, Hash, Inspectable, Schema } from "effect"
 
-import * as Bytes from "./Bytes.js"
 import * as Text128 from "./Text128.js"
 
 /**

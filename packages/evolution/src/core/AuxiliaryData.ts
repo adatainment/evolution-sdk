@@ -1,6 +1,5 @@
 import { Either as E, Equal, FastCheck, Hash, Inspectable, ParseResult, Schema } from "effect"
 
-import * as Bytes from "./Bytes.js"
 import * as CBOR from "./CBOR.js"
 import * as Metadata from "./Metadata.js"
 import * as NativeScripts from "./NativeScripts.js"

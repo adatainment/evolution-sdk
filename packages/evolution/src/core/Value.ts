@@ -1,7 +1,6 @@
 import { Effect as Eff, Equal, FastCheck, Hash, Inspectable, Option, ParseResult, Schema } from "effect"
 
 import * as AssetName from "./AssetName.js"
-import * as Bytes from "./Bytes.js"
 import * as CBOR from "./CBOR.js"
 import * as Coin from "./Coin.js"
 import * as MultiAsset from "./MultiAsset.js"

@@ -1,7 +1,6 @@
 import { Data, Either as E, FastCheck, ParseResult, Schema } from "effect"
 import type { ParseIssue } from "effect/ParseResult"
 
-import * as Bytes from "./Bytes.js"
 import * as CBOR from "./CBOR.js"
 import * as Function from "./Function.js"
 

@@ -1,7 +1,6 @@
 import { Effect as Eff, Equal, Hash, Inspectable, ParseResult, Schema } from "effect"
 
 import * as Anchor from "./Anchor.js"
-import * as Bytes from "./Bytes.js"
 import * as CBOR from "./CBOR.js"
 import * as Coin from "./Coin.js"
 import * as GovernanceAction from "./GovernanceAction.js"

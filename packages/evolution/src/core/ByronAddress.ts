@@ -1,6 +1,5 @@
 import { Effect as Eff, Equal, Hash, Inspectable, ParseResult, Schema } from "effect"
 
-import * as Bytes from "./Bytes.js"
 import * as NetworkId from "./NetworkId.js"
 
 /**

@@ -269,7 +269,7 @@ export const COSESignFromCBORBytes = (options: CBOR.CodecOptions = CBOR.CML_DEFA
  * @category Schemas
  */
 export const COSESignFromCBORHex = (options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTIONS) =>
-  Schema.compose(Bytes.FromHex, COSESignFromCBORBytes(options)).annotations({
+  Schema.compose(Schema.Uint8ArrayFromHex, COSESignFromCBORBytes(options)).annotations({
     identifier: "COSESign.FromCBORHex"
   })
 

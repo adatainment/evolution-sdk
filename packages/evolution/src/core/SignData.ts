@@ -8,6 +8,7 @@
  * @category Message Signing
  */
 
+import { blake2b } from "@noble/hashes/blake2"
 import { Equal, FastCheck, Hash, Inspectable, ParseResult, Schema } from "effect"
 
 import * as Bytes from "./Bytes.js"
@@ -80,6 +81,18 @@ export enum KeyOperation {
   DeriveBits = 7,
   MacCreate = 8,
   MacVerify = 9
+}
+
+/**
+ * Signature context for Sig_structure (RFC 8152).
+ *
+ * @since 2.0.0
+ * @category Enums
+ */
+export enum SigContext {
+  Signature = "Signature",
+  Signature1 = "Signature1",
+  CounterSignature = "CounterSignature"
 }
 
 /**
@@ -284,6 +297,42 @@ export class HeaderMap extends Schema.Class<HeaderMap>("HeaderMap")({
   }
 
   /**
+   * Set criticality header (label 2) - array of critical header labels.
+   *
+   * @since 2.0.0
+   * @category Mutators
+   */
+  setCriticality(labels: ReadonlyArray<Label>): this {
+    const newHeaders = new Map(this.headers)
+    // Store as array of label values
+    newHeaders.set(labelFromInt(2n), labels.map(l => l.value))
+    return new HeaderMap({ headers: newHeaders }, { disableValidation: true }) as this
+  }
+
+  /**
+   * Get criticality header (label 2) - array of critical header labels.
+   *
+   * @since 2.0.0
+   * @category Accessors
+   */
+  criticality(): ReadonlyArray<Label> | undefined {
+    const targetLabel = labelFromInt(2n)
+    for (const [label, value] of this.headers.entries()) {
+      if (Equal.equals(label, targetLabel)) {
+        if (Array.isArray(value)) {
+          return value.map(v => {
+            if (typeof v === "bigint") return labelFromInt(v)
+            if (typeof v === "string") return labelFromText(v)
+            return labelFromInt(BigInt(v))
+          })
+        }
+        return undefined
+      }
+    }
+    return undefined
+  }
+
+  /**
    * Set key ID header.
    *
    * @since 2.0.0
@@ -303,6 +352,92 @@ export class HeaderMap extends Schema.Class<HeaderMap>("HeaderMap")({
    */
   keyId(): Uint8Array | undefined {
     const targetLabel = labelFromInt(4n)
+    for (const [label, value] of this.headers.entries()) {
+      if (Equal.equals(label, targetLabel)) {
+        return value instanceof Uint8Array ? value : undefined
+      }
+    }
+    return undefined
+  }
+
+  /**
+   * Set content type header (label 3).
+   *
+   * @since 2.0.0
+   * @category Mutators
+   */
+  setContentType(contentType: Label): this {
+    const newHeaders = new Map(this.headers)
+    newHeaders.set(labelFromInt(3n), contentType.value)
+    return new HeaderMap({ headers: newHeaders }, { disableValidation: true }) as this
+  }
+
+  /**
+   * Get content type header (label 3).
+   *
+   * @since 2.0.0
+   * @category Accessors
+   */
+  contentType(): Label | undefined {
+    const targetLabel = labelFromInt(3n)
+    for (const [label, value] of this.headers.entries()) {
+      if (Equal.equals(label, targetLabel)) {
+        if (typeof value === "bigint") return labelFromInt(value)
+        if (typeof value === "string") return labelFromText(value)
+        return undefined
+      }
+    }
+    return undefined
+  }
+
+  /**
+   * Set initialization vector header (label 5).
+   *
+   * @since 2.0.0
+   * @category Mutators
+   */
+  setInitVector(iv: Uint8Array): this {
+    const newHeaders = new Map(this.headers)
+    newHeaders.set(labelFromInt(5n), iv)
+    return new HeaderMap({ headers: newHeaders }, { disableValidation: true }) as this
+  }
+
+  /**
+   * Get initialization vector header (label 5).
+   *
+   * @since 2.0.0
+   * @category Accessors
+   */
+  initVector(): Uint8Array | undefined {
+    const targetLabel = labelFromInt(5n)
+    for (const [label, value] of this.headers.entries()) {
+      if (Equal.equals(label, targetLabel)) {
+        return value instanceof Uint8Array ? value : undefined
+      }
+    }
+    return undefined
+  }
+
+  /**
+   * Set partial initialization vector header (label 6).
+   *
+   * @since 2.0.0
+   * @category Mutators
+   */
+  setPartialInitVector(piv: Uint8Array): this {
+    const newHeaders = new Map(this.headers)
+    newHeaders.set(labelFromInt(6n), piv)
+    return new HeaderMap({ headers: newHeaders }, { disableValidation: true }) as this
+  }
+
+  /**
+   * Get partial initialization vector header (label 6).
+   *
+   * @since 2.0.0
+   * @category Accessors
+   */
+  partialInitVector(): Uint8Array | undefined {
+    const targetLabel = labelFromInt(6n)
     for (const [label, value] of this.headers.entries()) {
       if (Equal.equals(label, targetLabel)) {
         return value instanceof Uint8Array ? value : undefined
@@ -749,6 +884,119 @@ export class EdDSA25519Key extends Schema.Class<EdDSA25519Key>("EdDSA25519Key")(
 }
 
 // ============================================================================
+// COSESignature
+// ============================================================================
+
+/**
+ * Single COSE signature (for multi-signature COSESign).
+ *
+ * @since 2.0.0
+ * @category Model
+ */
+export class COSESignature extends Schema.Class<COSESignature>("COSESignature")({
+  headers: Schema.instanceOf(Headers),
+  signature: Schema.instanceOf(Ed25519Signature.Ed25519Signature)
+}) {
+  toJSON() {
+    return {
+      _tag: "COSESignature" as const,
+      headers: this.headers.toJSON(),
+      signature: Bytes.toHex(this.signature.bytes)
+    }
+  }
+
+  toString(): string {
+    return Inspectable.format(this.toJSON())
+  }
+
+  [Inspectable.NodeInspectSymbol](): unknown {
+    return this.toJSON()
+  }
+
+  [Equal.symbol](that: unknown): boolean {
+    return (
+      that instanceof COSESignature &&
+      Equal.equals(this.headers, that.headers) &&
+      Equal.equals(this.signature, that.signature)
+    )
+  }
+
+  [Hash.symbol](): number {
+    return Hash.combine(Hash.hash(this.headers))(Hash.hash(this.signature))
+  }
+}
+
+/**
+ * Create a new COSESignature.
+ *
+ * @since 2.0.0
+ * @category Constructors
+ */
+export const coseSignatureNew = (
+  headers: Headers,
+  signature: Ed25519Signature.Ed25519Signature
+): COSESignature =>
+  new COSESignature({ headers, signature }, { disableValidation: true })
+
+/**
+ * CBOR bytes transformation schema for COSESignature.
+ *
+ * @since 2.0.0
+ * @category Schemas
+ */
+export const COSESignatureFromCBORBytes = (options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTIONS) =>
+  Schema.transformOrFail(
+    CBOR.FromBytes(options),
+    Schema.typeSchema(COSESignature),
+    {
+      strict: true,
+      decode: (cbor, _, ast) => {
+        if (!Array.isArray(cbor) || cbor.length !== 3) {
+          return ParseResult.fail(new ParseResult.Type(ast, cbor))
+        }
+        const [protectedBytes, unprotectedMap, signatureBytes] = cbor
+        
+        if (!(protectedBytes instanceof Uint8Array)) {
+          return ParseResult.fail(new ParseResult.Type(ast, protectedBytes))
+        }
+        if (!(unprotectedMap instanceof Map)) {
+          return ParseResult.fail(new ParseResult.Type(ast, unprotectedMap))
+        }
+        if (!(signatureBytes instanceof Uint8Array)) {
+          return ParseResult.fail(new ParseResult.Type(ast, signatureBytes))
+        }
+
+        const protectedDecoded = Schema.decodeSync(HeaderMapFromCBORBytes(options))(protectedBytes)
+        const unprotectedDecoded = Schema.decodeSync(HeaderMapFromCBORBytes(options))(
+          Schema.encodeSync(CBOR.FromBytes(options))(unprotectedMap)
+        )
+        const headers = headersNew(protectedDecoded, unprotectedDecoded)
+        const signature = Ed25519Signature.Ed25519Signature.make({ bytes: signatureBytes })
+
+        return ParseResult.succeed(new COSESignature({ headers, signature }, { disableValidation: true }))
+      },
+      encode: (coseSignature) => {
+        const protectedCbor = new Map(
+          Array.from(coseSignature.headers.protected.headers.entries()).map(([label, value]) => [
+            label.value,
+            value
+          ])
+        )
+        const protectedBytes = Schema.encodeSync(CBOR.FromBytes(options))(protectedCbor)
+
+        const unprotectedCbor = new Map(
+          Array.from(coseSignature.headers.unprotected.headers.entries()).map(([label, value]) => [
+            label.value,
+            value
+          ])
+        )
+
+        return ParseResult.succeed([protectedBytes, unprotectedCbor, coseSignature.signature.bytes])
+      }
+    }
+  ).annotations({ identifier: "COSESignatureFromCBORBytes" })
+
+// ============================================================================
 // COSESign1
 // ============================================================================
 
@@ -801,22 +1049,81 @@ export class COSESign1 extends Schema.Class<COSESign1>("COSESign1")({
    * @since 2.0.0
    * @category Accessors
    */
-  signedData(externalAad: Uint8Array = new Uint8Array()): Uint8Array {
+  signedData(externalAad: Uint8Array = new Uint8Array(), externalPayload?: Uint8Array): Uint8Array {
     // Encode protected headers to CBOR
     const protectedCbor = this.headers.protected.headers.size === 0 ? new Map() : new Map(
       Array.from(this.headers.protected.headers.entries()).map(([label, value]) => [label.value, value])
     )
     const protectedBytes = Schema.encodeSync(CBOR.FromBytes(CBOR.CML_DEFAULT_OPTIONS))(protectedCbor)
 
+    // Use external payload if provided, otherwise use internal payload
+    const payloadToUse = externalPayload !== undefined ? externalPayload :
+      (this.payload !== undefined ? this.payload : new Uint8Array())
+
     // Create Sig_structure: ["Signature1", protected, external_aad, payload]
     const sigStructure: CBOR.CBOR = [
       "Signature1",
       protectedBytes,
       externalAad,
-      this.payload !== undefined ? this.payload : new Uint8Array()
+      payloadToUse
     ]
 
     return Schema.encodeSync(CBOR.FromBytes(CBOR.CML_DEFAULT_OPTIONS))(sigStructure)
+  }
+
+  /**
+   * Convert to user-facing encoding format (cms_<base64url>).
+   * Includes checksum for data integrity verification.
+   *
+   * @since 2.0.0
+   * @category Conversion
+   */
+  toUserFacingEncoding(): string {
+    const bodyBytes = Schema.encodeSync(COSESign1FromCBORBytes())(this)
+    const checksum = fnv32a(bodyBytes)
+    const checksumBytes = new Uint8Array(4)
+    new DataView(checksumBytes.buffer).setUint32(0, checksum, false) // big-endian
+    
+    const bodyBase64 = Schema.encodeSync(Schema.Uint8ArrayFromBase64Url)(bodyBytes)
+    const checksumBase64 = Schema.encodeSync(Schema.Uint8ArrayFromBase64Url)(checksumBytes)
+    
+    return `cms_${bodyBase64}${checksumBase64}`
+  }
+
+  /**
+   * Parse from user-facing encoding format (cms_<base64url>).
+   *
+   * @since 2.0.0
+   * @category Conversion
+   */
+  static fromUserFacingEncoding(encoded: string): COSESign1 {
+    if (!encoded.startsWith("cms_")) {
+      throw new Error("SignedMessage user facing encoding must start with \"cms_\"")
+    }
+
+    const withoutPrefix = encoded.slice(4)
+    const withoutPadding = withoutPrefix.replace(/=+$/, "")
+    
+    if (withoutPadding.length < 8) {
+      throw new Error("Insufficient length - missing checksum")
+    }
+
+    const bodyBase64 = withoutPadding.slice(0, -6)
+    const checksumBase64 = withoutPadding.slice(-6)
+    
+    const bodyBytes = Schema.decodeSync(Schema.Uint8ArrayFromBase64Url)(bodyBase64)
+    const checksumBytes = Schema.decodeSync(Schema.Uint8ArrayFromBase64Url)(checksumBase64)
+    
+    const expectedChecksum = new DataView(checksumBytes.buffer).getUint32(0, false)
+    const computedChecksum = fnv32a(bodyBytes)
+    
+    if (expectedChecksum !== computedChecksum) {
+      throw new Error(
+        `Checksum does not match body. shown: ${expectedChecksum}, computed from body: ${computedChecksum}`
+      )
+    }
+
+    return Schema.decodeSync(COSESign1FromCBORBytes())(bodyBytes)
   }
 }
 
@@ -932,6 +1239,151 @@ export const COSESign1FromCBORHex = (options: CBOR.CodecOptions = CBOR.CML_DEFAU
   })
 
 // ============================================================================
+// COSESign
+// ============================================================================
+
+/**
+ * COSE_Sign structure (RFC 8152) - multi-signature message.
+ *
+ * @since 2.0.0
+ * @category Model
+ */
+export class COSESign extends Schema.Class<COSESign>("COSESign")({
+  headers: Schema.instanceOf(Headers),
+  payload: Schema.UndefinedOr(Schema.Uint8ArrayFromSelf),
+  signatures: Schema.Array(Schema.instanceOf(COSESignature))
+}) {
+  toJSON() {
+    return {
+      _tag: "COSESign" as const,
+      headers: this.headers.toJSON(),
+      payload: this.payload !== undefined ? Bytes.toHex(this.payload) : undefined,
+      signatures: this.signatures.map(sig => sig.toJSON())
+    }
+  }
+
+  toString(): string {
+    return Inspectable.format(this.toJSON())
+  }
+
+  [Inspectable.NodeInspectSymbol](): unknown {
+    return this.toJSON()
+  }
+
+  [Equal.symbol](that: unknown): boolean {
+    return (
+      that instanceof COSESign &&
+      Equal.equals(this.headers, that.headers) &&
+      Equal.equals(this.payload, that.payload) &&
+      Equal.equals(this.signatures, that.signatures)
+    )
+  }
+
+  [Hash.symbol](): number {
+    return Hash.combine(
+      Hash.combine(Hash.hash(this.headers))(Hash.hash(this.payload))
+    )(Hash.hash(this.signatures))
+  }
+}
+
+/**
+ * Create a new COSESign.
+ *
+ * @since 2.0.0
+ * @category Constructors
+ */
+export const coseSignNew = (
+  headers: Headers,
+  payload: Uint8Array | undefined,
+  signatures: ReadonlyArray<COSESignature>
+): COSESign =>
+  new COSESign({ headers, payload, signatures: [...signatures] }, { disableValidation: true })
+
+/**
+ * CBOR bytes transformation schema for COSESign.
+ *
+ * @since 2.0.0
+ * @category Schemas
+ */
+export const COSESignFromCBORBytes = (options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTIONS) =>
+  Schema.transformOrFail(
+    CBOR.FromBytes(options),
+    Schema.typeSchema(COSESign),
+    {
+      strict: true,
+      decode: (cbor, _, ast) => {
+        if (!Array.isArray(cbor) || cbor.length !== 4) {
+          return ParseResult.fail(new ParseResult.Type(ast, cbor))
+        }
+        const [protectedBytes, unprotectedMap, payloadOrNull, signaturesArray] = cbor
+
+        if (!(protectedBytes instanceof Uint8Array)) {
+          return ParseResult.fail(new ParseResult.Type(ast, protectedBytes))
+        }
+        if (!(unprotectedMap instanceof Map)) {
+          return ParseResult.fail(new ParseResult.Type(ast, unprotectedMap))
+        }
+        if (!Array.isArray(signaturesArray)) {
+          return ParseResult.fail(new ParseResult.Type(ast, signaturesArray))
+        }
+
+        const protectedDecoded = Schema.decodeSync(HeaderMapFromCBORBytes(options))(protectedBytes)
+        const unprotectedDecoded = Schema.decodeSync(HeaderMapFromCBORBytes(options))(
+          Schema.encodeSync(CBOR.FromBytes(options))(unprotectedMap)
+        )
+        const headers = headersNew(protectedDecoded, unprotectedDecoded)
+
+        const payload = payloadOrNull === null || payloadOrNull === undefined ? undefined : payloadOrNull as Uint8Array
+
+        const signatures = signaturesArray.map(sigCbor => 
+          Schema.decodeSync(COSESignatureFromCBORBytes(options))(
+            Schema.encodeSync(CBOR.FromBytes(options))(sigCbor)
+          )
+        )
+
+        return ParseResult.succeed(new COSESign({ headers, payload, signatures }, { disableValidation: true }))
+      },
+      encode: (coseSign) => {
+        const protectedCbor = new Map(
+          Array.from(coseSign.headers.protected.headers.entries()).map(([label, value]) => [
+            label.value,
+            value
+          ])
+        )
+        const protectedBytes = Schema.encodeSync(CBOR.FromBytes(options))(protectedCbor)
+
+        const unprotectedCbor = new Map(
+          Array.from(coseSign.headers.unprotected.headers.entries()).map(([label, value]) => [
+            label.value,
+            value
+          ])
+        )
+
+        const payloadOrNull = coseSign.payload === undefined ? null : coseSign.payload
+
+        const signaturesEncoded = coseSign.signatures.map(sig =>
+          Schema.decodeSync(CBOR.FromBytes(options))(
+            Schema.encodeSync(COSESignatureFromCBORBytes(options))(sig)
+          )
+        )
+
+        return ParseResult.succeed([protectedBytes, unprotectedCbor, payloadOrNull, signaturesEncoded])
+      }
+    }
+  ).annotations({ identifier: "COSESignFromCBORBytes" })
+
+/**
+ * CBOR hex transformation schema for COSESign.
+ *
+ * @since 2.0.0
+ * @category Schemas
+ */
+export const COSESignFromCBORHex = (options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTIONS) =>
+  Schema.compose(Bytes.FromHex, COSESignFromCBORBytes(options)).annotations({
+    identifier: "COSESign.FromCBORHex"
+  })
+
+// ============================================================================
 // COSESign1Builder
 // ============================================================================
 
@@ -945,7 +1397,8 @@ export class COSESign1Builder extends Schema.Class<COSESign1Builder>("COSESign1B
   headers: Schema.instanceOf(Headers),
   payload: Schema.Uint8ArrayFromSelf,
   hashPayload: Schema.Boolean,
-  externalAad: Schema.Uint8ArrayFromSelf
+  externalAad: Schema.Uint8ArrayFromSelf,
+  isPayloadExternal: Schema.Boolean
 }) {
   toJSON() {
     return {
@@ -953,7 +1406,8 @@ export class COSESign1Builder extends Schema.Class<COSESign1Builder>("COSESign1B
       headers: this.headers.toJSON(),
       payload: Bytes.toHex(this.payload),
       hashPayload: this.hashPayload,
-      externalAad: Bytes.toHex(this.externalAad)
+      externalAad: Bytes.toHex(this.externalAad),
+      isPayloadExternal: this.isPayloadExternal
     }
   }
 
@@ -971,16 +1425,19 @@ export class COSESign1Builder extends Schema.Class<COSESign1Builder>("COSESign1B
       Equal.equals(this.headers, that.headers) &&
       Bytes.bytesEquals(this.payload, that.payload) &&
       this.hashPayload === that.hashPayload &&
-      Bytes.bytesEquals(this.externalAad, that.externalAad)
+      Bytes.bytesEquals(this.externalAad, that.externalAad) &&
+      this.isPayloadExternal === that.isPayloadExternal
     )
   }
 
   [Hash.symbol](): number {
     return Hash.combine(
-      Hash.combine(Hash.combine(Hash.hash(this.headers))(Hash.array(Array.from(this.payload))))(
-        Hash.hash(this.hashPayload)
-      )
-    )(Hash.array(Array.from(this.externalAad)))
+      Hash.combine(
+        Hash.combine(Hash.combine(Hash.hash(this.headers))(Hash.array(Array.from(this.payload))))(
+          Hash.hash(this.hashPayload)
+        )
+      )(Hash.array(Array.from(this.externalAad)))
+    )(Hash.hash(this.isPayloadExternal))
   }
 
   /**
@@ -995,7 +1452,37 @@ export class COSESign1Builder extends Schema.Class<COSESign1Builder>("COSESign1B
         headers: this.headers,
         payload: this.payload,
         hashPayload: this.hashPayload,
-        externalAad: aad
+        externalAad: aad,
+        isPayloadExternal: this.isPayloadExternal
+      },
+      { disableValidation: true }
+    ) as this
+  }
+
+  /**
+   * Hash the payload with blake2b-224 and update headers.
+   * Sets the "hashed" header to true in unprotected headers.
+   *
+   * @since 2.0.0
+   * @category Mutators
+   */
+  hashPayloadWith224(): this {
+    if (!this.hashPayload) return this
+    
+    // Hash payload with blake2b-224 (28 bytes)
+    const hashedPayload = blake2b(this.payload, { dkLen: 28 })
+    
+    // Update unprotected headers to indicate payload is hashed
+    const newUnprotected = this.headers.unprotected.setHeader(labelFromText("hashed"), true)
+    const newHeaders = headersNew(this.headers.protected, newUnprotected)
+    
+    return new COSESign1Builder(
+      {
+        headers: newHeaders,
+        payload: hashedPayload,
+        hashPayload: false, // Already hashed
+        externalAad: this.externalAad,
+        isPayloadExternal: this.isPayloadExternal
       },
       { disableValidation: true }
     ) as this
@@ -1014,8 +1501,8 @@ export class COSESign1Builder extends Schema.Class<COSESign1Builder>("COSESign1B
     )
     const protectedBytes = Schema.encodeSync(CBOR.FromBytes(CBOR.CML_DEFAULT_OPTIONS))(protectedCbor)
 
-    // Use payload directly or hash it
-    const payloadToSign = this.hashPayload ? this.payload : this.payload
+    // Hash payload if needed
+    const payloadToSign = this.hashPayload ? blake2b(this.payload, { dkLen: 28 }) : this.payload
 
     // Create Sig_structure: ["Signature1", protected, external_aad, payload]
     const sigStructure: CBOR.CBOR = ["Signature1", protectedBytes, this.externalAad, payloadToSign]
@@ -1033,7 +1520,7 @@ export class COSESign1Builder extends Schema.Class<COSESign1Builder>("COSESign1B
     return new COSESign1(
       {
         headers: this.headers,
-        payload: this.payload,
+        payload: this.isPayloadExternal ? undefined : this.payload,
         signature
       },
       { disableValidation: true }
@@ -1050,14 +1537,134 @@ export class COSESign1Builder extends Schema.Class<COSESign1Builder>("COSESign1B
 export const coseSign1BuilderNew = (
   headers: Headers,
   payload: Uint8Array,
-  hashPayload: boolean
+  isPayloadExternal: boolean
 ): COSESign1Builder =>
   new COSESign1Builder(
     {
       headers,
       payload,
-      hashPayload,
-      externalAad: new Uint8Array()
+      hashPayload: false,
+      externalAad: new Uint8Array(),
+      isPayloadExternal
+    },
+    { disableValidation: true }
+  )
+
+// ============================================================================
+// COSESignBuilder
+// ============================================================================
+
+/**
+ * Builder for creating COSE_Sign structures (multi-signature).
+ *
+ * @since 2.0.0
+ * @category Model
+ */
+export class COSESignBuilder extends Schema.Class<COSESignBuilder>("COSESignBuilder")({
+  headers: Schema.instanceOf(Headers),
+  payload: Schema.Uint8ArrayFromSelf,
+  hashPayload: Schema.Boolean,
+  externalAad: Schema.Uint8ArrayFromSelf,
+  isPayloadExternal: Schema.Boolean
+}) {
+  /**
+   * Set external additional authenticated data.
+   *
+   * @since 2.0.0
+   * @category Mutators
+   */
+  setExternalAad(externalAad: Uint8Array): this {
+    return new COSESignBuilder(
+      {
+        headers: this.headers,
+        payload: this.payload,
+        hashPayload: this.hashPayload,
+        externalAad,
+        isPayloadExternal: this.isPayloadExternal
+      },
+      { disableValidation: true }
+    ) as this
+  }
+
+  /**
+   * Hash the payload with blake2b-224 and update headers.
+   *
+   * @since 2.0.0
+   * @category Mutators
+   */
+  hashPayloadWith224(): this {
+    if (!this.hashPayload) return this
+    
+    const hashedPayload = blake2b(this.payload, { dkLen: 28 })
+    
+    return new COSESignBuilder(
+      {
+        headers: this.headers,
+        payload: hashedPayload,
+        hashPayload: false,
+        externalAad: this.externalAad,
+        isPayloadExternal: this.isPayloadExternal
+      },
+      { disableValidation: true }
+    ) as this
+  }
+
+  /**
+   * Create the data that needs to be signed (Sig_structure).
+   *
+   * @since 2.0.0
+   * @category Building
+   */
+  makeDataToSign(): Uint8Array {
+    const protectedCbor = new Map(
+      Array.from(this.headers.protected.headers.entries()).map(([label, value]) => [label.value, value])
+    )
+    const protectedBytes = Schema.encodeSync(CBOR.FromBytes(CBOR.CML_DEFAULT_OPTIONS))(protectedCbor)
+
+    const payloadToSign = this.hashPayload ? blake2b(this.payload, { dkLen: 28 }) : this.payload
+
+    // Create Sig_structure for multi-signature: ["Signature", protected, external_aad, payload]
+    const sigStructure: CBOR.CBOR = ["Signature", protectedBytes, this.externalAad, payloadToSign]
+
+    return Schema.encodeSync(CBOR.FromBytes(CBOR.CML_DEFAULT_OPTIONS))(sigStructure)
+  }
+
+  /**
+   * Build the final COSESign structure with the provided signatures.
+   *
+   * @since 2.0.0
+   * @category Building
+   */
+  build(signatures: ReadonlyArray<COSESignature>): COSESign {
+    return new COSESign(
+      {
+        headers: this.headers,
+        payload: this.isPayloadExternal ? undefined : this.payload,
+        signatures: [...signatures]
+      },
+      { disableValidation: true }
+    )
+  }
+}
+
+/**
+ * Create a new COSESignBuilder.
+ *
+ * @since 2.0.0
+ * @category Constructors
+ */
+export const coseSignBuilderNew = (
+  headers: Headers,
+  payload: Uint8Array,
+  isPayloadExternal: boolean
+): COSESignBuilder =>
+  new COSESignBuilder(
+    {
+      headers,
+      payload,
+      hashPayload: false,
+      externalAad: new Uint8Array(),
+      isPayloadExternal
     },
     { disableValidation: true }
   )
@@ -1304,3 +1911,26 @@ export const arbitraryPayload: FastCheck.Arbitrary<Payload> = FastCheck.uint8Arr
   minLength: 0,
   maxLength: 256
 })
+
+// ============================================================================
+// Utility Functions - Internal
+// ============================================================================
+
+/**
+ * FNV-1a 32-bit hash algorithm.
+ * Used for checksums in user-facing encoding.
+ *
+ * @internal
+ */
+function fnv32a(bytes: Uint8Array): number {
+  const FNV_PRIME = 0x01000193
+  let hash = 0x811c9dc5 // FNV offset basis
+  
+  for (let i = 0; i < bytes.length; i++) {
+    hash ^= bytes[i]
+    hash = Math.imul(hash, FNV_PRIME)
+  }
+  
+  return hash >>> 0 // Convert to unsigned 32-bit
+}
+

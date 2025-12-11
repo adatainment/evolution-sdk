@@ -43,13 +43,13 @@
     "typescript": "^5.9.2"
   },
   "dependencies": {
+    "@noble/hashes": "^1.8.0",
     "dockerode": "^4.0.7"
   },
   "peerDependencies": {
     "@evolution-sdk/evolution": "workspace:*",
     "@effect/platform": "^0.90.10",
     "@effect/platform-node": "^0.96.1",
-    "@noble/hashes": "^1.8.0",
     "effect": "^3.19.3"
   },
   "keywords": [

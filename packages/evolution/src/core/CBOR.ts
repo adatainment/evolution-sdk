@@ -161,6 +161,29 @@ export const STRUCT_FRIENDLY_OPTIONS: CodecOptions = {
   mapsAsObjects: true
 } as const
 
+/**
+ * Cardano Node compatible CBOR encoding options for PlutusData
+ *
+ * Uses definite-length encoding for arrays and maps, matching the format
+ * produced by CML's `to_cardano_node_format().to_cbor_hex()`.
+ *
+ * Note: The on-chain format uses indefinite-length (AIKEN_DEFAULT_OPTIONS),
+ * but this option is useful for testing compatibility with tools that
+ * expect definite-length encoding.
+ *
+ * @since 2.0.0
+ * @category constants
+ */
+export const CARDANO_NODE_DATA_OPTIONS: CodecOptions = {
+  mode: "custom",
+  useIndefiniteArrays: false,
+  useIndefiniteMaps: false,
+  useDefiniteForEmpty: true,
+  sortMapKeys: false,
+  useMinimalEncoding: true,
+  mapsAsObjects: false
+} as const
+
 const DEFAULT_OPTIONS: CodecOptions = {
   mode: "custom",
   useIndefiniteArrays: false,

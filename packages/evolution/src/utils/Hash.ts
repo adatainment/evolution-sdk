@@ -162,6 +162,8 @@ export const hashAuxiliaryData = (aux: AuxiliaryData.AuxiliaryData): AuxiliaryDa
 /**
  * Compute hash of plutus data using specified CBOR encoding options.
  * Defaults to CML_DATA_DEFAULT_OPTIONS (indefinite-length arrays/maps).
+ *
+ * TODO: Consider moving this to the Data module as Data.hash() for better organization
  */
 export const hashPlutusData = (
   pd: Data.Data,

@@ -236,3 +236,101 @@ export const arbitrary = FastCheck.record({
       stakingCredential: props.stakingCredential ?? undefined
     })
 )
+
+/**
+ * Address details with both structured and serialized formats
+ *
+ * @since 1.0.0
+ * @category Model
+ */
+export interface AddressDetails {
+  readonly type: "Base" | "Enterprise"
+  readonly networkId: NetworkId.NetworkId
+  readonly address: {
+    readonly bech32: string
+    readonly hex: string
+  }
+  readonly paymentCredential: Credential.CredentialSchema
+  readonly stakingCredential?: Credential.CredentialSchema
+}
+
+/**
+ * Parse address from bech32 or hex string and extract all details
+ * Returns undefined if the address cannot be parsed
+ *
+ * Supports:
+ * - Base addresses (payment + staking credentials)
+ * - Enterprise addresses (payment credential only)
+ *
+ * @since 1.0.0
+ * @category Utils
+ * @example
+ * ```typescript
+ * const details = getAddressDetails("addr_test1qp...")
+ * if (details) {
+ *   console.log(details.type) // "Base" | "Enterprise"
+ *   console.log(details.networkId) // 0 | 1
+ *   console.log(details.paymentCredential)
+ *   console.log(details.stakingCredential) // present for Base addresses
+ * }
+ * ```
+ */
+export const getAddressDetails = (address: string): AddressDetails | undefined => {
+  try {
+    // Try bech32 first
+    const parsed = fromBech32(address)
+    return {
+      type: parsed.stakingCredential ? "Base" : "Enterprise",
+      networkId: parsed.networkId,
+      address: {
+        bech32: address,
+        hex: toHex(parsed)
+      },
+      paymentCredential: parsed.paymentCredential,
+      stakingCredential: parsed.stakingCredential
+    }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  } catch (_bech32Error) {
+    try {
+      // Try hex
+      const parsed = fromHex(address)
+      return {
+        type: parsed.stakingCredential ? "Base" : "Enterprise",
+        networkId: parsed.networkId,
+        address: {
+          bech32: toBech32(parsed),
+          hex: address
+        },
+        paymentCredential: parsed.paymentCredential,
+        stakingCredential: parsed.stakingCredential
+      }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (_hexError) {
+      return undefined
+    }
+  }
+}
+
+/**
+ * Extract payment credential from address string
+ * Returns undefined if the address cannot be parsed
+ *
+ * @since 1.0.0
+ * @category Utils
+ */
+export const getPaymentCredential = (address: string): Credential.CredentialSchema | undefined => {
+  const details = getAddressDetails(address)
+  return details?.paymentCredential
+}
+
+/**
+ * Extract staking credential from address string
+ * Returns undefined if the address has no staking credential or cannot be parsed
+ *
+ * @since 1.0.0
+ * @category Utils
+ */
+export const getStakingCredential = (address: string): Credential.CredentialSchema | undefined => {
+  const details = getAddressDetails(address)
+  return details?.stakingCredential
+}

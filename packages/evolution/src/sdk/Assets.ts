@@ -2,7 +2,7 @@ import { Effect as Eff, ParseResult, Schema } from "effect"
 import * as Equal from "effect/Equal"
 
 import * as AssetName from "../core/AssetName.js"
-import * as CoreAssets from "../core/Assets.js"
+import * as CoreAssets from "../core/Assets/index.js"
 import * as CoreMint from "../core/Mint.js"
 import * as MultiAsset from "../core/MultiAsset.js"
 import * as NonZeroInt64 from "../core/NonZeroInt64.js"

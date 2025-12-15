@@ -11,8 +11,10 @@
 
 import { Effect, Ref } from "effect"
 
-import * as Assets from "../../Assets.js"
-import type * as UTxO from "../../UTxO.js"
+import * as CoreAddress from "../../../core/Address.js"
+import * as CoreAssets from "../../../core/Assets/index.js"
+import * as TxOut from "../../../core/TxOut.js"
+import * as UTxO from "../../../core/UTxO.js"
 import {
   AvailableUtxosTag,
   BuildOptionsTag,
@@ -47,7 +49,7 @@ const MAX_COLLATERAL_INPUTS = 3
  * @category helpers
  */
 const isPureAda = (utxo: UTxO.UTxO): boolean => {
-  return Object.keys(utxo.assets).length === 1 && "lovelace" in utxo.assets
+  return !CoreAssets.hasMultiAsset(utxo.assets)
 }
 
 /**
@@ -70,7 +72,7 @@ const sortCollateralCandidates = (
     if (!aIsPure && bIsPure) return 1
 
     // Then by lovelace amount (descending - prefer largest first)
-    return Number(Assets.getLovelace(b.assets) - Assets.getLovelace(a.assets))
+    return Number(CoreAssets.lovelaceOf(b.assets) - CoreAssets.lovelaceOf(a.assets))
   })
 }
 
@@ -188,7 +190,7 @@ export const executeCollateral = (): Effect.Effect<
     // ═══════════════════════════════════════════════════════════
     const selectedCollateral: Array<UTxO.UTxO> = []
     let totalLovelace = 0n
-    let totalAssets: Assets.Assets = { lovelace: 0n }
+    let totalAssets: CoreAssets.Assets = CoreAssets.zero
 
     for (const utxo of sorted) {
       if (selectedCollateral.length >= MAX_COLLATERAL_INPUTS) {
@@ -196,11 +198,11 @@ export const executeCollateral = (): Effect.Effect<
       }
 
       selectedCollateral.push(utxo)
-      totalLovelace += Assets.getLovelace(utxo.assets)
-      totalAssets = Assets.add(totalAssets, utxo.assets)
+      totalLovelace += CoreAssets.lovelaceOf(utxo.assets)
+      totalAssets = CoreAssets.merge(totalAssets, utxo.assets)
 
       yield* Effect.logDebug(
-        `[Collateral] Selected UTxO: ${utxo.txHash}#${utxo.outputIndex} (${Assets.getLovelace(utxo.assets)} lovelace)`
+        `[Collateral] Selected UTxO: ${UTxO.toOutRefString(utxo)} (${CoreAssets.lovelaceOf(utxo.assets)} lovelace)`
       )
 
       // Check if we have enough
@@ -237,7 +239,7 @@ export const executeCollateral = (): Effect.Effect<
     // STEP 6: Calculate Return Amount and Assets
     // ═══════════════════════════════════════════════════════════
     const returnLovelace = totalLovelace - totalCollateral
-    const hasTokens = Object.keys(totalAssets).length > 1
+    const hasTokens = CoreAssets.hasMultiAsset(totalAssets)
 
     yield* Effect.logDebug(
       `[Collateral] Return amount: ${returnLovelace} lovelace${hasTokens ? " + tokens" : ""}`
@@ -272,9 +274,9 @@ export const executeCollateral = (): Effect.Effect<
     // ═══════════════════════════════════════════════════════════
     // STEP 7: Validate MinUTxO for Return Output
     // ═══════════════════════════════════════════════════════════
-    const returnAssets = Assets.setLovelace(totalAssets, returnLovelace)
+    const returnAssets = CoreAssets.withLovelace(totalAssets, returnLovelace)
     
-    yield* Effect.logDebug(`[Collateral] Return assets keys: ${Object.keys(returnAssets).length} (${Object.keys(returnAssets).join(", ")})`)
+    yield* Effect.logDebug(`[Collateral] Return assets: ${returnAssets.toString()}`)
 
     const minUtxo = yield* calculateMinimumUtxoLovelace({
       address: changeAddress,
@@ -300,12 +302,13 @@ export const executeCollateral = (): Effect.Effect<
     // ═══════════════════════════════════════════════════════════
     // STEP 9: Create Return Output
     // ═══════════════════════════════════════════════════════════
-    const collateralReturn: UTxO.TxOutput = {
-      address: changeAddress,
+    const coreAddress = CoreAddress.fromBech32(changeAddress)
+    const collateralReturn = new TxOut.TransactionOutput({
+      address: coreAddress,
       assets: returnAssets,
       datumOption: undefined, // No datum for collateral return
       scriptRef: undefined // No script reference
-    }
+    })
 
     // ═══════════════════════════════════════════════════════════
     // STEP 10: Update State

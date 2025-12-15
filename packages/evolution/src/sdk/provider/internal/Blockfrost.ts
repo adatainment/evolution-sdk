@@ -5,12 +5,13 @@
 
 import { Schema } from "effect"
 
-import * as Assets from "../../Assets.js"
-import type * as Datum from "../../Datum.js"
+import * as CoreAddress from "../../../core/Address.js"
+import * as CoreAssets from "../../../core/Assets/index.js"
+import * as TransactionHash from "../../../core/TransactionHash.js"
+import * as CoreUTxO from "../../../core/UTxO.js"
 import * as Delegation from "../../Delegation.js"
 import type { EvalRedeemer } from "../../EvalRedeemer.js"
 import type * as ProtocolParameters from "../../ProtocolParameters.js"
-import type * as UTxO from "../../UTxO.js"
 
 // ============================================================================
 // Blockfrost API Response Schemas
@@ -182,49 +183,56 @@ export const transformProtocolParameters = (
 }
 
 /**
- * Transform Blockfrost amounts to Evolution SDK Assets
+ * Transform Blockfrost amounts to Core Assets
  */
-export const transformAmounts = (amounts: ReadonlyArray<BlockfrostAmount>): Assets.Assets => {
-  let assets = Assets.empty()
+export const transformAmounts = (amounts: ReadonlyArray<BlockfrostAmount>): CoreAssets.Assets => {
+  let lovelace = 0n
+  const multiAssetEntries: Array<[string, bigint]> = []
   
   for (const amount of amounts) {
     if (amount.unit === "lovelace") {
-      assets = { ...assets, lovelace: BigInt(amount.quantity) }
+      lovelace = BigInt(amount.quantity)
     } else {
-      assets = { ...assets, [amount.unit]: BigInt(amount.quantity) }
+      multiAssetEntries.push([amount.unit, BigInt(amount.quantity)])
     }
+  }
+  
+  // Build Core Assets starting with lovelace
+  let assets = CoreAssets.fromLovelace(lovelace)
+  
+  // Add multi-assets if any using hex strings
+  for (const [unit, qty] of multiAssetEntries) {
+    // Parse unit - policyId is first 56 chars, assetName is remainder
+    const policyIdHex = unit.slice(0, 56)
+    const assetNameHex = unit.slice(56)
+    assets = CoreAssets.addByHex(assets, policyIdHex, assetNameHex, qty)
   }
   
   return assets
 }
 
 /**
- * Transform Blockfrost UTxO to Evolution SDK UTxO
+ * Transform Blockfrost UTxO to Core UTxO
  */
-export const transformUTxO = (blockfrostUtxo: BlockfrostUTxO, address: string): UTxO.UTxO => {
+export const transformUTxO = (blockfrostUtxo: BlockfrostUTxO, addressStr: string): CoreUTxO.UTxO => {
   const assets = transformAmounts(blockfrostUtxo.amount)
+  const address = CoreAddress.fromBech32(addressStr)
+  const transactionId = TransactionHash.fromHex(blockfrostUtxo.tx_hash)
 
-  let datumOption: Datum.Datum | undefined = undefined
-  if (blockfrostUtxo.inline_datum) {
-    datumOption = {
-      type: "inlineDatum",
-      inline: blockfrostUtxo.inline_datum
-    }
-  } else if (blockfrostUtxo.data_hash) {
-    datumOption = {
-      type: "datumHash",
-      hash: blockfrostUtxo.data_hash
-    }
-  }
+  // TODO: Handle datum and script ref when Core types support them
+  // let datumOption: Datum.Datum | undefined = undefined
+  // if (blockfrostUtxo.inline_datum) {
+  //   datumOption = { type: "inlineDatum", inline: blockfrostUtxo.inline_datum }
+  // } else if (blockfrostUtxo.data_hash) {
+  //   datumOption = { type: "datumHash", hash: blockfrostUtxo.data_hash }
+  // }
 
-  return {
-    txHash: blockfrostUtxo.tx_hash,
-    outputIndex: blockfrostUtxo.output_index,
+  return new CoreUTxO.UTxO({
+    transactionId,
+    index: BigInt(blockfrostUtxo.output_index),
     address,
-    assets,
-    datumOption,
-    scriptRef: undefined // Blockfrost doesn't provide full script data, only hash
-  }
+    assets
+  })
 }
 
 /**

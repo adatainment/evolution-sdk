@@ -1,10 +1,10 @@
 // Effect-TS imports
 import { Effect, Ref, Schema } from "effect"
-import * as Array from "effect/Array"
+import type * as Array from "effect/Array"
 
 // Core imports
 import * as CoreAddress from "../../core/Address.js"
-import * as AddressEras from "../../core/AddressEras.js"
+import * as CoreAssets from "../../core/Assets/index.js"
 import * as Bytes32 from "../../core/Bytes32.js"
 import * as PlutusData from "../../core/Data.js"
 import * as DatumOption from "../../core/DatumOption.js"
@@ -19,12 +19,11 @@ import * as TransactionHash from "../../core/TransactionHash.js"
 import * as TransactionInput from "../../core/TransactionInput.js"
 import * as TransactionWitnessSet from "../../core/TransactionWitnessSet.js"
 import * as TxOut from "../../core/TxOut.js"
+import * as CoreUTxO from "../../core/UTxO.js"
 import * as VKey from "../../core/VKey.js"
-// SDK imports
+// SDK imports (for conversion utilities)
 import * as Address from "../Address.js"
-import * as Assets from "../Assets.js"
 import type * as Datum from "../Datum.js"
-import * as UTxO from "../UTxO.js"
 // Internal imports
 import type { UnfrackOptions } from "./TransactionBuilder.js"
 import { TransactionBuilderError, TxContext } from "./TransactionBuilder.js"
@@ -52,6 +51,17 @@ import * as Unfrack from "./Unfrack.js"
 
 /**
  * Check if an address is a script address (payment credential is ScriptHash).
+ * Works with Core Address type.
+ *
+ * @since 2.0.0
+ * @category helpers
+ */
+export const isScriptAddressCore = (address: CoreAddress.Address): boolean => {
+  return address.paymentCredential._tag === "ScriptHash"
+}
+
+/**
+ * Check if an address string is a script address (payment credential is ScriptHash).
  * Parses the address to extract its structure and checks the payment credential type.
  *
  * @since 2.0.0
@@ -80,14 +90,14 @@ export const isScriptAddress = (address: string): Effect.Effect<boolean, Transac
  * @category helpers
  */
 export const filterScriptUtxos = (
-  utxos: ReadonlyArray<UTxO.UTxO>
-): Effect.Effect<ReadonlyArray<UTxO.UTxO>, TransactionBuilderError> =>
+  utxos: ReadonlyArray<CoreUTxO.UTxO>
+): Effect.Effect<ReadonlyArray<CoreUTxO.UTxO>, TransactionBuilderError> =>
   Effect.gen(function* () {
-    const scriptUtxos: Array<UTxO.UTxO> = []
+    const scriptUtxos: Array<CoreUTxO.UTxO> = []
 
     for (const utxo of utxos) {
-      const isScript = yield* isScriptAddress(utxo.address)
-      if (isScript) {
+      // Core UTxO has address as Address class, check directly
+      if (isScriptAddressCore(utxo.address)) {
         scriptUtxos.push(utxo)
       }
     }
@@ -105,9 +115,9 @@ export const filterScriptUtxos = (
  * @since 2.0.0
  * @category helpers
  */
-export const calculateTotalAssets = (utxos: ReadonlyArray<UTxO.UTxO> | Set<UTxO.UTxO>): Assets.Assets => {
-  const utxoArray = (Array.isArray(utxos) ? utxos : globalThis.Array.from(utxos)) as ReadonlyArray<UTxO.UTxO>
-  return utxoArray.reduce((total: Assets.Assets, utxo: UTxO.UTxO) => Assets.add(total, utxo.assets), Assets.empty())
+export const calculateTotalAssets = (utxos: ReadonlyArray<CoreUTxO.UTxO> | Set<CoreUTxO.UTxO>): CoreAssets.Assets => {
+  const utxoArray = (globalThis.Array.isArray(utxos) ? utxos : globalThis.Array.from(utxos)) as ReadonlyArray<CoreUTxO.UTxO>
+  return utxoArray.reduce((total: CoreAssets.Assets, utxo: CoreUTxO.UTxO) => CoreAssets.merge(total, utxo.assets), CoreAssets.zero)
 }
 
 /**
@@ -126,7 +136,7 @@ export const calculateTotalAssets = (utxos: ReadonlyArray<UTxO.UTxO> | Set<UTxO.
  * @category helpers
  */
 export const calculateReferenceScriptFee = (
-  referenceInputs: ReadonlyArray<UTxO.UTxO>
+  referenceInputs: ReadonlyArray<CoreUTxO.UTxO>
 ): Effect.Effect<bigint, TransactionBuilderError> =>
   Effect.gen(function* () {
     // Calculate total reference script size in bytes
@@ -134,10 +144,9 @@ export const calculateReferenceScriptFee = (
     
     for (const utxo of referenceInputs) {
       if (utxo.scriptRef) {
-        // Get script CBOR bytes length
-        // Script is stored as CBOR hex string, convert to bytes
-        const scriptHex = utxo.scriptRef.script // Script type has 'script' property with CBOR hex
-        const scriptBytes = scriptHex.length / 2 // Hex string is 2 chars per byte
+        // Get script CBOR bytes length from Core Script type
+        // Core scripts have a 'bytes' property with the raw script bytes
+        const scriptBytes = utxo.scriptRef.bytes.length
         totalScriptSize += scriptBytes
       }
     }
@@ -216,32 +225,37 @@ export const makeDatumOption = (datum: Datum.Datum): Effect.Effect<DatumOption.D
   )
 
 /**
- * Create a TxOutput from user-friendly parameters.
- * Stays in SDK types for easier manipulation (merging, etc).
+ * Create a TransactionOutput from user-friendly parameters.
+ * Uses Core types directly.
  *
- * TxOutput represents an output being created in a transaction - it doesn't have
- * txHash/outputIndex yet since the transaction hasn't been submitted.
+ * TransactionOutput represents an output being created in a transaction.
  *
  * @since 2.0.0
  * @category helpers
  */
 export const makeTxOutput = (params: {
   address: string
-  assets: Assets.Assets
+  assets: CoreAssets.Assets
   datum?: Datum.Datum
   scriptRef?: any // TODO: Add ScriptRef type
-}): Effect.Effect<UTxO.TxOutput, TransactionBuilderError> =>
+}): Effect.Effect<TxOut.TransactionOutput, TransactionBuilderError> =>
   Effect.gen(function* () {
-    // Validate address format using Schema (will fail if invalid bech32)
-    yield* Schema.decodeUnknown(AddressEras.FromBech32)(params.address)
+    // Parse address from bech32 string to core Address type
+    const address = yield* Schema.decodeUnknown(CoreAddress.FromBech32)(params.address)
 
-    // Create SDK TxOutput (no txHash/outputIndex until transaction is submitted)
-    const output: UTxO.TxOutput = {
-      address: params.address,
-      assets: params.assets,
-      datumOption: params.datum,
-      scriptRef: params.scriptRef
+    // Convert datum if provided
+    let datumOption: DatumOption.DatumOption | undefined
+    if (params.datum) {
+      datumOption = yield* makeDatumOption(params.datum)
     }
+
+    // Create Core TransactionOutput
+    const output = new TxOut.TransactionOutput({
+      address,
+      assets: params.assets,
+      datumOption,
+      scriptRef: params.scriptRef
+    })
 
     return output
   }).pipe(
@@ -255,9 +269,9 @@ export const makeTxOutput = (params: {
   )
 
 /**
- * Convert SDK TxOutput to core TransactionOutput.
+ * Convert parameters to core TransactionOutput.
  * This is an internal conversion function used during transaction assembly.
- * Converts SDK types (Assets, Datum) to core CML types (Value, DatumOption).
+ * Now uses Core Assets directly.
  *
  * @since 2.0.0
  * @category helpers
@@ -265,16 +279,13 @@ export const makeTxOutput = (params: {
  */
 export const txOutputToTransactionOutput = (params: {
   address: string
-  assets: Assets.Assets
+  assets: CoreAssets.Assets
   datum?: Datum.Datum
   scriptRef?: any // TODO: Add ScriptRef type
 }): Effect.Effect<TxOut.TransactionOutput, TransactionBuilderError> =>
   Effect.gen(function* () {
     // Parse address from bech32 string to core Address type using Schema
     const address = yield* Schema.decodeUnknown(CoreAddress.FromBech32)(params.address)
-
-    // Convert SDK Assets to core Assets directly
-    const coreAssets = Assets.toCoreAssets(params.assets)
 
     // Convert datum if provided
     let datumOption: DatumOption.DatumOption | undefined
@@ -285,7 +296,7 @@ export const txOutputToTransactionOutput = (params: {
     // Create TransactionOutput (unified format with assets)
     const output = new TxOut.TransactionOutput({
       address,
-      assets: coreAssets,
+      assets: params.assets,
       datumOption,
       scriptRef: params.scriptRef
     })
@@ -302,7 +313,7 @@ export const txOutputToTransactionOutput = (params: {
   )
 
 /**
- * Merge additional assets into an existing UTxO (output).
+ * Merge additional assets into an existing UTxO.
  * Creates a new UTxO with combined assets from the original UTxO and additional assets.
  *
  * Use case: Draining wallet by merging leftover into an existing payment output.
@@ -311,13 +322,21 @@ export const txOutputToTransactionOutput = (params: {
  * @category helpers
  */
 export const mergeAssetsIntoUTxO = (
-  utxo: UTxO.UTxO,
-  additionalAssets: Assets.Assets
-): Effect.Effect<UTxO.UTxO, TransactionBuilderError> =>
+  utxo: CoreUTxO.UTxO,
+  additionalAssets: CoreAssets.Assets
+): Effect.Effect<CoreUTxO.UTxO, TransactionBuilderError> =>
   Effect.gen(function* () {
-    // Use UTxO.addAssets helper to merge assets
-    const mergedUTxO = UTxO.addAssets(utxo, additionalAssets)
-    return mergedUTxO
+    // Merge assets using Core Assets helper
+    const mergedAssets = CoreAssets.merge(utxo.assets, additionalAssets)
+    // Create new UTxO with merged assets
+    return new CoreUTxO.UTxO({
+      transactionId: utxo.transactionId,
+      index: utxo.index,
+      address: utxo.address,
+      assets: mergedAssets,
+      datumOption: utxo.datumOption,
+      scriptRef: utxo.scriptRef
+    })
   }).pipe(
     Effect.mapError(
       (error) =>
@@ -334,32 +353,21 @@ export const mergeAssetsIntoUTxO = (
  *
  * Use case: Draining wallet by merging leftover into an existing payment output.
  *
- * @deprecated Use mergeAssetsIntoUTxO instead. This function works with core types and will be removed.
- *
  * @since 2.0.0
  * @category helpers
  */
 export const mergeAssetsIntoOutput = (
   output: TxOut.TransactionOutput,
-  additionalAssets: Assets.Assets
+  additionalAssets: CoreAssets.Assets
 ): Effect.Effect<TxOut.TransactionOutput, TransactionBuilderError> =>
   Effect.gen(function* () {
-    // Extract current assets from output (core Assets)
-    const currentAssets = output.assets
-
-    // Convert core Assets to SDK assets
-    const sdkCurrentAssets = Assets.fromCoreAssets(currentAssets)
-
-    // Merge SDK assets
-    const mergedSDKAssets = Assets.add(sdkCurrentAssets, additionalAssets)
-
-    // Convert merged SDK assets back to core Assets
-    const mergedCoreAssets = Assets.toCoreAssets(mergedSDKAssets)
+    // Merge assets using Core Assets helper
+    const mergedAssets = CoreAssets.merge(output.assets, additionalAssets)
 
     // Create new output with merged assets, preserving optional fields
     const newOutput = new TxOut.TransactionOutput({
       address: output.address,
-      assets: mergedCoreAssets,
+      assets: mergedAssets,
       datumOption: output.datumOption,
       scriptRef: output.scriptRef
     })
@@ -381,26 +389,23 @@ export const mergeAssetsIntoOutput = (
 /**
  * Convert an array of UTxOs to an array of TransactionInputs.
  * Inputs are sorted by txHash then outputIndex for deterministic ordering.
- * Converts SDK types (UTxO.UTxO) to core types (TransactionInput).
+ * Uses Core UTxO types directly.
  *
  * @since 2.0.0
  * @category assembly
  */
 export const buildTransactionInputs = (
-  utxos: ReadonlyArray<UTxO.UTxO>
+  utxos: ReadonlyArray<CoreUTxO.UTxO>
 ): Effect.Effect<ReadonlyArray<TransactionInput.TransactionInput>, TransactionBuilderError> =>
   Effect.gen(function* () {
-    // Convert each UTxO to TransactionInput
+    // Convert each Core UTxO to TransactionInput
     const inputs: Array<TransactionInput.TransactionInput> = []
 
     for (const utxo of utxos) {
-      // Parse transaction hash from hex string
-      const txHash = yield* Schema.decodeUnknown(TransactionHash.FromHex)(utxo.txHash)
-
-      // Create TransactionInput
+      // Create TransactionInput directly from Core UTxO fields
       const input = new TransactionInput.TransactionInput({
-        transactionId: txHash,
-        index: BigInt(utxo.outputIndex)
+        transactionId: utxo.transactionId,
+        index: utxo.index
       })
 
       inputs.push(input)
@@ -438,7 +443,7 @@ export const buildTransactionInputs = (
  * Assemble a Transaction from inputs, outputs, and calculated fee.
  * Creates TransactionBody with all required fields.
  *
- * This is where SDK UTxO outputs are converted to core TransactionOutputs.
+ * Uses Core TransactionOutput directly.
  *
  * This is minimal assembly with accurate fee:
  * - Build witness set with redeemers and signatures (Step 4 - future)
@@ -450,7 +455,7 @@ export const buildTransactionInputs = (
  */
 export const assembleTransaction = (
   inputs: ReadonlyArray<TransactionInput.TransactionInput>,
-  outputs: ReadonlyArray<UTxO.TxOutput>,
+  outputs: ReadonlyArray<TxOut.TransactionOutput>,
   fee: bigint
 ): Effect.Effect<Transaction.Transaction, TransactionBuilderError, TxContext> =>
   Effect.gen(function* () {
@@ -462,17 +467,8 @@ export const assembleTransaction = (
     yield* Effect.logDebug(`[Assembly] Scripts in state: ${state.scripts.size}`)
     yield* Effect.logDebug(`[Assembly] Redeemers in state: ${state.redeemers.size}`)
 
-    // Convert SDK TxOutput outputs to core TransactionOutputs
-    const transactionOutputs: Array<TxOut.TransactionOutput> = yield* Effect.all(
-      outputs.map((output) =>
-        txOutputToTransactionOutput({
-          address: output.address,
-          assets: output.assets,
-          datum: output.datumOption,
-          scriptRef: output.scriptRef
-        })
-      )
-    )
+    // Outputs are already Core TransactionOutputs
+    const transactionOutputs = outputs as Array<TxOut.TransactionOutput>
 
     // Build collateral inputs if present
     let collateralInputs: Array.NonEmptyReadonlyArray<TransactionInput.TransactionInput> | undefined
@@ -489,20 +485,12 @@ export const assembleTransaction = (
       collateralInputs = (yield* buildTransactionInputs(state.collateral.inputs)) as Array.NonEmptyReadonlyArray<TransactionInput.TransactionInput>
       totalCollateral = state.collateral.totalAmount
 
-      // Collateral return is only present if there are leftover assets
+      // Collateral return is already a Core TransactionOutput
       if (state.collateral.returnOutput) {
         yield* Effect.logDebug(
-          `[Assembly] Collateral return assets: ${Object.keys(state.collateral.returnOutput.assets).length} keys`
+          `[Assembly] Collateral return lovelace: ${state.collateral.returnOutput.assets.lovelace}`
         )
-        collateralReturn = yield* txOutputToTransactionOutput({
-          address: state.collateral.returnOutput.address,
-          assets: state.collateral.returnOutput.assets,
-          datum: state.collateral.returnOutput.datumOption,
-          scriptRef: state.collateral.returnOutput.scriptRef
-        })
-        yield* Effect.logDebug(
-          `[Assembly] Collateral return TransactionOutput lovelace: ${collateralReturn.assets.lovelace}`
-        )
+        collateralReturn = state.collateral.returnOutput
       }
     }
 
@@ -626,9 +614,9 @@ export const assembleTransaction = (
     // Extract plutus data (datums) from selected UTxOs
     const plutusDataArray: Array<PlutusData.Data> = []
     for (const utxo of state.selectedUtxos) {
-      if (utxo.datumOption?.type === "inlineDatum") {
-        const datum = yield* Schema.decode(PlutusData.FromCBORHex())(utxo.datumOption.inline)
-        plutusDataArray.push(datum)
+      if (utxo.datumOption?._tag === "InlineDatum") {
+        // Inline datum contains PlutusData directly
+        plutusDataArray.push(utxo.datumOption.data)
         yield* Effect.logDebug(`[Assembly] Extracted inline datum from UTxO`)
       }
     }
@@ -733,7 +721,7 @@ export const calculateMinimumFee = (
  * @category fee-calculation
  * @internal
  */
-const extractPaymentKeyHash = (address: string): Effect.Effect<Uint8Array | null, TransactionBuilderError> =>
+export const extractPaymentKeyHash = (address: string): Effect.Effect<Uint8Array | null, TransactionBuilderError> =>
   Effect.gen(function* () {
     const addressStructure = yield* Effect.try({
       try: () => Address.toCoreAddress(address),
@@ -751,6 +739,22 @@ const extractPaymentKeyHash = (address: string): Effect.Effect<Uint8Array | null
 
     return null
   })
+
+/**
+ * Extract payment key hash from a Core Address.
+ * Returns null if address has script credential or no payment credential.
+ *
+ * @since 2.0.0
+ * @category fee-calculation
+ * @internal
+ */
+const extractPaymentKeyHashFromCore = (address: CoreAddress.Address): Uint8Array | null => {
+  // Check if payment credential is a KeyHash
+  if (address.paymentCredential._tag === "KeyHash" && address.paymentCredential.hash) {
+    return address.paymentCredential.hash
+  }
+  return null
+}
 
 /**
  * Build a fake VKeyWitness for fee estimation.
@@ -805,15 +809,15 @@ const buildFakeVKeyWitness = (
  * @category fee-calculation
  */
 export const buildFakeWitnessSet = (
-  inputUtxos: ReadonlyArray<UTxO.UTxO>
+  inputUtxos: ReadonlyArray<CoreUTxO.UTxO>
 ): Effect.Effect<TransactionWitnessSet.TransactionWitnessSet, TransactionBuilderError> =>
   Effect.gen(function* () {
-    // Extract unique key hashes from input addresses
+    // Extract unique key hashes from input addresses (Core Address)
     const keyHashesSet = new Set<string>()
     const keyHashes: Array<Uint8Array> = []
 
     for (const utxo of inputUtxos) {
-      const keyHash = yield* extractPaymentKeyHash(utxo.address)
+      const keyHash = extractPaymentKeyHashFromCore(utxo.address)
       if (keyHash) {
         const keyHashHex = Buffer.from(keyHash).toString("hex")
         if (!keyHashesSet.has(keyHashHex)) {
@@ -856,9 +860,9 @@ export const buildFakeWitnessSet = (
  * @category fee-calculation
  */
 export const calculateFeeIteratively = (
-  inputUtxos: ReadonlyArray<UTxO.UTxO>,
+  inputUtxos: ReadonlyArray<CoreUTxO.UTxO>,
   inputs: ReadonlyArray<TransactionInput.TransactionInput>,
-  outputs: ReadonlyArray<UTxO.TxOutput>,
+  outputs: ReadonlyArray<TxOut.TransactionOutput>,
   redeemers: Map<
     string,
     {
@@ -878,17 +882,8 @@ export const calculateFeeIteratively = (
     // Build fake witness set once for accurate size estimation
     const fakeWitnessSet = yield* buildFakeWitnessSet(inputUtxos)
 
-    // Convert SDK TxOutput outputs to core TransactionOutputs once
-    const transactionOutputs: Array<TxOut.TransactionOutput> = yield* Effect.all(
-      outputs.map((output) =>
-        txOutputToTransactionOutput({
-          address: output.address,
-          assets: output.assets,
-          datum: output.datumOption,
-          scriptRef: output.scriptRef
-        })
-      )
-    )
+    // Outputs are already Core TransactionOutputs
+    const transactionOutputs = outputs as Array<TxOut.TransactionOutput>
 
     let currentFee = 0n
     let previousSize = 0
@@ -978,42 +973,54 @@ export const calculateFeeIteratively = (
  * @category fee-calculation
  */
 export const verifyTransactionBalance = (
-  selectedUtxos: ReadonlyArray<UTxO.UTxO>,
-  outputs: ReadonlyArray<UTxO.TxOutput>,
+  selectedUtxos: ReadonlyArray<CoreUTxO.UTxO>,
+  outputs: ReadonlyArray<TxOut.TransactionOutput>,
   fee: bigint
 ): { sufficient: boolean; shortfall: bigint; change: bigint } => {
-  // Sum all input assets
-  const totalInputAssets = selectedUtxos.reduce((acc, utxo) => Assets.add(acc, utxo.assets), Assets.empty())
+  // Sum all input assets using Core Assets
+  const totalInputAssets = selectedUtxos.reduce(
+    (acc, utxo) => CoreAssets.merge(acc, utxo.assets),
+    CoreAssets.zero
+  )
 
-  // Sum all output assets
-  const totalOutputAssets = outputs.reduce((acc, output) => Assets.add(acc, output.assets), Assets.empty())
+  // Sum all output assets using Core Assets
+  const totalOutputAssets = outputs.reduce(
+    (acc, output) => CoreAssets.merge(acc, output.assets),
+    CoreAssets.zero
+  )
 
   // Add fee to required lovelace
-  const requiredAssets = Assets.add(totalOutputAssets, Assets.fromLovelace(fee))
+  const requiredAssets = CoreAssets.withLovelace(
+    totalOutputAssets,
+    totalOutputAssets.lovelace + fee
+  )
 
   // Calculate balance for ALL assets: inputs - (outputs + fee)
-  const balance = Assets.subtract(totalInputAssets, requiredAssets)
+  const balance = CoreAssets.subtract(totalInputAssets, requiredAssets)
 
   // Check if ANY asset is negative (insufficient)
   let hasShortfall = false
   let lovelaceShortfall = 0n
 
   // Check lovelace
-  const balanceLovelace = Assets.getAsset(balance, "lovelace")
+  const balanceLovelace = balance.lovelace
   if (balanceLovelace < 0n) {
     hasShortfall = true
     lovelaceShortfall = -balanceLovelace
   }
 
-  // Check all native assets
-  for (const [unit, amount] of Object.entries(balance)) {
-    if (unit !== "lovelace" && amount < 0n) {
-      hasShortfall = true
-      // For native asset shortfalls, we still return lovelace shortfall
-      // since coin selection will need to find UTxOs with both lovelace AND the missing asset
-      // Add some lovelace buffer to encourage selection of UTxOs with native assets
-      lovelaceShortfall = lovelaceShortfall > 0n ? lovelaceShortfall : 100_000n
-      break
+  // Check all native assets using Core Assets helpers
+  for (const unit of CoreAssets.getUnits(balance)) {
+    if (unit !== "lovelace") {
+      const amount = CoreAssets.getByUnit(balance, unit)
+      if (amount < 0n) {
+        hasShortfall = true
+        // For native asset shortfalls, we still return lovelace shortfall
+        // since coin selection will need to find UTxOs with both lovelace AND the missing asset
+        // Add some lovelace buffer to encourage selection of UTxOs with native assets
+        lovelaceShortfall = lovelaceShortfall > 0n ? lovelaceShortfall : 100_000n
+        break
+      }
     }
   }
 
@@ -1036,20 +1043,23 @@ export const verifyTransactionBalance = (
  * @category validation
  */
 export const validateTransactionBalance = (params: {
-  totalInputAssets: Assets.Assets
-  totalOutputAssets: Assets.Assets
+  totalInputAssets: CoreAssets.Assets
+  totalOutputAssets: CoreAssets.Assets
   fee: bigint
 }): Effect.Effect<void, TransactionBuilderError> =>
   Effect.gen(function* () {
     const { fee, totalInputAssets, totalOutputAssets } = params
 
     // Calculate total outputs including fee (outputs + fee)
-    const totalRequired = Assets.add(totalOutputAssets, Assets.fromLovelace(fee))
+    const totalRequired = CoreAssets.withLovelace(
+      totalOutputAssets,
+      totalOutputAssets.lovelace + fee
+    )
 
-    // Check each asset using Assets.getUnits and Assets.getAsset helpers
-    for (const unit of Assets.getUnits(totalRequired)) {
-      const requiredAmount = Assets.getAsset(totalRequired, unit)
-      const availableAmount = Assets.getAsset(totalInputAssets, unit)
+    // Check each asset using Core Assets helpers
+    for (const unit of CoreAssets.getUnits(totalRequired)) {
+      const requiredAmount = CoreAssets.getByUnit(totalRequired, unit)
+      const availableAmount = CoreAssets.getByUnit(totalInputAssets, unit)
 
       if (availableAmount < requiredAmount) {
         const shortfall = requiredAmount - availableAmount
@@ -1078,18 +1088,19 @@ export const validateTransactionBalance = (params: {
  * @category validation
  */
 export const calculateLeftoverAssets = (params: {
-  totalInputAssets: Assets.Assets
-  totalOutputAssets: Assets.Assets
+  totalInputAssets: CoreAssets.Assets
+  totalOutputAssets: CoreAssets.Assets
   fee: bigint
-}): Assets.Assets => {
+}): CoreAssets.Assets => {
   const { fee, totalInputAssets, totalOutputAssets } = params
 
-  // Start with inputs, subtract outputs and fee using Assets helpers
-  const afterOutputs = Assets.subtract(totalInputAssets, totalOutputAssets)
-  const leftover = Assets.subtract(afterOutputs, Assets.fromLovelace(fee))
+  // Start with inputs, subtract outputs using Core Assets
+  const afterOutputs = CoreAssets.subtract(totalInputAssets, totalOutputAssets)
+  // Subtract fee from lovelace
+  const leftover = CoreAssets.withLovelace(afterOutputs, afterOutputs.lovelace - fee)
 
-  // Filter out zero or negative amounts
-  return Assets.filter(leftover, (_unit, amount) => amount > 0n)
+  // Filter out zero or negative amounts using Core Assets filter
+  return CoreAssets.filter(leftover, (_unit, amount) => amount > 0n)
 }
 
 /**
@@ -1104,7 +1115,7 @@ export const calculateLeftoverAssets = (params: {
  */
 export const calculateMinimumUtxoLovelace = (params: {
   address: string
-  assets: Assets.Assets
+  assets: CoreAssets.Assets
   datum?: Datum.Datum
   scriptRef?: any
   coinsPerUtxoByte: bigint
@@ -1153,16 +1164,16 @@ export const calculateMinimumUtxoLovelace = (params: {
  * @category change
  */
 export const createChangeOutput = (params: {
-  leftoverAssets: Assets.Assets
+  leftoverAssets: CoreAssets.Assets
   changeAddress: string
   coinsPerUtxoByte: bigint
   unfrackOptions?: UnfrackOptions
-}): Effect.Effect<ReadonlyArray<UTxO.TxOutput>, TransactionBuilderError> =>
+}): Effect.Effect<ReadonlyArray<TxOut.TransactionOutput>, TransactionBuilderError> =>
   Effect.gen(function* () {
     const { changeAddress, coinsPerUtxoByte, leftoverAssets, unfrackOptions } = params
 
     // If no leftover, no change needed
-    if (Assets.isEmpty(leftoverAssets)) {
+    if (CoreAssets.isEmpty(leftoverAssets)) {
       yield* Effect.logDebug(`[createChangeOutput] No leftover assets, skipping change`)
       return []
     }
@@ -1197,7 +1208,7 @@ export const createChangeOutput = (params: {
     })
 
     // Check if we have enough lovelace for change
-    const leftoverLovelace = Assets.getAsset(leftoverAssets, "lovelace")
+    const leftoverLovelace = leftoverAssets.lovelace
 
     yield* Effect.logDebug(
       `[createChangeOutput] Leftover: ${leftoverLovelace} lovelace, MinUTxO: ${minLovelace} lovelace`
@@ -1212,7 +1223,7 @@ export const createChangeOutput = (params: {
       return []
     }
 
-    // Create change output using SDK UTxO output creation
+    // Create change output using Core TransactionOutput
     const changeOutput = yield* makeTxOutput({
       address: changeAddress,
       assets: leftoverAssets

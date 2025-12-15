@@ -2,10 +2,10 @@ import { Data, type Effect } from "effect"
 
 import type * as Transaction from "../../core/Transaction.js"
 import type * as TransactionWitnessSet from "../../core/TransactionWitnessSet.js"
+import type * as CoreUTxO from "../../core/UTxO.js"
 import type * as Address from "../Address.js"
 import type * as RewardAddress from "../RewardAddress.js"
 import type { EffectToPromiseAPI } from "../Type.js"
-import type * as UTxO from "../UTxO.js"
 
 /**
  * Error class for wallet-related operations.
@@ -86,7 +86,7 @@ export interface SigningWalletEffect extends ReadOnlyWalletEffect {
    */
   readonly signTx: (
     tx: Transaction.Transaction | string,
-    context?: { utxos?: ReadonlyArray<UTxO.UTxO> }
+    context?: { utxos?: ReadonlyArray<CoreUTxO.UTxO> }
   ) => Effect.Effect<TransactionWitnessSet.TransactionWitnessSet, WalletError>
   readonly signMessage: (
     address: Address.Address | RewardAddress.RewardAddress,
@@ -134,7 +134,7 @@ export interface WalletApi {
 export interface ApiWalletEffect extends ReadOnlyWalletEffect {
   readonly signTx: (
     tx: Transaction.Transaction | string,
-    context?: { utxos?: ReadonlyArray<UTxO.UTxO> }
+    context?: { utxos?: ReadonlyArray<CoreUTxO.UTxO> }
   ) => Effect.Effect<TransactionWitnessSet.TransactionWitnessSet, WalletError>
   readonly signMessage: (
     address: Address.Address | RewardAddress.RewardAddress,

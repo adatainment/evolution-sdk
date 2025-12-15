@@ -28,18 +28,19 @@
 import { Context, Data, Effect, Layer, Logger, LogLevel, Ref } from "effect"
 import type { Either } from "effect/Either"
 
+import * as CoreAssets from "../../core/Assets/index.js"
 import type * as Coin from "../../core/Coin.js"
 import type * as Network from "../../core/Network.js"
 import type * as CoreScript from "../../core/Script.js"
 import * as Time from "../../core/Time/index.js"
 import * as Transaction from "../../core/Transaction.js"
+import type * as TxOut from "../../core/TxOut.js"
+import type * as CoreUTxO from "../../core/UTxO.js"
 import { runEffectPromise } from "../../utils/effect-runtime.js"
-import type * as Assets from "../Assets.js"
 import type { EvalRedeemer } from "../EvalRedeemer.js"
 import type * as ProtocolParametersSDK from "../ProtocolParameters.js"
 import type * as Provider from "../provider/Provider.js"
 import type * as Script from "../Script.js"
-import type * as UTxO from "../UTxO.js"
 import type * as WalletNew from "../wallet/WalletNew.js"
 import type { CoinSelectionAlgorithm, CoinSelectionFunction } from "./CoinSelection.js"
 import { attachScriptToState } from "./operations/Attach.js"
@@ -89,8 +90,8 @@ interface PhaseContext {
   readonly attempt: number
   readonly calculatedFee: bigint
   readonly shortfall: bigint
-  readonly changeOutputs: ReadonlyArray<UTxO.TxOutput>
-  readonly leftoverAfterFee: Assets.Assets
+  readonly changeOutputs: ReadonlyArray<TxOut.TransactionOutput>
+  readonly leftoverAfterFee: CoreAssets.Assets
   readonly canUnfrack: boolean
 }
 
@@ -103,8 +104,8 @@ const initialTxBuilderState: TxBuilderState = {
   selectedUtxos: [],
   outputs: [],
   scripts: new Map(),
-  totalOutputAssets: { lovelace: 0n },
-  totalInputAssets: { lovelace: 0n },
+  totalOutputAssets: CoreAssets.zero,
+  totalInputAssets: CoreAssets.zero,
   redeemers: new Map(),
   referenceInputs: []
 }
@@ -174,7 +175,7 @@ const resolveAvailableUtxos = (
   config: TxBuilderConfig,
   options?: BuildOptions
 ): Effect.Effect<
-  ReadonlyArray<UTxO.UTxO>,
+  ReadonlyArray<CoreUTxO.UTxO>,
   TransactionBuilderError | WalletNew.WalletError | Provider.ProviderError
 > => {
   if (options?.availableUtxos) {
@@ -182,7 +183,10 @@ const resolveAvailableUtxos = (
   }
 
   if (config.wallet && config.provider) {
-    return Effect.flatMap(config.wallet.Effect.address(), (addr) => config.provider!.Effect.getUtxos(addr))
+    return Effect.flatMap(
+      config.wallet.Effect.address(), 
+      (addr) => config.provider!.Effect.getUtxos(addr)
+    )
   }
 
   return Effect.fail(
@@ -210,8 +214,8 @@ const resolveEvaluator = (config: TxBuilderConfig, options?: BuildOptions): Eval
   // Priority 2: Wrap provider's evaluateTx as an Evaluator
   if (config.provider) {
     return {
-      evaluate: (tx: string, additionalUtxos: ReadonlyArray<UTxO.UTxO> | undefined, _context: EvaluationContext) =>
-        config.provider!.Effect.evaluateTx(tx, additionalUtxos ? [...additionalUtxos] : undefined).pipe(
+      evaluate: (tx: string, additionalUtxos: ReadonlyArray<CoreUTxO.UTxO> | undefined, _context: EvaluationContext) =>
+        config.provider!.Effect.evaluateTx(tx, additionalUtxos as Array<CoreUTxO.UTxO> | undefined).pipe(
           Effect.mapError(
             (providerError) =>
               new EvaluationError({
@@ -443,7 +447,7 @@ const makeBuild = (
         calculatedFee: 0n,
         shortfall: 0n,
         changeOutputs: [],
-        leftoverAfterFee: { lovelace: 0n },
+        leftoverAfterFee: CoreAssets.zero,
         canUnfrack: options?.unfrack !== undefined
       })
     )
@@ -504,9 +508,9 @@ const buildPartialEffectCore = (
  */
 export interface ChainResult {
   readonly transaction: Transaction.Transaction
-  readonly newOutputs: ReadonlyArray<UTxO.UTxO> // UTxOs created by this transaction
-  readonly updatedUtxos: ReadonlyArray<UTxO.UTxO> // Available UTxOs for next transaction (original - spent + new)
-  readonly spentUtxos: ReadonlyArray<UTxO.UTxO> // UTxOs consumed by this transaction
+  readonly newOutputs: ReadonlyArray<CoreUTxO.UTxO> // UTxOs created by this transaction
+  readonly updatedUtxos: ReadonlyArray<CoreUTxO.UTxO> // Available UTxOs for next transaction (original - spent + new)
+  readonly spentUtxos: ReadonlyArray<CoreUTxO.UTxO> // UTxOs consumed by this transaction
 }
 
 // ============================================================================
@@ -558,7 +562,7 @@ export interface Evaluator {
    */
   evaluate: (
     tx: string,
-    additionalUtxos: ReadonlyArray<UTxO.UTxO> | undefined,
+    additionalUtxos: ReadonlyArray<CoreUTxO.UTxO> | undefined,
     context: EvaluationContext
   ) => Effect.Effect<ReadonlyArray<EvalRedeemer>, EvaluationError>
 }
@@ -613,7 +617,7 @@ export type UPLCEvalFunction = (
  * @experimental
  */
 export const createUPLCEvaluator = (_evalFunction: UPLCEvalFunction): Evaluator => ({
-  evaluate: (_tx: string, _additionalUtxos: ReadonlyArray<UTxO.UTxO> | undefined, _context: EvaluationContext) =>
+  evaluate: (_tx: string, _additionalUtxos: ReadonlyArray<CoreUTxO.UTxO> | undefined, _context: EvaluationContext) =>
     Effect.gen(function* () {
       // Implementation: Call UPLC evaluation with provided parameters
       // _evalFunction(
@@ -808,7 +812,7 @@ export interface BuildOptions {
    *
    * @since 2.0.0
    */
-  readonly availableUtxos?: ReadonlyArray<UTxO.UTxO>
+  readonly availableUtxos?: ReadonlyArray<CoreUTxO.UTxO>
 
   /**
    * # Change Handling Strategy Matrix
@@ -1134,9 +1138,8 @@ export interface TxBuilderConfig {
  * Mutable state created FRESH on each build() call.
  * Contains all Refs for transaction building state.
  *
- * Design: Stores SDK types (UTxO.UTxO), converts to core types during build.
- * This enables coin selection (needs full UTxO context) while maintaining
- * transaction-native assembly.
+ * Design: Stores Core types (CoreUTxO.UTxO, CoreAssets.Assets) for
+ * coin selection and transaction assembly.
  *
  * @since 2.0.0
  * @category state
@@ -1149,18 +1152,18 @@ export interface TxBuilderConfig {
  * @category state
  */
 export interface TxBuilderState {
-  readonly selectedUtxos: ReadonlyArray<UTxO.UTxO> // SDK type: Array for ordering, converted at build
-  readonly outputs: ReadonlyArray<UTxO.TxOutput> // Transaction outputs (no txHash/outputIndex yet)
+  readonly selectedUtxos: ReadonlyArray<CoreUTxO.UTxO> // Core UTxO type
+  readonly outputs: ReadonlyArray<TxOut.TransactionOutput> // Transaction outputs (no txHash/outputIndex yet)
   readonly scripts: Map<string, CoreScript.Script> // Scripts attached to the transaction
-  readonly totalOutputAssets: Assets.Assets // Asset totals for balancing
-  readonly totalInputAssets: Assets.Assets // Asset totals for balancing
+  readonly totalOutputAssets: CoreAssets.Assets // Asset totals for balancing
+  readonly totalInputAssets: CoreAssets.Assets // Asset totals for balancing
   readonly redeemers: Map<string, RedeemerData> // Redeemer data for script inputs
-  readonly referenceInputs: ReadonlyArray<UTxO.UTxO> // Reference inputs (UTxOs with reference scripts)
+  readonly referenceInputs: ReadonlyArray<CoreUTxO.UTxO> // Reference inputs (UTxOs with reference scripts)
   readonly collateral?: {
     // Collateral data for script transactions
-    readonly inputs: ReadonlyArray<UTxO.UTxO>
+    readonly inputs: ReadonlyArray<CoreUTxO.UTxO>
     readonly totalAmount: bigint
-    readonly returnOutput?: UTxO.TxOutput // Optional: only if there are leftover assets
+    readonly returnOutput?: TxOut.TransactionOutput // Optional: only if there are leftover assets
   }
 }
 
@@ -1266,7 +1269,7 @@ export class TxBuilderConfigTag extends Context.Tag("TxBuilderConfig")<TxBuilder
  * @since 2.0.0
  * @category context
  */
-export class AvailableUtxosTag extends Context.Tag("AvailableUtxos")<AvailableUtxosTag, ReadonlyArray<UTxO.UTxO>>() {}
+export class AvailableUtxosTag extends Context.Tag("AvailableUtxos")<AvailableUtxosTag, ReadonlyArray<CoreUTxO.UTxO>>() {}
 
 /**
  * Context tag providing BuildOptions for the current build.
@@ -1440,7 +1443,7 @@ export interface TransactionBuilderBase {
    *
    * @example
    * ```typescript
-   * import * as UTxO from "./UTxO.js"
+   * import * as UTxO from "../../core/UTxO.js"
    *
    * // Use reference script stored on-chain instead of attaching to transaction
    * const refScriptUtxo = await provider.getUtxoByTxHash("abc123...")

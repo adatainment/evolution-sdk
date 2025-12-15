@@ -186,6 +186,15 @@ export const isEmpty = (set: UTxOSet): boolean => HashSet.size(set) === 0
  */
 export const toArray = (set: UTxOSet): Array<UTxO> => Array.from(set)
 
+/**
+ * Get the output reference string for a UTxO (txHash#index format).
+ *
+ * @since 2.0.0
+ * @category getters
+ */
+export const toOutRefString = (utxo: UTxO): string =>
+  `${TransactionHash.toHex(utxo.transactionId)}#${utxo.index}`
+
 // =============================================================================
 // SDK Conversion Utilities
 // =============================================================================

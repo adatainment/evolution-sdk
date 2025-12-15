@@ -1,3 +1,8 @@
+import { Effect } from "effect"
+
+import * as CoreAddress from "../core/Address.js"
+import * as TransactionHash from "../core/TransactionHash.js"
+import * as CoreUTxO from "../core/UTxO.js"
 import * as Assets from "./Assets.js"
 import * as Datum from "./Datum.js"
 import * as OutRef from "./OutRef.js"
@@ -180,3 +185,71 @@ export const findWithMinLovelace = (utxos: UTxOSet, minLovelace: bigint): UTxOSe
 
 // Equals utility
 export const equals = (a: UTxO, b: UTxO): boolean => OutRef.equals(getOutRef(a), getOutRef(b))
+
+// Core type conversion
+/**
+ * Convert SDK UTxO to Core UTxO.
+ * This is an Effect as it needs to parse the address and transaction hash.
+ * 
+ * @since 2.0.0
+ * @category conversion
+ */
+export const toCore = (utxo: UTxO): Effect.Effect<CoreUTxO.UTxO, Error> =>
+  Effect.gen(function* () {
+    // Convert address from bech32 string to Core Address
+    const address = yield* Effect.try({
+      try: () => CoreAddress.fromBech32(utxo.address),
+      catch: (e) => new Error(`Failed to parse address: ${e}`)
+    })
+    
+    // Convert txHash from hex string to TransactionHash
+    const transactionId = yield* Effect.try({
+      try: () => TransactionHash.fromHex(utxo.txHash),
+      catch: (e) => new Error(`Failed to parse txHash: ${e}`)
+    })
+    
+    // Convert assets from SDK Assets to Core Assets
+    const assets = Assets.toCoreAssets(utxo.assets)
+    
+    return new CoreUTxO.UTxO({
+      transactionId,
+      index: BigInt(utxo.outputIndex),
+      address,
+      assets
+    })
+  })
+
+/**
+ * Convert array of SDK UTxOs to Core UTxOs.
+ * 
+ * @since 2.0.0
+ * @category conversion
+ */
+export const toCoreArray = (utxos: ReadonlyArray<UTxO>): Effect.Effect<ReadonlyArray<CoreUTxO.UTxO>, Error> =>
+  Effect.all(utxos.map(toCore))
+
+/**
+ * Convert Core UTxO to SDK UTxO.
+ * This is a pure function as all data is available to convert.
+ * 
+ * @since 2.0.0
+ * @category conversion
+ */
+export const fromCore = (utxo: CoreUTxO.UTxO): UTxO => ({
+  txHash: TransactionHash.toHex(utxo.transactionId),
+  outputIndex: Number(utxo.index),
+  address: CoreAddress.toBech32(utxo.address),
+  assets: Assets.fromCoreAssets(utxo.assets),
+  // TODO: Convert datum and script if present
+  datumOption: undefined,
+  scriptRef: undefined
+})
+
+/**
+ * Convert array of Core UTxOs to SDK UTxOs.
+ * 
+ * @since 2.0.0
+ * @category conversion
+ */
+export const fromCoreArray = (utxos: ReadonlyArray<CoreUTxO.UTxO>): ReadonlyArray<UTxO> =>
+  utxos.map(fromCore)

@@ -13,6 +13,7 @@
 
 import { Effect, Ref } from "effect"
 
+import * as CoreUTxO from "../../../core/UTxO.js"
 import { TransactionBuilderError, TxContext } from "../TransactionBuilder.js"
 import type { ReadFromParams } from "./Operations.js"
 
@@ -45,10 +46,10 @@ export const createReadFromProgram = (params: ReadFromParams) =>
     // 2. Validate no conflicts with regular inputs
     const state = yield* Ref.get(ctx)
     const refInputKeys = new Set(
-      params.referenceInputs.map((utxo) => `${utxo.txHash}#${utxo.outputIndex}`)
+      params.referenceInputs.map((utxo) => CoreUTxO.toOutRefString(utxo))
     )
     const selectedInputKeys = new Set(
-      state.selectedUtxos.map((utxo) => `${utxo.txHash}#${utxo.outputIndex}`)
+      state.selectedUtxos.map((utxo) => CoreUTxO.toOutRefString(utxo))
     )
 
     const refInputKeysArray = Array.from(refInputKeys)

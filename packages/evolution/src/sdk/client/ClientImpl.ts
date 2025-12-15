@@ -5,6 +5,7 @@ import * as PrivateKey from "../../core/PrivateKey.js"
 import * as Transaction from "../../core/Transaction.js"
 import * as TransactionHash from "../../core/TransactionHash.js"
 import * as TransactionWitnessSet from "../../core/TransactionWitnessSet.js"
+import * as CoreUTxO from "../../core/UTxO.js"
 import * as VKey from "../../core/VKey.js"
 import { runEffectPromise } from "../../utils/effect-runtime.js"
 import { hashTransaction } from "../../utils/Hash.js"
@@ -20,7 +21,6 @@ import * as Kupmios from "../provider/Kupmios.js"
 import * as Maestro from "../provider/Maestro.js"
 import * as Provider from "../provider/Provider.js"
 import * as RewardAddress from "../RewardAddress.js"
-import type * as UTxO from "../UTxO.js"
 import * as Derivation from "../wallet/Derivation.js"
 import * as WalletNew from "../wallet/WalletNew.js"
 import {
@@ -211,7 +211,7 @@ const computeRequiredKeyHashesSync = (params: {
   rewardAddress?: RewardAddress.RewardAddress | null
   stakeKhHex?: string
   tx: Transaction.Transaction
-  utxos: ReadonlyArray<UTxO.UTxO>
+  utxos: ReadonlyArray<CoreUTxO.UTxO>
 }): Set<string> => {
   const required = new Set<string>()
 
@@ -219,7 +219,7 @@ const computeRequiredKeyHashesSync = (params: {
     for (const kh of params.tx.body.requiredSigners) required.add(KeyHash.toHex(kh))
   }
 
-  const ownedRefs = new Set<string>(params.utxos.map((u) => `${u.txHash}#${u.outputIndex}`))
+  const ownedRefs = new Set<string>(params.utxos.map((u) => CoreUTxO.toOutRefString(u)))
 
   const checkInputs = (inputs?: ReadonlyArray<Transaction.Transaction["body"]["inputs"][number]>) => {
     if (!inputs || !params.paymentKhHex) return
@@ -282,7 +282,7 @@ const createSigningWallet = (network: WalletNew.Network, config: SeedWalletConfi
   const effectInterface: WalletNew.SigningWalletEffect = {
     address: () => Effect.map(derivationEffect, (d) => d.address),
     rewardAddress: () => Effect.map(derivationEffect, (d) => d.rewardAddress ?? null),
-    signTx: (txOrHex: Transaction.Transaction | string, context?: { utxos?: ReadonlyArray<UTxO.UTxO> }) =>
+    signTx: (txOrHex: Transaction.Transaction | string, context?: { utxos?: ReadonlyArray<CoreUTxO.UTxO> }) =>
       Effect.gen(function* () {
         const derivation = yield* derivationEffect
 
@@ -366,7 +366,7 @@ const createPrivateKeyWallet = (
   const effectInterface: WalletNew.SigningWalletEffect = {
     address: () => Effect.map(derivationEffect, (d) => d.address),
     rewardAddress: () => Effect.map(derivationEffect, (d) => d.rewardAddress ?? null),
-    signTx: (txOrHex: Transaction.Transaction | string, context?: { utxos?: ReadonlyArray<UTxO.UTxO> }) =>
+    signTx: (txOrHex: Transaction.Transaction | string, context?: { utxos?: ReadonlyArray<CoreUTxO.UTxO> }) =>
       Effect.gen(function* () {
         const derivation = yield* derivationEffect
 
@@ -470,7 +470,7 @@ const createApiWallet = (_network: WalletNew.Network, config: ApiWalletConfig): 
   const effectInterface: WalletNew.ApiWalletEffect = {
     address: () => getPrimaryAddress,
     rewardAddress: () => getPrimaryRewardAddress,
-    signTx: (txOrHex: Transaction.Transaction | string, _context?: { utxos?: ReadonlyArray<UTxO.UTxO> }) =>
+    signTx: (txOrHex: Transaction.Transaction | string, _context?: { utxos?: ReadonlyArray<CoreUTxO.UTxO> }) =>
       Effect.gen(function* () {
         const cbor = typeof txOrHex === "string" ? txOrHex : Transaction.toCBORHex(txOrHex)
         const witnessHex = yield* Effect.tryPromise({

@@ -1,3 +1,7 @@
+import * as CoreAddress from "../../src/core/Address.js"
+import * as CoreAssets from "../../src/core/Assets/index.js"
+import * as CoreTransactionHash from "../../src/core/TransactionHash.js"
+import * as CoreUTxO from "../../src/core/UTxO.js"
 import type * as Assets from "../../src/sdk/Assets.js"
 import type * as Datum from "../../src/sdk/Datum.js"
 import type * as Script from "../../src/sdk/Script.js"
@@ -223,4 +227,113 @@ export const createUniqueAddressUtxos = (
  */
 export const resetUniqueAddressCounter = (): void => {
   uniqueAddressCounter = 0
+}
+
+// ============================================================================
+// Core UTxO Helpers - For use with CoinSelection and other Core-based modules
+// ============================================================================
+
+/**
+ * Options for creating a Core test UTxO.
+ */
+export type CreateCoreTestUtxoOptions = {
+  /**
+   * The bech32 address of the UTxO. Defaults to a test address.
+   * @default "addr_test1qz2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzer3n0d3vllmyqwsx5wktcd8cc3sq835lu7drv2xwl2wywfgs68faae"
+   */
+  address?: string
+  /**
+   * The amount of lovelace in the UTxO.
+   */
+  lovelace: bigint
+  /**
+   * Optional native assets to include in the UTxO.
+   * Map of "policyIdHex + assetNameHex" (56 hex chars policyId + rest is assetName) to quantity.
+   */
+  nativeAssets?: Record<string, bigint>
+  /**
+   * The output index. Defaults to 0.
+   * @default 0
+   */
+  index?: number
+  /**
+   * The transaction hash (64 hex chars). Defaults to 64 zeros.
+   * @default "0".repeat(64)
+   */
+  transactionId?: string
+}
+
+/**
+ * Creates a Core UTxO with the specified parameters.
+ * 
+ * @example
+ * ```typescript
+ * import { createCoreTestUtxo } from "../test/utils/utxo-helpers.js"
+ * 
+ * // Simple UTxO with only lovelace
+ * const utxo = createCoreTestUtxo({ lovelace: 5_000_000n })
+ * 
+ * // UTxO with native assets (policyId + assetName concatenated)
+ * const utxoWithAssets = createCoreTestUtxo({
+ *   lovelace: 2_000_000n,
+ *   nativeAssets: {
+ *     "a0028f350aaabe0545fdcb56b039bfb08e4bb4d8c4d7c3c7d4484f534b59": 1000n
+ *   }
+ * })
+ * ```
+ * 
+ * @since 2.0.0
+ * @category test-utils
+ */
+export const createCoreTestUtxo = (options: CreateCoreTestUtxoOptions): CoreUTxO.UTxO => {
+  const {
+    address = DEFAULT_TEST_ADDRESS,
+    index = 0,
+    lovelace,
+    nativeAssets,
+    transactionId = "0".repeat(64)
+  } = options
+
+  // Ensure transactionId is 64 hex characters
+  const paddedTxId = transactionId.length === 64 && /^[0-9a-fA-F]+$/.test(transactionId)
+    ? transactionId
+    : Array.from(transactionId)
+        .map(c => c.charCodeAt(0).toString(16).padStart(2, '0'))
+        .join('')
+        .padEnd(64, '0')
+
+  // Build Core Assets
+  let assets = CoreAssets.fromLovelace(lovelace)
+  
+  if (nativeAssets) {
+    for (const [unit, quantity] of Object.entries(nativeAssets)) {
+      // Parse unit: first 56 chars are policy ID, rest is asset name
+      const policyIdHex = unit.slice(0, 56)
+      const assetNameHex = unit.slice(56)
+      assets = CoreAssets.addByHex(assets, policyIdHex, assetNameHex, quantity)
+    }
+  }
+
+  return new CoreUTxO.UTxO({
+    transactionId: CoreTransactionHash.fromHex(paddedTxId),
+    index: BigInt(index),
+    address: CoreAddress.fromBech32(address),
+    assets
+  })
+}
+
+/**
+ * Creates multiple Core test UTxOs with the same base parameters.
+ * Each UTxO will have a unique index starting from 0.
+ * 
+ * @since 2.0.0
+ * @category test-utils
+ */
+export const createCoreTestUtxos = (
+  count: number,
+  options: CreateCoreTestUtxoOptions
+): Array<CoreUTxO.UTxO> => {
+  return Array.from({ length: count }, (_, idx) =>
+    createCoreTestUtxo({ ...options, index: idx })
+  )
 }

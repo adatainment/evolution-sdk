@@ -10,7 +10,7 @@
 
 import { Effect, Ref } from "effect"
 
-import * as Assets from "../../Assets.js"
+import * as CoreAssets from "../../../core/Assets/index.js"
 import * as EvaluationStateManager from "../EvaluationStateManager.js"
 import {
   BuildOptionsTag,
@@ -23,10 +23,13 @@ import type { PhaseResult } from "./Phases.js"
 /**
  * Helper: Format assets for logging (BigInt-safe, truncates long unit names)
  */
-const formatAssetsForLog = (assets: Assets.Assets): string => {
-  return Object.entries(assets)
-    .map(([unit, amount]) => `${unit.substring(0, 16)}...: ${amount.toString()}`)
-    .join(", ")
+const formatAssetsForLog = (assets: CoreAssets.Assets): string => {
+  const parts: Array<string> = [`lovelace: ${CoreAssets.lovelaceOf(assets)}`]
+  for (const unit of CoreAssets.getUnits(assets)) {
+    const amount = CoreAssets.getByUnit(assets, unit)
+    parts.push(`${unit.substring(0, 16)}...: ${amount.toString()}`)
+  }
+  return parts.join(", ")
 }
 
 /**
@@ -80,17 +83,17 @@ export const executeBalance = (): Effect.Effect<
 
     // Calculate total change assets
     const changeAssets = buildCtx.changeOutputs.reduce(
-      (acc, output) => Assets.merge(acc, output.assets),
-      Assets.empty()
+      (acc, output) => CoreAssets.merge(acc, output.assets),
+      CoreAssets.zero
     )
 
     // Delta = inputs - outputs - change - fee
-    let delta = Assets.subtract(inputAssets, outputAssets)
-    delta = Assets.subtract(delta, changeAssets)
-    delta = Assets.subtractLovelace(delta, buildCtx.calculatedFee)
+    let delta = CoreAssets.subtract(inputAssets, outputAssets)
+    delta = CoreAssets.subtract(delta, changeAssets)
+    delta = CoreAssets.subtractLovelace(delta, buildCtx.calculatedFee)
 
     // Check if balanced: lovelace must be exactly 0 and all native assets must be 0
-    const deltaLovelace = Assets.getLovelace(delta)
+    const deltaLovelace = CoreAssets.lovelaceOf(delta)
     const isBalanced = deltaLovelace === 0n
 
     yield* Effect.logDebug(
@@ -120,7 +123,7 @@ export const executeBalance = (): Effect.Effect<
     }
 
     // Step 4: Not balanced - check for native assets in delta (shouldn't happen)
-    const hasNativeAssets = Object.keys(delta).some((key) => key !== "lovelace")
+    const hasNativeAssets = CoreAssets.getUnits(delta).length > 0
     if (hasNativeAssets) {
       return yield* Effect.fail(
         new TransactionBuilderError({
@@ -158,8 +161,15 @@ export const executeBalance = (): Effect.Effect<
 
         // Merge delta into target output
         const targetOutput = outputs[drainToIndex]
-        const newAssets = Assets.addLovelace(targetOutput.assets, deltaLovelace)
-        const updatedOutput = { ...targetOutput, assets: newAssets }
+        const newAssets = CoreAssets.addLovelace(targetOutput.assets, deltaLovelace)
+        
+        // Create new TransactionOutput with updated assets
+        const updatedOutput = new (targetOutput.constructor as any)({
+          address: targetOutput.address,
+          assets: newAssets,
+          datumOption: targetOutput.datumOption,
+          scriptRef: targetOutput.scriptRef
+        })
 
         // Update outputs
         const newOutputs = [...outputs]
@@ -167,8 +177,8 @@ export const executeBalance = (): Effect.Effect<
 
         // Recalculate totalOutputAssets
         const newTotalOutputAssets = newOutputs.reduce(
-          (acc, output) => Assets.merge(acc, output.assets),
-          Assets.empty()
+          (acc, output) => CoreAssets.merge(acc, output.assets),
+          CoreAssets.zero
         )
 
         yield* Ref.update(ctx, (s) => ({
@@ -179,7 +189,7 @@ export const executeBalance = (): Effect.Effect<
 
         yield* Effect.logDebug(
           `[Balance] DrainTo mode: Merged ${deltaLovelace} lovelace into output[${drainToIndex}]. ` +
-            `New output value: ${Assets.getLovelace(newAssets)}. Transaction balanced.`
+            `New output value: ${CoreAssets.lovelaceOf(newAssets)}. Transaction balanced.`
         )
         return { next: "complete" as const }
       } else if (isBurnMode) {

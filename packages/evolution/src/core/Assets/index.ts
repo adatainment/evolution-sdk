@@ -89,6 +89,62 @@ export const fromAsset = (
 }
 
 /**
+ * Create a single asset from unit string format (policyId.assetName or policyId for empty asset name).
+ *
+ * @since 2.0.0
+ * @category constructors
+ */
+export const fromUnit = (
+  unit: string,
+  quantity: bigint,
+  lovelace: Coin.Coin = 0n
+): Eff.Effect<Assets, Error> =>
+  Eff.gen(function* () {
+    // Parse "policyId.assetName" or "policyId" (empty asset name)
+    const dotIndex = unit.indexOf(".")
+    const policyIdHex = dotIndex === -1 ? unit : unit.slice(0, dotIndex)
+    const assetNameHex = dotIndex === -1 ? "" : unit.slice(dotIndex + 1)
+    
+    // Decode policy ID from hex (28 bytes = 56 hex chars)
+    const policyIdBytes = new Uint8Array(Buffer.from(policyIdHex, "hex"))
+    const policyId = new PolicyId.PolicyId({ hash: policyIdBytes })
+    
+    // Decode asset name from hex (empty string yields empty bytes)
+    const assetNameBytes = assetNameHex 
+      ? new Uint8Array(Buffer.from(assetNameHex, "hex"))
+      : new Uint8Array(0)
+    const assetName = new AssetName.AssetName({ bytes: assetNameBytes })
+    
+    return fromAsset(policyId, assetName, quantity as PositiveCoin.PositiveCoin, lovelace)
+  })
+
+/**
+ * Create a single asset from hex policy ID and hex asset name strings.
+ * This is a synchronous version using pre-validated hex strings.
+ *
+ * @since 2.0.0
+ * @category constructors
+ */
+export const fromHexStrings = (
+  policyIdHex: string,
+  assetNameHex: string,
+  quantity: bigint,
+  lovelace: Coin.Coin = 0n
+): Assets => {
+  // Decode policy ID from hex (28 bytes = 56 hex chars)
+  const policyIdBytes = new Uint8Array(Buffer.from(policyIdHex, "hex"))
+  const policyId = new PolicyId.PolicyId({ hash: policyIdBytes })
+  
+  // Decode asset name from hex (empty string yields empty bytes)
+  const assetNameBytes = assetNameHex 
+    ? new Uint8Array(Buffer.from(assetNameHex, "hex"))
+    : new Uint8Array(0)
+  const assetName = new AssetName.AssetName({ bytes: assetNameBytes })
+  
+  return fromAsset(policyId, assetName, quantity as PositiveCoin.PositiveCoin, lovelace)
+}
+
+/**
  * Empty Assets with zero ADA and no tokens.
  *
  * @since 2.0.0
@@ -140,9 +196,18 @@ export const isZero = (assets: Assets): boolean => assets.lovelace === 0n && !ha
  */
 export const quantityOf = (assets: Assets, policyId: PolicyId.PolicyId, assetName: AssetName.AssetName): bigint => {
   if (!assets.multiAsset) return 0n
-  const assetMap = assets.multiAsset.map.get(policyId)
-  if (!assetMap) return 0n
-  return assetMap.get(assetName) ?? 0n
+  // Find by structural equality, not reference equality
+  for (const [pid, assetMap] of assets.multiAsset.map.entries()) {
+    if (Equal.equals(pid, policyId)) {
+      for (const [aname, qty] of assetMap.entries()) {
+        if (Equal.equals(aname, assetName)) {
+          return qty
+        }
+      }
+      return 0n
+    }
+  }
+  return 0n
 }
 
 /**
@@ -222,6 +287,22 @@ export const add = (
 }
 
 /**
+ * Add a single asset to Assets using hex strings for policy ID and asset name.
+ *
+ * @since 2.0.0
+ * @category combining
+ */
+export const addByHex = (
+  assets: Assets,
+  policyIdHex: string,
+  assetNameHex: string,
+  quantity: bigint
+): Assets => {
+  const toAdd = fromHexStrings(policyIdHex, assetNameHex, quantity, 0n)
+  return merge(assets, toAdd)
+}
+
+/**
  * Negate all quantities (ADA and tokens).
  *
  * @since 2.0.0
@@ -260,6 +341,208 @@ export const withoutLovelace = (assets: Assets): Assets => {
     return zero
   }
   return new Assets({ lovelace: 0n, multiAsset: assets.multiAsset })
+}
+
+/**
+ * Create a new Assets with a different lovelace amount, keeping multiAsset.
+ *
+ * @since 2.0.0
+ * @category combining
+ */
+export const withLovelace = (assets: Assets, lovelace: Coin.Coin): Assets => {
+  return new Assets({ lovelace, multiAsset: assets.multiAsset })
+}
+
+/**
+ * Add lovelace to existing assets. Creates new Assets with added lovelace.
+ *
+ * @since 2.0.0
+ * @category combining
+ */
+export const addLovelace = (assets: Assets, additionalLovelace: Coin.Coin): Assets => {
+  return new Assets({ lovelace: assets.lovelace + additionalLovelace, multiAsset: assets.multiAsset })
+}
+
+/**
+ * Subtract lovelace from existing assets. Creates new Assets with reduced lovelace.
+ *
+ * @since 2.0.0
+ * @category combining
+ */
+export const subtractLovelace = (assets: Assets, lovelaceToSubtract: Coin.Coin): Assets => {
+  return new Assets({ lovelace: assets.lovelace - lovelaceToSubtract, multiAsset: assets.multiAsset })
+}
+
+/**
+ * Subtract assets (a - b). Result can have negative values.
+ *
+ * @since 2.0.0
+ * @category combining
+ */
+export const subtract = (a: Assets, b: Assets): Assets => {
+  return merge(a, negate(b))
+}
+
+/**
+ * Filter assets based on a predicate.
+ *
+ * @since 2.0.0
+ * @category combining
+ */
+export const filter = (assets: Assets, predicate: (unit: string, amount: bigint) => boolean): Assets => {
+  // Check if lovelace passes the filter
+  const keepLovelace = predicate("lovelace", assets.lovelace)
+  const newLovelace = keepLovelace ? assets.lovelace : 0n
+  
+  if (!assets.multiAsset) {
+    return new Assets({ lovelace: newLovelace })
+  }
+  
+  // Filter multiAsset
+  const filteredMap = new Map<PolicyId.PolicyId, MultiAsset.AssetMap>()
+  for (const [policyId, assetMap] of assets.multiAsset.map.entries()) {
+    const policyIdHex = PolicyId.toHex(policyId)
+    const filteredAssets = new Map<AssetName.AssetName, PositiveCoin.PositiveCoin>()
+    for (const [assetName, quantity] of assetMap.entries()) {
+      const assetNameHex = AssetName.toHex(assetName)
+      const unit = assetNameHex ? `${policyIdHex}.${assetNameHex}` : policyIdHex
+      if (predicate(unit, quantity)) {
+        filteredAssets.set(assetName, quantity)
+      }
+    }
+    if (filteredAssets.size > 0) {
+      filteredMap.set(policyId, filteredAssets)
+    }
+  }
+  
+  if (filteredMap.size === 0) {
+    return new Assets({ lovelace: newLovelace })
+  }
+  
+  return new Assets({
+    lovelace: newLovelace,
+    multiAsset: new MultiAsset.MultiAsset({ map: filteredMap })
+  })
+}
+
+/**
+ * Check if assets are empty (zero lovelace and no tokens).
+ *
+ * @since 2.0.0
+ * @category inspection
+ */
+export const isEmpty = (assets: Assets): boolean => {
+  if (assets.lovelace !== 0n) return false
+  if (!assets.multiAsset) return true
+  
+  // Check if all token quantities are zero
+  for (const [_, assetMap] of assets.multiAsset.map.entries()) {
+    for (const [_, quantity] of assetMap.entries()) {
+      if (quantity !== 0n) return false
+    }
+  }
+  return true
+}
+
+/**
+ * Check if assets contain only ADA (no native tokens).
+ *
+ * @since 2.0.0
+ * @category inspection
+ */
+export const hasOnlyLovelace = (assets: Assets): boolean => {
+  if (!assets.multiAsset) return true
+  
+  // Check if any non-zero token quantities exist
+  for (const [_, assetMap] of assets.multiAsset.map.entries()) {
+    for (const [_, quantity] of assetMap.entries()) {
+      if (quantity !== 0n) return false
+    }
+  }
+  return true
+}
+// ============================================================================
+// Unit String Helpers (for SDK compatibility)
+// ============================================================================
+
+/**
+ * Get asset quantity by unit string.
+ * Unit is either "lovelace" or "policyId.assetName" (hex encoded).
+ *
+ * @since 2.0.0
+ * @category inspection
+ */
+export const getByUnit = (assets: Assets, unit: string): bigint => {
+  if (unit === "lovelace") return assets.lovelace
+  
+  // Parse unit: first 56 chars are policy ID, rest is asset name
+  const policyIdHex = unit.slice(0, 56)
+  const assetNameHex = unit.slice(56)
+  
+  if (!assets.multiAsset) return 0n
+  
+  // Find policy by hex comparison
+  for (const [policyId, assetMap] of assets.multiAsset.map.entries()) {
+    if (PolicyId.toHex(policyId) === policyIdHex) {
+      for (const [assetName, quantity] of assetMap.entries()) {
+        if (AssetName.toHex(assetName) === assetNameHex) {
+          return quantity
+        }
+      }
+    }
+  }
+  return 0n
+}
+
+/**
+ * Get all unit strings from Assets.
+ * Returns "lovelace" plus all "policyId.assetName" strings.
+ *
+ * @since 2.0.0
+ * @category inspection
+ */
+export const getUnits = (assets: Assets): Array<string> => {
+  const units: Array<string> = ["lovelace"]
+  
+  if (assets.multiAsset) {
+    for (const [policyId, assetMap] of assets.multiAsset.map.entries()) {
+      const policyIdHex = PolicyId.toHex(policyId)
+      for (const [assetName] of assetMap.entries()) {
+        const assetNameHex = AssetName.toHex(assetName)
+        units.push(`${policyIdHex}${assetNameHex}`)
+      }
+    }
+  }
+  
+  return units
+}
+
+/**
+ * Check if all requirements are covered by accumulated assets.
+ * Compares lovelace and all token quantities.
+ *
+ * @since 2.0.0
+ * @category inspection
+ */
+export const covers = (accumulated: Assets, required: Assets): boolean => {
+  // Check lovelace
+  if (accumulated.lovelace < required.lovelace) {
+    return false
+  }
+  
+  // Check all required tokens
+  if (required.multiAsset) {
+    for (const [policyId, requiredAssetMap] of required.multiAsset.map.entries()) {
+      for (const [assetName, requiredQty] of requiredAssetMap.entries()) {
+        const haveQty = quantityOf(accumulated, policyId, assetName)
+        if (haveQty < requiredQty) {
+          return false
+        }
+      }
+    }
+  }
+  
+  return true
 }
 
 // ============================================================================

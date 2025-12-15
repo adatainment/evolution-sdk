@@ -7,7 +7,7 @@
 
 import { Effect, Ref } from "effect"
 
-import * as Assets from "../../Assets.js"
+import * as CoreAssets from "../../../core/Assets/index.js"
 import { TxContext } from "../TransactionBuilder.js"
 import { makeTxOutput } from "../TxBuilderImpl.js"
 import type { PayToAddressParams } from "./Operations.js"
@@ -28,7 +28,7 @@ export const createPayToAddressProgram = (params: PayToAddressParams) =>
   Effect.gen(function* () {
     const ctx = yield* TxContext
 
-    // 1. Create UTxO output from params
+    // 1. Create Core TransactionOutput from params
     const output = yield* makeTxOutput({
       address: params.address,
       assets: params.assets,
@@ -40,6 +40,6 @@ export const createPayToAddressProgram = (params: PayToAddressParams) =>
     yield* Ref.update(ctx, (state) => ({
       ...state,
       outputs: [...state.outputs, output],
-      totalOutputAssets: Assets.add(state.totalOutputAssets, params.assets)
+      totalOutputAssets: CoreAssets.merge(state.totalOutputAssets, params.assets)
     }))
   })

@@ -3,11 +3,12 @@ import { FetchHttpClient } from "@effect/platform"
 import { Effect, pipe, Schema } from "effect"
 import type { ParseError } from "effect/ParseResult"
 
+import * as CoreAddress from "../../../core/Address.js"
+import * as CoreAssets from "../../../core/Assets/index.js"
+import * as TransactionHash from "../../../core/TransactionHash.js"
+import * as CoreUTxO from "../../../core/UTxO.js"
 import type * as Address from "../../Address.js"
-import * as Assets from "../../Assets.js"
 import type * as Credential from "../../Credential.js"
-import * as Script from "../../Script.js"
-import type * as UtxO from "../../UTxO.js"
 import * as HttpUtils from "./HttpUtils.js"
 
 export const ProtocolParametersSchema = Schema.Struct({
@@ -273,57 +274,56 @@ export const getHeadersWithToken = (token?: string, headers: Record<string, stri
   return headers
 }
 
-export const toUTxO = (koiosUTxO: UTxO, address: string): UtxO.UTxO => ({
-  txHash: koiosUTxO.tx_hash,
-  outputIndex: koiosUTxO.tx_index,
-  assets: (() => {
-    const tokens: Record<string, bigint> = {}
-    if (koiosUTxO.asset_list) {
-      koiosUTxO.asset_list.forEach((am: Asset) => {
-        tokens[am.policy_id + am.asset_name] = BigInt(am.quantity)
-      })
-    }
-    return Assets.make(BigInt(koiosUTxO.value), tokens)
-  })(),
-  address,
-  datumOption: koiosUTxO.inline_datum
-    ? { type: "inlineDatum", inline: koiosUTxO.inline_datum.bytes }
-    : koiosUTxO.datum_hash
-      ? { type: "datumHash", hash: koiosUTxO.datum_hash }
-      : undefined,
-  scriptRef: toScriptRef(koiosUTxO.reference_script)
-})
-
-const toScriptRef = (reference_script: ReferenceScript | null): Script.Script | undefined => {
-  if (reference_script && reference_script.bytes && reference_script.type) {
-    switch (reference_script.type) {
-      case "plutusV1":
-        return {
-          type: "PlutusV1" as const,
-          script: Script.applyDoubleCborEncoding(reference_script.bytes)
-        }
-      case "plutusV2":
-        return {
-          type: "PlutusV2" as const,
-          script: Script.applyDoubleCborEncoding(reference_script.bytes)
-        }
-      case "plutusV3":
-        return {
-          type: "PlutusV3" as const,
-          script: Script.applyDoubleCborEncoding(reference_script.bytes)
-        }
-      default:
-        return undefined
+export const toUTxO = (koiosUTxO: UTxO, addressStr: string): CoreUTxO.UTxO => {
+  // Build Core Assets
+  const lovelace = BigInt(koiosUTxO.value)
+  let assets = CoreAssets.fromLovelace(lovelace)
+  
+  if (koiosUTxO.asset_list) {
+    for (const am of koiosUTxO.asset_list) {
+      // policy_id is hex (56 chars), asset_name is hex
+      assets = CoreAssets.addByHex(assets, am.policy_id, am.asset_name || "", BigInt(am.quantity))
     }
   }
+  
+  const address = CoreAddress.fromBech32(addressStr)
+  const transactionId = TransactionHash.fromHex(koiosUTxO.tx_hash)
+
+  // TODO: Handle datum and script ref when Core types support them
+  // datumOption: koiosUTxO.inline_datum ? { type: "inlineDatum", inline: koiosUTxO.inline_datum.bytes }
+  //   : koiosUTxO.datum_hash ? { type: "datumHash", hash: koiosUTxO.datum_hash } : undefined,
+  // scriptRef: toScriptRef(koiosUTxO.reference_script)
+
+  return new CoreUTxO.UTxO({
+    transactionId,
+    index: BigInt(koiosUTxO.tx_index),
+    address,
+    assets
+  })
 }
+
+// Keep for future reference when Core types support scripts
+// const toScriptRef = (reference_script: ReferenceScript | null): Script.Script | undefined => {
+//   if (reference_script && reference_script.bytes && reference_script.type) {
+//     switch (reference_script.type) {
+//       case "plutusV1":
+//         return { type: "PlutusV1" as const, script: Script.applyDoubleCborEncoding(reference_script.bytes) }
+//       case "plutusV2":
+//         return { type: "PlutusV2" as const, script: Script.applyDoubleCborEncoding(reference_script.bytes) }
+//       case "plutusV3":
+//         return { type: "PlutusV3" as const, script: Script.applyDoubleCborEncoding(reference_script.bytes) }
+//       default:
+//         return undefined
+//     }
+//   }
+// }
 
 export const getUtxosEffect = (
   baseUrl: string,
   addressOrCredential: Address.Address | Credential.Credential,
   headers: Record<string, string> | undefined
 ): Effect.Effect<
-  Array<UtxO.UTxO>,
+  Array<CoreUTxO.UTxO>,
   string | HttpBody.HttpBodyError | HttpClientError.HttpClientError | ParseError,
   never
 > => {

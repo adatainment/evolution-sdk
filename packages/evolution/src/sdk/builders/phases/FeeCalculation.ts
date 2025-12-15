@@ -10,7 +10,7 @@
 
 import { Effect, Ref } from "effect"
 
-import * as Assets from "../../Assets.js"
+import * as CoreAssets from "../../../core/Assets/index.js"
 import type { TransactionBuilderError } from "../TransactionBuilder.js"
 import { PhaseContextTag, ProtocolParametersTag, TxContext } from "../TransactionBuilder.js"
 import { buildTransactionInputs, calculateFeeIteratively, calculateReferenceScriptFee } from "../TxBuilderImpl.js"
@@ -97,9 +97,9 @@ export const executeFeeCalculation = (): Effect.Effect<
     // Step 5: Calculate leftover after fee NOW (after fee is known)
     const inputAssets = state.totalInputAssets
     const outputAssets = state.totalOutputAssets
-    const leftoverBeforeFee = Assets.subtract(inputAssets, outputAssets)
+    const leftoverBeforeFee = CoreAssets.subtract(inputAssets, outputAssets)
 
-    const leftoverAfterFee = Assets.subtractLovelace(leftoverBeforeFee, calculatedFee)
+    const leftoverAfterFee = CoreAssets.subtractLovelace(leftoverBeforeFee, calculatedFee)
 
     // Step 6: Store both fee and leftoverAfterFee in context
     yield* Ref.update(buildCtxRef, (ctx) => ({

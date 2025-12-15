@@ -235,16 +235,40 @@ export const addAsset = (
   assetName: AssetName.AssetName,
   amount: PositiveCoin.PositiveCoin
 ): MultiAsset => {
-  const existingAssetMap = multiAsset.map.get(policyId)
+  // Find existing entry by structural equality (not reference equality)
+  let existingPolicyId: PolicyId.PolicyId | undefined
+  let existingAssetMap: AssetMap | undefined
+  for (const [pid, amap] of multiAsset.map.entries()) {
+    if (Equal.equals(pid, policyId)) {
+      existingPolicyId = pid
+      existingAssetMap = amap
+      break
+    }
+  }
 
-  if (existingAssetMap !== undefined) {
-    const existingAmount = existingAssetMap.get(assetName)
+  if (existingAssetMap !== undefined && existingPolicyId !== undefined) {
+    // Find existing asset by structural equality
+    let existingAssetName: AssetName.AssetName | undefined
+    let existingAmount: PositiveCoin.PositiveCoin | undefined
+    for (const [aname, amt] of existingAssetMap.entries()) {
+      if (Equal.equals(aname, assetName)) {
+        existingAssetName = aname
+        existingAmount = amt
+        break
+      }
+    }
+    
     const newAmount = existingAmount !== undefined ? PositiveCoin.add(existingAmount, amount) : amount
 
     const updatedAssetMap = new Map(existingAssetMap)
+    // Use the existing key if found, otherwise use the new one
+    if (existingAssetName !== undefined) {
+      updatedAssetMap.delete(existingAssetName)
+    }
     updatedAssetMap.set(assetName, newAmount)
 
     const result = new Map(multiAsset.map)
+    result.delete(existingPolicyId)
     result.set(policyId, updatedAssetMap)
     return new MultiAsset({ map: result })
   } else {

@@ -18,8 +18,8 @@ import { Effect } from "effect"
 
 import * as Transaction from "../../core/Transaction.js"
 import * as TransactionWitnessSet from "../../core/TransactionWitnessSet.js"
+import type * as CoreUTxO from "../../core/UTxO.js"
 import type * as Provider from "../provider/Provider.js"
-import type * as UTxO from "../UTxO.js"
 import type * as WalletNew from "../wallet/WalletNew.js"
 import type { SignBuilder, SignBuilderEffect } from "./SignBuilder.js"
 import { makeSubmitBuilder } from "./SubmitBuilderImpl.js"
@@ -44,7 +44,7 @@ export const makeSignBuilder = (params: {
   transaction: Transaction.Transaction
   transactionWithFakeWitnesses: Transaction.Transaction
   fee: bigint
-  utxos: ReadonlyArray<UTxO.UTxO>
+  utxos: ReadonlyArray<CoreUTxO.UTxO>
   provider: Provider.Provider
   wallet: Wallet
 }): SignBuilder => {

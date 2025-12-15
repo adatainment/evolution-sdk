@@ -13,6 +13,7 @@ import { Effect, Ref } from "effect"
 import * as Bytes from "../../../core/Bytes.js"
 import * as CostModel from "../../../core/CostModel.js"
 import * as Transaction from "../../../core/Transaction.js"
+import * as CoreUTxO from "../../../core/UTxO.js"
 import type * as ProtocolParametersModule from "../../ProtocolParameters.js"
 import * as EvaluationStateManager from "../EvaluationStateManager.js"
 import {
@@ -166,8 +167,8 @@ export const executeEvaluation = (): Effect.Effect<
     // Build inputs from selectedUtxos (this will sort them canonically)
     const sortedUtxos = Array.from(state.selectedUtxos.values()).sort((a, b) => {
       // MUST use same sorting as buildTransactionInputs: byte comparison of tx hash
-      const hashA = new Uint8Array(a.txHash.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)))
-      const hashB = new Uint8Array(b.txHash.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)))
+      const hashA = a.transactionId.hash
+      const hashB = b.transactionId.hash
       
       for (let i = 0; i < hashA.length; i++) {
         if (hashA[i] !== hashB[i]) {
@@ -176,13 +177,13 @@ export const executeEvaluation = (): Effect.Effect<
       }
       
       // If hashes equal, compare by output index
-      return a.outputIndex - b.outputIndex
+      return Number(a.index - b.index)
     })
     
     // Build the mapping while preserving the same order
     for (let i = 0; i < sortedUtxos.length; i++) {
       const utxo = sortedUtxos[i]!
-      const key = `${utxo.txHash}#${utxo.outputIndex}`
+      const key = CoreUTxO.toOutRefString(utxo)
       inputIndexMapping.set(i, key)
       yield* Effect.logDebug(`[Evaluation] Input ${i} maps to UTxO: ${key}`)
     }

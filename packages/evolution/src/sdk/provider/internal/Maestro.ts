@@ -5,12 +5,13 @@
 
 import { Schema } from "effect"
 
-import * as Assets from "../../Assets.js"
-import * as Datum from "../../Datum.js"
+import * as CoreAddress from "../../../core/Address.js"
+import * as CoreAssets from "../../../core/Assets/index.js"
+import * as TransactionHash from "../../../core/TransactionHash.js"
+import * as CoreUTxO from "../../../core/UTxO.js"
 import * as Delegation from "../../Delegation.js"
 import type { EvalRedeemer } from "../../EvalRedeemer.js"
 import type * as ProtocolParameters from "../../ProtocolParameters.js"
-import type * as UTxO from "../../UTxO.js"
 
 // ============================================================================
 // Maestro API Response Schemas
@@ -217,35 +218,47 @@ export const transformProtocolParameters = (
 
 /**
  * Transform Maestro datum option to Evolution SDK format
+ * TODO: Convert to Core datum type when available
  */
 export const transformDatumOption = (
-  maestroDatum?: Schema.Schema.Type<typeof MaestroDatumOption> | null
-): Datum.Datum | undefined => {
-  if (!maestroDatum) return undefined
-
-  if (maestroDatum.type === "inline" && maestroDatum.bytes) {
-    return Datum.makeInlineDatum(maestroDatum.bytes)
-  } else if (maestroDatum.type === "hash") {
-    return Datum.makeDatumHash(maestroDatum.hash)
-  }
-
+  _maestroDatum?: Schema.Schema.Type<typeof MaestroDatumOption> | null
+): undefined => {
+  // TODO: Handle datum when Core types support it
+  // if (!maestroDatum) return undefined
+  // if (maestroDatum.type === "inline" && maestroDatum.bytes) {
+  //   return Datum.makeInlineDatum(maestroDatum.bytes)
+  // } else if (maestroDatum.type === "hash") {
+  //   return Datum.makeDatumHash(maestroDatum.hash)
+  // }
   return undefined
 }
 
 /**
- * Transform Maestro assets array to Evolution SDK assets format
+ * Transform Maestro assets array to Core Assets format
  */
 export const transformAssets = (
   maestroAssets: ReadonlyArray<Schema.Schema.Type<typeof MaestroAsset>>
-): Assets.Assets => {
-  let assets = Assets.empty()
+): CoreAssets.Assets => {
+  let lovelace = 0n
+  const multiAssetEntries: Array<[string, bigint]> = []
 
   for (const asset of maestroAssets) {
     if (asset.unit === "lovelace") {
-      assets = { ...assets, lovelace: BigInt(asset.amount) }
+      lovelace = BigInt(asset.amount)
     } else {
-      assets = { ...assets, [asset.unit]: BigInt(asset.amount) }
+      multiAssetEntries.push([asset.unit, BigInt(asset.amount)])
     }
+  }
+
+  // Build Core Assets starting with lovelace
+  let assets = CoreAssets.fromLovelace(lovelace)
+  
+  // Add multi-assets using hex strings
+  for (const [unit, qty] of multiAssetEntries) {
+    // Parse unit - policyId is first 56 chars, assetName is remainder
+    const policyIdHex = unit.slice(0, 56)
+    const assetNameHex = unit.slice(56)
+    assets = CoreAssets.addByHex(assets, policyIdHex, assetNameHex, qty)
   }
 
   return assets
@@ -253,54 +266,35 @@ export const transformAssets = (
 
 /**
  * Transform Maestro script reference to Evolution SDK format
+ * TODO: Convert to Core script type when available
  */
 export const transformScriptRef = (
-  maestroScript?: Schema.Schema.Type<typeof MaestroScript> | null
+  _maestroScript?: Schema.Schema.Type<typeof MaestroScript> | null
 ) => {
-  if (!maestroScript || !maestroScript.bytes) {
-    return undefined
-  }
-
-  switch (maestroScript.type) {
-    case "native":
-      return {
-        type: "Native" as const,
-        script: maestroScript.bytes,
-      }
-    case "plutusv1":
-      return {
-        type: "PlutusV1" as const,
-        script: maestroScript.bytes,
-      }
-    case "plutusv2":
-      return {
-        type: "PlutusV2" as const,
-        script: maestroScript.bytes,
-      }
-    case "plutusv3":
-      return {
-        type: "PlutusV3" as const,
-        script: maestroScript.bytes,
-      }
-    default:
-      return undefined
-  }
+  // TODO: Handle script ref when Core types support it
+  return undefined
 }
 
 /**
- * Transform Maestro UTxO to Evolution SDK format
+ * Transform Maestro UTxO to Core UTxO format
  */
 export const transformUTxO = (
   maestroUtxo: Schema.Schema.Type<typeof MaestroUTxO>
-): UTxO.UTxO => {
-  return {
-    txHash: maestroUtxo.tx_hash,
-    outputIndex: maestroUtxo.index,
-    assets: transformAssets(maestroUtxo.assets),
-    address: maestroUtxo.address,
-    datumOption: transformDatumOption(maestroUtxo.datum),
-    scriptRef: transformScriptRef(maestroUtxo.reference_script),
-  }
+): CoreUTxO.UTxO => {
+  const assets = transformAssets(maestroUtxo.assets)
+  const address = CoreAddress.fromBech32(maestroUtxo.address)
+  const transactionId = TransactionHash.fromHex(maestroUtxo.tx_hash)
+
+  // TODO: Handle datum and script ref when Core types support them
+  // datumOption: transformDatumOption(maestroUtxo.datum),
+  // scriptRef: transformScriptRef(maestroUtxo.reference_script),
+
+  return new CoreUTxO.UTxO({
+    transactionId,
+    index: BigInt(maestroUtxo.index),
+    address,
+    assets
+  })
 }
 
 /**

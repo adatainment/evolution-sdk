@@ -1,7 +1,10 @@
 import { FetchHttpClient } from "@effect/platform"
 import { Effect, pipe, Schedule, Schema } from "effect"
 
+import * as CoreAssets from "../../../core/Assets/index.js"
 import * as Bytes from "../../../core/Bytes.js"
+import * as TransactionHash from "../../../core/TransactionHash.js"
+import type * as CoreUTxO from "../../../core/UTxO.js"
 import type * as Address from "../../Address.js"
 import type * as Credential from "../../Credential.js"
 import type * as Delegation from "../../Delegation.js"
@@ -9,7 +12,6 @@ import type * as EvalRedeemer from "../../EvalRedeemer.js"
 import type * as OutRef from "../../OutRef.js"
 import type * as RewardAddress from "../../RewardAddress.js"
 import * as Unit from "../../Unit.js"
-import type * as UTxO from "../../UTxO.js"
 import * as Provider from "../Provider.js"
 import * as HttpUtils from "./HttpUtils.js"
 import * as _Koios from "./Koios.js"
@@ -72,8 +74,8 @@ export const getUtxosWithUnit =
       _Koios.getUtxosEffect(baseUrl, addressOrCredential, token ? { Authorization: `Bearer ${token}` } : undefined),
       Effect.map((utxos) =>
         utxos.filter((utxo) => {
-          const keys = Object.keys(utxo.assets)
-          return keys.length > 0 && keys.includes(unit)
+          const units = CoreAssets.getUnits(utxo.assets)
+          return units.length > 0 && units.includes(unit)
         })
       ),
       Effect.timeout(10_000),
@@ -110,8 +112,8 @@ export const getUtxoByUnit = (baseUrl: string, token?: string) => (unit: Unit.Un
         Effect.flatMap((address) => _Koios.getUtxosEffect(baseUrl, address.payment_address, bearerToken)),
         Effect.map((utxos) =>
           utxos.filter((utxo) => {
-            const keys = Object.keys(utxo.assets)
-            return keys.length > 0 && keys.includes(unit)
+            const units = CoreAssets.getUnits(utxo.assets)
+            return units.length > 0 && units.includes(unit)
           })
         ),
         Effect.flatMap((utxos) =>
@@ -169,7 +171,10 @@ export const getUtxosByOutRef = (baseUrl: string, token?: string) => (outRefs: R
         )
       )
       return utxos.filter((utxo) =>
-        outRefs.some((outRef) => utxo.txHash === outRef.txHash && utxo.outputIndex === outRef.outputIndex)
+        outRefs.some((outRef) => 
+          TransactionHash.toHex(utxo.transactionId) === outRef.txHash && 
+          Number(utxo.index) === outRef.outputIndex
+        )
       )
     } else {
       return []
@@ -285,10 +290,11 @@ export const evaluateTx =
   (baseUrl: string, token?: string) =>
   (
     tx: string,
-    additionalUTxOs?: Array<UTxO.UTxO>
+    additionalUTxOs?: Array<CoreUTxO.UTxO>
   ): Effect.Effect<Array<EvalRedeemer.EvalRedeemer>, Provider.ProviderError> =>
     Effect.gen(function* () {
       const url = `${baseUrl}/ogmios`
+      // Use Core UTxOs directly with Ogmios format
       const body = {
         jsonrpc: "2.0",
         method: "evaluateTransaction",

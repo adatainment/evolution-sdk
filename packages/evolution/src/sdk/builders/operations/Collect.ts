@@ -7,7 +7,8 @@
 
 import { Effect, Ref } from "effect"
 
-import * as Assets from "../../Assets.js"
+import * as CoreAssets from "../../../core/Assets/index.js"
+import * as UTxO from "../../../core/UTxO.js"
 import { TransactionBuilderError, TxContext } from "../TransactionBuilder.js"
 import { calculateTotalAssets, filterScriptUtxos } from "../TxBuilderImpl.js"
 import type { CollectFromParams } from "./Operations.js"
@@ -62,7 +63,7 @@ export const createCollectFromProgram = (params: CollectFromParams) =>
       if (params.redeemer && scriptUtxos.length > 0) {
         newRedeemers = new Map(state.redeemers)
         scriptUtxos.forEach((utxo) => {
-          const inputKey = `${utxo.txHash}#${utxo.outputIndex}`
+          const inputKey = UTxO.toOutRefString(utxo)
           newRedeemers.set(inputKey, {
             tag: "spend",
             data: params.redeemer!, // PlutusData CBOR hex
@@ -76,7 +77,7 @@ export const createCollectFromProgram = (params: CollectFromParams) =>
         ...state,
         selectedUtxos: [...state.selectedUtxos, ...params.inputs],
         redeemers: newRedeemers,
-        totalInputAssets: Assets.add(state.totalInputAssets, inputAssets)
+        totalInputAssets: CoreAssets.merge(state.totalInputAssets, inputAssets)
       }
     })
   })

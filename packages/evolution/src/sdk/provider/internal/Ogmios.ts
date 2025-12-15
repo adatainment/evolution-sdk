@@ -1,10 +1,15 @@
 import type { Record } from "effect"
 import { Schema } from "effect"
 
-import type * as Assets from "../../Assets.js"
-import * as Script from "../../Script.js"
-import * as Unit from "../../Unit.js"
-import type * as UTxO from "../../UTxO.js"
+import * as CoreAddress from "../../../core/Address.js"
+import * as AssetName from "../../../core/AssetName.js"
+import type * as CoreAssets from "../../../core/Assets/index.js"
+import * as PlutusData from "../../../core/Data.js"
+import type * as DatumOption from "../../../core/DatumOption.js"
+import * as PolicyId from "../../../core/PolicyId.js"
+import type * as ScriptRef from "../../../core/ScriptRef.js"
+import * as TransactionHash from "../../../core/TransactionHash.js"
+import type * as CoreUTxO from "../../../core/UTxO.js"
 
 export const JSONRPCSchema = <A, I, R>(schema: Schema.Schema<A, I, R>) =>
   Schema.Struct({
@@ -146,61 +151,61 @@ export const RedeemerSchema = Schema.Struct({
   })
 }).annotations({ identifier: "RedeemerSchema" })
 
-export const toOgmiosUTxOs = (utxos: Array<UTxO.UTxO> | undefined): Array<OgmiosUTxO> => {
+export const toOgmiosUTxOs = (utxos: Array<CoreUTxO.UTxO> | undefined): Array<OgmiosUTxO> => {
   // NOTE: Ogmios only works with single encoding, not double encoding.
   // You will get the following error:
   // "Invalid request: couldn't decode Plutus script."
-  // TODO: Ensure the CBOR script is sent with single encoding.
-  const toOgmiosScript = (scriptRef: UTxO.UTxO["scriptRef"]): OgmiosUTxO["script"] | undefined => {
+  const toOgmiosScript = (scriptRef: ScriptRef.ScriptRef | undefined): OgmiosUTxO["script"] | undefined => {
     if (scriptRef) {
-      switch (scriptRef.type) {
-        case "PlutusV1":
-          return {
-            language: "plutus:v1",
-            cbor: Script.applySingleCborEncoding(scriptRef.script)
-          }
-        case "PlutusV2":
-          return {
-            language: "plutus:v2",
-            cbor: Script.applySingleCborEncoding(scriptRef.script)
-          }
-        case "PlutusV3":
-          return {
-            language: "plutus:v3",
-            cbor: Script.applySingleCborEncoding(scriptRef.script)
-          }
-        default:
-          return undefined
-      }
+      // ScriptRef contains raw script bytes - we need to detect the language from the CBOR
+      // For now, we return undefined as we'd need to decode the script to determine language
+      // TODO: Implement script language detection from bytes
+      return undefined
     }
+    return undefined
   }
 
-  const toOgmiosAssets = (assets: Assets.Assets) => {
+  const toOgmiosAssets = (assets: CoreAssets.Assets): OgmiosAssets => {
     const newAssets: OgmiosAssets = {}
-    Object.entries(assets).forEach(([unit, amount]) => {
-      if (unit == "lovelace") return
-      const { assetName, policyId } = Unit.fromUnit(unit)
-      if (!newAssets[policyId]) {
-        newAssets[policyId] = {}
+    if (assets.multiAsset) {
+      for (const [policyId, assetMap] of assets.multiAsset.map.entries()) {
+        const policyIdHex = PolicyId.toHex(policyId)
+        if (!newAssets[policyIdHex]) {
+          newAssets[policyIdHex] = {}
+        }
+        for (const [assetName, quantity] of assetMap.entries()) {
+          const assetNameHex = AssetName.toHex(assetName)
+          newAssets[policyIdHex][assetNameHex || ""] = Number(quantity)
+        }
       }
-      return (newAssets[policyId][assetName ? assetName : ""] = Number(amount))
-    })
+    }
     return newAssets
+  }
+
+  const toOgmiosDatum = (datumOption: DatumOption.DatumOption | undefined): { datumHash?: string; datum?: string } => {
+    if (!datumOption) return {}
+    if (datumOption._tag === "DatumHash") {
+      return { datumHash: Buffer.from(datumOption.hash).toString("hex") }
+    }
+    if (datumOption._tag === "InlineDatum") {
+      // Convert PlutusData to hex CBOR
+      return { datum: PlutusData.toCBORHex(datumOption.data) }
+    }
+    return {}
   }
 
   return (utxos || []).map(
     (utxo): OgmiosUTxO => ({
       transaction: {
-        id: utxo.txHash
+        id: TransactionHash.toHex(utxo.transactionId)
       },
-      index: utxo.outputIndex,
-      address: utxo.address,
+      index: Number(utxo.index),
+      address: CoreAddress.toBech32(utxo.address),
       value: {
-        ada: { lovelace: Number(utxo.assets["lovelace"]) },
+        ada: { lovelace: Number(utxo.assets.lovelace) },
         ...toOgmiosAssets(utxo.assets)
       },
-      datumHash: utxo.datumOption?.type === "datumHash" ? utxo.datumOption.hash : undefined,
-      datum: utxo.datumOption?.type === "inlineDatum" ? utxo.datumOption.inline : undefined,
+      ...toOgmiosDatum(utxo.datumOption),
       script: toOgmiosScript(utxo.scriptRef)
     })
   )

@@ -1,6 +1,6 @@
 ---
 title: sdk/wallet/WalletNew.ts
-nav_order: 191
+nav_order: 196
 parent: Modules
 ---
 
@@ -139,7 +139,7 @@ API wallets handle both signing and submission through the wallet extension.
 export interface ApiWalletEffect extends ReadOnlyWalletEffect {
   readonly signTx: (
     tx: Transaction.Transaction | string,
-    context?: { utxos?: ReadonlyArray<UTxO.UTxO> }
+    context?: { utxos?: ReadonlyArray<CoreUTxO.UTxO> }
   ) => Effect.Effect<TransactionWitnessSet.TransactionWitnessSet, WalletError>
   readonly signMessage: (
     address: Address.Address | RewardAddress.RewardAddress,
@@ -259,7 +259,7 @@ export interface SigningWalletEffect extends ReadOnlyWalletEffect {
    */
   readonly signTx: (
     tx: Transaction.Transaction | string,
-    context?: { utxos?: ReadonlyArray<UTxO.UTxO> }
+    context?: { utxos?: ReadonlyArray<CoreUTxO.UTxO> }
   ) => Effect.Effect<TransactionWitnessSet.TransactionWitnessSet, WalletError>
   readonly signMessage: (
     address: Address.Address | RewardAddress.RewardAddress,

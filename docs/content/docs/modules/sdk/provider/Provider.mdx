@@ -1,6 +1,6 @@
 ---
 title: sdk/provider/Provider.ts
-nav_order: 183
+nav_order: 188
 parent: Modules
 ---
 
@@ -82,22 +82,24 @@ export interface ProviderEffect {
    */
   readonly getUtxos: (
     addressOrCredential: Address.Address | Credential.Credential
-  ) => Effect.Effect<Array<UTxO>, ProviderError>
+  ) => Effect.Effect<Array<CoreUTxO.UTxO>, ProviderError>
   /**
    * Query UTxOs at a given address or credential filtered by specific unit.
    */
   readonly getUtxosWithUnit: (
     addressOrCredential: Address.Address | Credential.Credential,
     unit: string
-  ) => Effect.Effect<Array<UTxO>, ProviderError>
+  ) => Effect.Effect<Array<CoreUTxO.UTxO>, ProviderError>
   /**
    * Query a single UTxO by its unit identifier.
    */
-  readonly getUtxoByUnit: (unit: string) => Effect.Effect<UTxO, ProviderError>
+  readonly getUtxoByUnit: (unit: string) => Effect.Effect<CoreUTxO.UTxO, ProviderError>
   /**
    * Query UTxOs by their output references.
    */
-  readonly getUtxosByOutRef: (outRefs: ReadonlyArray<OutRef.OutRef>) => Effect.Effect<Array<UTxO>, ProviderError>
+  readonly getUtxosByOutRef: (
+    outRefs: ReadonlyArray<OutRef.OutRef>
+  ) => Effect.Effect<Array<CoreUTxO.UTxO>, ProviderError>
   /**
    * Query delegation info for a reward address.
    */
@@ -119,7 +121,10 @@ export interface ProviderEffect {
   /**
    * Evaluate a transaction to determine script execution costs.
    */
-  readonly evaluateTx: (tx: string, additionalUTxOs?: Array<UTxO>) => Effect.Effect<Array<EvalRedeemer>, ProviderError>
+  readonly evaluateTx: (
+    tx: string,
+    additionalUTxOs?: Array<CoreUTxO.UTxO>
+  ) => Effect.Effect<Array<EvalRedeemer>, ProviderError>
 }
 ```
 

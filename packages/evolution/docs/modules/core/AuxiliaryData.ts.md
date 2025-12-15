@@ -1,6 +1,6 @@
 ---
 title: core/AuxiliaryData.ts
-nav_order: 10
+nav_order: 11
 parent: Modules
 ---
 

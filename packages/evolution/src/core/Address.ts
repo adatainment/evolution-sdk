@@ -266,7 +266,9 @@ export interface AddressDetails {
  * @category Utils
  * @example
  * ```typescript
- * const details = getAddressDetails("addr_test1qp...")
+ * import * as Address from "@evolution-sdk/evolution/core/Address"
+ *
+ * const details = Address.getAddressDetails("addr_test1qp...")
  * if (details) {
  *   console.log(details.type) // "Base" | "Enterprise"
  *   console.log(details.networkId) // 0 | 1

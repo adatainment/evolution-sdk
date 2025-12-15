@@ -1,6 +1,6 @@
 ---
 title: sdk/builders/TxBuilderImpl.ts
-nav_order: 165
+nav_order: 171
 parent: Modules
 ---
 
@@ -29,9 +29,10 @@ parent: Modules
   - [calculateTotalAssets](#calculatetotalassets)
   - [filterScriptUtxos](#filterscriptutxos)
   - [isScriptAddress](#isscriptaddress)
+  - [isScriptAddressCore](#isscriptaddresscore)
   - [makeDatumOption](#makedatumoption)
   - [makeTxOutput](#maketxoutput)
-  - [~~mergeAssetsIntoOutput~~](#mergeassetsintooutput)
+  - [mergeAssetsIntoOutput](#mergeassetsintooutput)
   - [mergeAssetsIntoUTxO](#mergeassetsintoutxo)
 - [validation](#validation)
   - [calculateLeftoverAssets](#calculateleftoverassets)
@@ -46,7 +47,7 @@ parent: Modules
 Assemble a Transaction from inputs, outputs, and calculated fee.
 Creates TransactionBody with all required fields.
 
-This is where SDK UTxO outputs are converted to core TransactionOutputs.
+Uses Core TransactionOutput directly.
 
 This is minimal assembly with accurate fee:
 
@@ -59,7 +60,7 @@ This is minimal assembly with accurate fee:
 ```ts
 export declare const assembleTransaction: (
   inputs: ReadonlyArray<TransactionInput.TransactionInput>,
-  outputs: ReadonlyArray<UTxO.TxOutput>,
+  outputs: ReadonlyArray<TxOut.TransactionOutput>,
   fee: bigint
 ) => Effect.Effect<Transaction.Transaction, TransactionBuilderError, TxContext>
 ```
@@ -70,13 +71,13 @@ Added in v2.0.0
 
 Convert an array of UTxOs to an array of TransactionInputs.
 Inputs are sorted by txHash then outputIndex for deterministic ordering.
-Converts SDK types (UTxO.UTxO) to core types (TransactionInput).
+Uses Core UTxO types directly.
 
 **Signature**
 
 ```ts
 export declare const buildTransactionInputs: (
-  utxos: ReadonlyArray<UTxO.UTxO>
+  utxos: ReadonlyArray<CoreUTxO.UTxO>
 ) => Effect.Effect<ReadonlyArray<TransactionInput.TransactionInput>, TransactionBuilderError>
 ```
 
@@ -97,7 +98,7 @@ and calculates the exact size to determine the minimum lovelace required.
 ```ts
 export declare const calculateMinimumUtxoLovelace: (params: {
   address: string
-  assets: Assets.Assets
+  assets: CoreAssets.Assets
   datum?: Datum.Datum
   scriptRef?: any
   coinsPerUtxoByte: bigint
@@ -130,11 +131,11 @@ When unfracking is enabled:
 
 ```ts
 export declare const createChangeOutput: (params: {
-  leftoverAssets: Assets.Assets
+  leftoverAssets: CoreAssets.Assets
   changeAddress: string
   coinsPerUtxoByte: bigint
   unfrackOptions?: UnfrackOptions
-}) => Effect.Effect<ReadonlyArray<UTxO.TxOutput>, TransactionBuilderError>
+}) => Effect.Effect<ReadonlyArray<TxOut.TransactionOutput>, TransactionBuilderError>
 ```
 
 Added in v2.0.0
@@ -151,7 +152,7 @@ fake witnesses to accurately estimate witness set size in CBOR.
 
 ```ts
 export declare const buildFakeWitnessSet: (
-  inputUtxos: ReadonlyArray<UTxO.UTxO>
+  inputUtxos: ReadonlyArray<CoreUTxO.UTxO>
 ) => Effect.Effect<TransactionWitnessSet.TransactionWitnessSet, TransactionBuilderError>
 ```
 
@@ -173,9 +174,9 @@ Algorithm:
 
 ```ts
 export declare const calculateFeeIteratively: (
-  inputUtxos: ReadonlyArray<UTxO.UTxO>,
+  inputUtxos: ReadonlyArray<CoreUTxO.UTxO>,
   inputs: ReadonlyArray<TransactionInput.TransactionInput>,
-  outputs: ReadonlyArray<UTxO.TxOutput>,
+  outputs: ReadonlyArray<TxOut.TransactionOutput>,
   redeemers: Map<
     string,
     {
@@ -233,8 +234,8 @@ Checks both lovelace AND native assets (tokens/NFTs) to ensure complete balance.
 
 ```ts
 export declare const verifyTransactionBalance: (
-  selectedUtxos: ReadonlyArray<UTxO.UTxO>,
-  outputs: ReadonlyArray<UTxO.TxOutput>,
+  selectedUtxos: ReadonlyArray<CoreUTxO.UTxO>,
+  outputs: ReadonlyArray<TxOut.TransactionOutput>,
   fee: bigint
 ) => { sufficient: boolean; shortfall: bigint; change: bigint }
 ```
@@ -258,7 +259,7 @@ Reference scripts stored on-chain incur additional fees based on their size:
 
 ```ts
 export declare const calculateReferenceScriptFee: (
-  referenceInputs: ReadonlyArray<UTxO.UTxO>
+  referenceInputs: ReadonlyArray<CoreUTxO.UTxO>
 ) => Effect.Effect<bigint, TransactionBuilderError>
 ```
 
@@ -271,7 +272,9 @@ Calculate total assets from a set of UTxOs.
 **Signature**
 
 ```ts
-export declare const calculateTotalAssets: (utxos: ReadonlyArray<UTxO.UTxO> | Set<UTxO.UTxO>) => Assets.Assets
+export declare const calculateTotalAssets: (
+  utxos: ReadonlyArray<CoreUTxO.UTxO> | Set<CoreUTxO.UTxO>
+) => CoreAssets.Assets
 ```
 
 Added in v2.0.0
@@ -284,21 +287,34 @@ Filter UTxOs to find those locked by scripts (script-locked UTxOs).
 
 ```ts
 export declare const filterScriptUtxos: (
-  utxos: ReadonlyArray<UTxO.UTxO>
-) => Effect.Effect<ReadonlyArray<UTxO.UTxO>, TransactionBuilderError>
+  utxos: ReadonlyArray<CoreUTxO.UTxO>
+) => Effect.Effect<ReadonlyArray<CoreUTxO.UTxO>, TransactionBuilderError>
 ```
 
 Added in v2.0.0
 
 ## isScriptAddress
 
-Check if an address is a script address (payment credential is ScriptHash).
+Check if an address string is a script address (payment credential is ScriptHash).
 Parses the address to extract its structure and checks the payment credential type.
 
 **Signature**
 
 ```ts
 export declare const isScriptAddress: (address: string) => Effect.Effect<boolean, TransactionBuilderError>
+```
+
+Added in v2.0.0
+
+## isScriptAddressCore
+
+Check if an address is a script address (payment credential is ScriptHash).
+Works with Core Address type.
+
+**Signature**
+
+```ts
+export declare const isScriptAddressCore: (address: CoreAddress.Address) => boolean
 ```
 
 Added in v2.0.0
@@ -320,26 +336,25 @@ Added in v2.0.0
 
 ## makeTxOutput
 
-Create a TxOutput from user-friendly parameters.
-Stays in SDK types for easier manipulation (merging, etc).
+Create a TransactionOutput from user-friendly parameters.
+Uses Core types directly.
 
-TxOutput represents an output being created in a transaction - it doesn't have
-txHash/outputIndex yet since the transaction hasn't been submitted.
+TransactionOutput represents an output being created in a transaction.
 
 **Signature**
 
 ```ts
 export declare const makeTxOutput: (params: {
   address: string
-  assets: Assets.Assets
+  assets: CoreAssets.Assets
   datum?: Datum.Datum
   scriptRef?: any
-}) => Effect.Effect<UTxO.TxOutput, TransactionBuilderError>
+}) => Effect.Effect<TxOut.TransactionOutput, TransactionBuilderError>
 ```
 
 Added in v2.0.0
 
-## ~~mergeAssetsIntoOutput~~
+## mergeAssetsIntoOutput
 
 Merge additional assets into an existing TransactionOutput.
 Creates a new output with combined assets from the original output and leftover assets.
@@ -351,7 +366,7 @@ Use case: Draining wallet by merging leftover into an existing payment output.
 ```ts
 export declare const mergeAssetsIntoOutput: (
   output: TxOut.TransactionOutput,
-  additionalAssets: Assets.Assets
+  additionalAssets: CoreAssets.Assets
 ) => Effect.Effect<TxOut.TransactionOutput, TransactionBuilderError>
 ```
 
@@ -359,7 +374,7 @@ Added in v2.0.0
 
 ## mergeAssetsIntoUTxO
 
-Merge additional assets into an existing UTxO (output).
+Merge additional assets into an existing UTxO.
 Creates a new UTxO with combined assets from the original UTxO and additional assets.
 
 Use case: Draining wallet by merging leftover into an existing payment output.
@@ -368,9 +383,9 @@ Use case: Draining wallet by merging leftover into an existing payment output.
 
 ```ts
 export declare const mergeAssetsIntoUTxO: (
-  utxo: UTxO.UTxO,
-  additionalAssets: Assets.Assets
-) => Effect.Effect<UTxO.UTxO, TransactionBuilderError>
+  utxo: CoreUTxO.UTxO,
+  additionalAssets: CoreAssets.Assets
+) => Effect.Effect<CoreUTxO.UTxO, TransactionBuilderError>
 ```
 
 Added in v2.0.0
@@ -385,10 +400,10 @@ Calculate leftover assets (will become excess fee in minimal build).
 
 ```ts
 export declare const calculateLeftoverAssets: (params: {
-  totalInputAssets: Assets.Assets
-  totalOutputAssets: Assets.Assets
+  totalInputAssets: CoreAssets.Assets
+  totalOutputAssets: CoreAssets.Assets
   fee: bigint
-}) => Assets.Assets
+}) => CoreAssets.Assets
 ```
 
 Added in v2.0.0
@@ -402,8 +417,8 @@ This is the ONLY validation for minimal build - no coin selection.
 
 ```ts
 export declare const validateTransactionBalance: (params: {
-  totalInputAssets: Assets.Assets
-  totalOutputAssets: Assets.Assets
+  totalInputAssets: CoreAssets.Assets
+  totalOutputAssets: CoreAssets.Assets
   fee: bigint
 }) => Effect.Effect<void, TransactionBuilderError>
 ```

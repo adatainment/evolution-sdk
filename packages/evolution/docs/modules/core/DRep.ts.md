@@ -1,6 +1,6 @@
 ---
 title: core/DRep.ts
-nav_order: 48
+nav_order: 49
 parent: Modules
 ---
 
@@ -18,8 +18,11 @@ parent: Modules
   - [fromKeyHash](#fromkeyhash)
   - [fromScriptHash](#fromscripthash)
 - [encoding](#encoding)
+  - [toBech32](#tobech32)
+  - [toBytes](#tobytes)
   - [toCBORBytes](#tocborbytes)
   - [toCBORHex](#tocborhex)
+  - [toHex](#tohex)
 - [model](#model)
   - [AlwaysAbstainDRep (class)](#alwaysabstaindrep-class)
     - [toJSON (method)](#tojson-method)
@@ -56,11 +59,12 @@ parent: Modules
 - [schemas](#schemas)
   - [DRep](#drep)
   - [FromCDDL](#fromcddl)
+- [transformations](#transformations)
+  - [FromBech32](#frombech32)
+  - [FromBytes](#frombytes)
+  - [FromHex](#fromhex)
 - [type guards](#type-guards)
-  - [isAlwaysAbstainDRep](#isalwaysabstaindrep)
   - [isAlwaysNoConfidenceDRep](#isalwaysnoconfidencedrep)
-  - [isKeyHashDRep](#iskeyhashdrep)
-  - [isScriptHashDRep](#isscripthashdrep)
 - [utils](#utils)
   - [CDDLSchema](#cddlschema)
   - [FromCBORBytes](#fromcborbytes-1)
@@ -136,6 +140,36 @@ Added in v2.0.0
 
 # encoding
 
+## toBech32
+
+Encode DRep to Bech32 string (CIP-129 format).
+
+**Signature**
+
+```ts
+export declare const toBech32: (
+  a: KeyHashDRep | ScriptHashDRep | AlwaysAbstainDRep | AlwaysNoConfidenceDRep,
+  overrideOptions?: ParseOptions
+) => string
+```
+
+Added in v2.0.0
+
+## toBytes
+
+Encode DRep to CIP-129 bytes (KeyHashDRep or ScriptHashDRep only).
+
+**Signature**
+
+```ts
+export declare const toBytes: (
+  a: KeyHashDRep | ScriptHashDRep | AlwaysAbstainDRep | AlwaysNoConfidenceDRep,
+  overrideOptions?: ParseOptions
+) => any
+```
+
+Added in v2.0.0
+
 ## toCBORBytes
 
 Encode DRep to CBOR bytes.
@@ -143,7 +177,12 @@ Encode DRep to CBOR bytes.
 **Signature**
 
 ```ts
-export declare const toCBORBytes: (drep: DRep, options?: CBOR.CodecOptions) => Uint8Array
+export declare const toCBORBytes: (
+  options?: CBOR.CodecOptions
+) => (
+  a: KeyHashDRep | ScriptHashDRep | AlwaysAbstainDRep | AlwaysNoConfidenceDRep,
+  overrideOptions?: ParseOptions
+) => any
 ```
 
 Added in v2.0.0
@@ -155,7 +194,27 @@ Encode DRep to CBOR hex string.
 **Signature**
 
 ```ts
-export declare const toCBORHex: (drep: DRep, options?: CBOR.CodecOptions) => string
+export declare const toCBORHex: (
+  options?: CBOR.CodecOptions
+) => (
+  a: KeyHashDRep | ScriptHashDRep | AlwaysAbstainDRep | AlwaysNoConfidenceDRep,
+  overrideOptions?: ParseOptions
+) => string
+```
+
+Added in v2.0.0
+
+## toHex
+
+Encode DRep to hex string.
+
+**Signature**
+
+```ts
+export declare const toHex: (
+  a: KeyHashDRep | ScriptHashDRep | AlwaysAbstainDRep | AlwaysNoConfidenceDRep,
+  overrideOptions?: ParseOptions
+) => string
 ```
 
 Added in v2.0.0
@@ -494,19 +553,75 @@ export declare const FromCDDL: Schema.transformOrFail<
 
 Added in v2.0.0
 
-# type guards
+# transformations
 
-## isAlwaysAbstainDRep
+## FromBech32
 
-Check if DRep is an AlwaysAbstainDRep.
+Transform from Bech32 string to DRep following CIP-129.
+Bech32 prefix: "drep" for both KeyHash and ScriptHash
 
 **Signature**
 
 ```ts
-export declare const isAlwaysAbstainDRep: (drep: DRep) => drep is AlwaysAbstainDRep
+export declare const FromBech32: Schema.transformOrFail<
+  typeof Schema.String,
+  Schema.SchemaClass<
+    KeyHashDRep | ScriptHashDRep | AlwaysAbstainDRep | AlwaysNoConfidenceDRep,
+    KeyHashDRep | ScriptHashDRep | AlwaysAbstainDRep | AlwaysNoConfidenceDRep,
+    never
+  >,
+  never
+>
 ```
 
 Added in v2.0.0
+
+## FromBytes
+
+Transform from raw bytes to DRep following CIP-129.
+CIP-129 format: [1-byte header][28-byte credential]
+Header byte: 0x22 = KeyHash, 0x23 = ScriptHash
+
+**Signature**
+
+```ts
+export declare const FromBytes: Schema.transformOrFail<
+  typeof Schema.Uint8ArrayFromSelf,
+  Schema.SchemaClass<
+    KeyHashDRep | ScriptHashDRep | AlwaysAbstainDRep | AlwaysNoConfidenceDRep,
+    KeyHashDRep | ScriptHashDRep | AlwaysAbstainDRep | AlwaysNoConfidenceDRep,
+    never
+  >,
+  never
+>
+```
+
+Added in v2.0.0
+
+## FromHex
+
+Transform from hex string to DRep.
+
+**Signature**
+
+```ts
+export declare const FromHex: Schema.transform<
+  Schema.Schema<Uint8Array, string, never>,
+  Schema.transformOrFail<
+    typeof Schema.Uint8ArrayFromSelf,
+    Schema.SchemaClass<
+      KeyHashDRep | ScriptHashDRep | AlwaysAbstainDRep | AlwaysNoConfidenceDRep,
+      KeyHashDRep | ScriptHashDRep | AlwaysAbstainDRep | AlwaysNoConfidenceDRep,
+      never
+    >,
+    never
+  >
+>
+```
+
+Added in v2.0.0
+
+# type guards
 
 ## isAlwaysNoConfidenceDRep
 
@@ -516,30 +631,6 @@ Check if DRep is an AlwaysNoConfidenceDRep.
 
 ```ts
 export declare const isAlwaysNoConfidenceDRep: (drep: DRep) => drep is AlwaysNoConfidenceDRep
-```
-
-Added in v2.0.0
-
-## isKeyHashDRep
-
-Check if DRep is a KeyHashDRep.
-
-**Signature**
-
-```ts
-export declare const isKeyHashDRep: (drep: DRep) => drep is KeyHashDRep
-```
-
-Added in v2.0.0
-
-## isScriptHashDRep
-
-Check if DRep is a ScriptHashDRep.
-
-**Signature**
-
-```ts
-export declare const isScriptHashDRep: (drep: DRep) => drep is ScriptHashDRep
 ```
 
 Added in v2.0.0

@@ -47,10 +47,10 @@ function checksum(num: string): string {
  * @category conversions
  * @example
  * ```typescript
- * import * as Label from "@evolution-sdk/core/Label"
+ * import * as Label from "@evolution-sdk/evolution/core/Assets/Label"
  *
  * const label = Label.toLabel(222)
- * // => "000de1400"
+ * // => "000de140"
  * ```
  */
 export const toLabel = (num: number): string => {
@@ -71,9 +71,9 @@ export const toLabel = (num: number): string => {
  * @category conversions
  * @example
  * ```typescript
- * import * as Label from "@evolution-sdk/core/Label"
+ * import * as Label from "@evolution-sdk/evolution/core/Assets/Label"
  *
- * const num = Label.fromLabel("000de1400")
+ * const num = Label.fromLabel("000de140")
  * // => 222
  *
  * const invalid = Label.fromLabel("00000000")
@@ -98,14 +98,14 @@ export const fromLabel = (label: string): number | undefined => {
  * @category schemas
  * @example
  * ```typescript
- * import * as Label from "@evolution-sdk/core/Label"
+ * import * as Label from "@evolution-sdk/evolution/core/Assets/Label"
  * import { Schema } from "effect"
  *
- * const decoded = Schema.decodeSync(Label.LabelFromHex)("000de1400")
+ * const decoded = Schema.decodeSync(Label.LabelFromHex)("000de140")
  * // => 222
  *
  * const encoded = Schema.encodeSync(Label.LabelFromHex)(222)
- * // => "000de1400"
+ * // => "000de140"
  * ```
  */
 export const LabelFromHex = Schema.transformOrFail(

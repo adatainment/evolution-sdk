@@ -1,6 +1,6 @@
 ---
 title: core/CBOR.ts
-nav_order: 34
+nav_order: 35
 parent: Modules
 ---
 
@@ -13,6 +13,7 @@ parent: Modules
 - [constants](#constants)
   - [AIKEN_DEFAULT_OPTIONS](#aiken_default_options)
   - [CANONICAL_OPTIONS](#canonical_options)
+  - [CARDANO_NODE_DATA_OPTIONS](#cardano_node_data_options)
   - [CBOR_ADDITIONAL_INFO](#cbor_additional_info)
   - [CBOR_MAJOR_TYPE](#cbor_major_type)
   - [CBOR_SIMPLE](#cbor_simple)
@@ -95,6 +96,25 @@ export declare const CANONICAL_OPTIONS: CodecOptions
 ```
 
 Added in v1.0.0
+
+## CARDANO_NODE_DATA_OPTIONS
+
+Cardano Node compatible CBOR encoding options for PlutusData
+
+Uses definite-length encoding for arrays and maps, matching the format
+produced by CML's `to_cardano_node_format().to_cbor_hex()`.
+
+Note: The on-chain format uses indefinite-length (AIKEN_DEFAULT_OPTIONS),
+but this option is useful for testing compatibility with tools that
+expect definite-length encoding.
+
+**Signature**
+
+```ts
+export declare const CARDANO_NODE_DATA_OPTIONS: CodecOptions
+```
+
+Added in v2.0.0
 
 ## CBOR_ADDITIONAL_INFO
 

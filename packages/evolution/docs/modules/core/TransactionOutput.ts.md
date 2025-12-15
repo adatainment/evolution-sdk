@@ -1,6 +1,6 @@
 ---
 title: core/TransactionOutput.ts
-nav_order: 128
+nav_order: 132
 parent: Modules
 ---
 

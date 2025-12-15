@@ -16,6 +16,8 @@ Added in v1.0.0
   - [arbitrary](#arbitrary-1)
 - [Functions](#functions)
   - [fromBech32](#frombech32)
+- [Model](#model)
+  - [AddressDetails (interface)](#addressdetails-interface)
 - [Schema](#schema)
   - [Address (class)](#address-class)
     - [toJSON (method)](#tojson-method)
@@ -28,7 +30,10 @@ Added in v1.0.0
   - [FromBytes](#frombytes)
   - [FromHex](#fromhex)
 - [Utils](#utils)
+  - [getAddressDetails](#getaddressdetails)
   - [getNetworkId](#getnetworkid)
+  - [getPaymentCredential](#getpaymentcredential)
+  - [getStakingCredential](#getstakingcredential)
   - [hasStakingCredential](#hasstakingcredential)
   - [isEnterprise](#isenterprise)
 - [utils](#utils-1)
@@ -64,6 +69,29 @@ Sync functions using Schema utilities
 
 ```ts
 export declare const fromBech32: (i: string, overrideOptions?: ParseOptions) => Address
+```
+
+Added in v1.0.0
+
+# Model
+
+## AddressDetails (interface)
+
+Address details with both structured and serialized formats
+
+**Signature**
+
+```ts
+export interface AddressDetails {
+  readonly type: "Base" | "Enterprise"
+  readonly networkId: NetworkId.NetworkId
+  readonly address: {
+    readonly bech32: string
+    readonly hex: string
+  }
+  readonly paymentCredential: Credential.CredentialSchema
+  readonly stakingCredential?: Credential.CredentialSchema
+}
 ```
 
 Added in v1.0.0
@@ -178,6 +206,38 @@ Added in v1.0.0
 
 # Utils
 
+## getAddressDetails
+
+Parse address from bech32 or hex string and extract all details
+Returns undefined if the address cannot be parsed
+
+Supports:
+
+- Base addresses (payment + staking credentials)
+- Enterprise addresses (payment credential only)
+
+**Signature**
+
+```ts
+export declare const getAddressDetails: (address: string) => AddressDetails | undefined
+```
+
+**Example**
+
+```typescript
+import * as Address from "@evolution-sdk/evolution/core/Address"
+
+const details = Address.getAddressDetails("addr_test1qp...")
+if (details) {
+  console.log(details.type) // "Base" | "Enterprise"
+  console.log(details.networkId) // 0 | 1
+  console.log(details.paymentCredential)
+  console.log(details.stakingCredential) // present for Base addresses
+}
+```
+
+Added in v1.0.0
+
 ## getNetworkId
 
 Get network ID from AddressStructure
@@ -186,6 +246,32 @@ Get network ID from AddressStructure
 
 ```ts
 export declare const getNetworkId: (address: Address) => NetworkId.NetworkId
+```
+
+Added in v1.0.0
+
+## getPaymentCredential
+
+Extract payment credential from address string
+Returns undefined if the address cannot be parsed
+
+**Signature**
+
+```ts
+export declare const getPaymentCredential: (address: string) => Credential.CredentialSchema | undefined
+```
+
+Added in v1.0.0
+
+## getStakingCredential
+
+Extract staking credential from address string
+Returns undefined if the address has no staking credential or cannot be parsed
+
+**Signature**
+
+```ts
+export declare const getStakingCredential: (address: string) => Credential.CredentialSchema | undefined
 ```
 
 Added in v1.0.0

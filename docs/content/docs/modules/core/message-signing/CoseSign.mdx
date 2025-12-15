@@ -1,6 +1,6 @@
 ---
 title: core/message-signing/CoseSign.ts
-nav_order: 66
+nav_order: 67
 parent: Modules
 ---
 

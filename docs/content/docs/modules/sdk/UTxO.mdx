@@ -1,6 +1,6 @@
 ---
 title: sdk/UTxO.ts
-nav_order: 189
+nav_order: 194
 parent: Modules
 ---
 
@@ -12,6 +12,11 @@ parent: Modules
 
 - [constructors](#constructors)
   - [toUTxO](#toutxo)
+- [conversion](#conversion)
+  - [fromCore](#fromcore)
+  - [fromCoreArray](#fromcorearray)
+  - [toCore](#tocore)
+  - [toCoreArray](#tocorearray)
 - [utils](#utils)
   - [TxOutput (interface)](#txoutput-interface)
   - [UTxO (interface)](#utxo-interface)
@@ -72,6 +77,58 @@ Used after transaction submission when outputs become UTxOs on-chain.
 
 ```ts
 export declare const toUTxO: (output: TxOutput, txHash: string, outputIndex: number) => UTxO
+```
+
+Added in v2.0.0
+
+# conversion
+
+## fromCore
+
+Convert Core UTxO to SDK UTxO.
+This is a pure function as all data is available to convert.
+
+**Signature**
+
+```ts
+export declare const fromCore: (utxo: CoreUTxO.UTxO) => UTxO
+```
+
+Added in v2.0.0
+
+## fromCoreArray
+
+Convert array of Core UTxOs to SDK UTxOs.
+
+**Signature**
+
+```ts
+export declare const fromCoreArray: (utxos: ReadonlyArray<CoreUTxO.UTxO>) => ReadonlyArray<UTxO>
+```
+
+Added in v2.0.0
+
+## toCore
+
+Convert SDK UTxO to Core UTxO.
+This is an Effect as it needs to parse the address and transaction hash.
+
+**Signature**
+
+```ts
+export declare const toCore: (utxo: UTxO) => Effect.Effect<CoreUTxO.UTxO, Error>
+```
+
+Added in v2.0.0
+
+## toCoreArray
+
+Convert array of SDK UTxOs to Core UTxOs.
+
+**Signature**
+
+```ts
+export declare const toCoreArray: (utxos: ReadonlyArray<UTxO>) => Effect.Effect<ReadonlyArray<CoreUTxO.UTxO>, Error>
 ```
 
 Added in v2.0.0

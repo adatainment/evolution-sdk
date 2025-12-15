@@ -1,6 +1,6 @@
 ---
 title: sdk/client/Client.ts
-nav_order: 167
+nav_order: 173
 parent: Modules
 ---
 
@@ -322,7 +322,7 @@ Use newTx() to build unsigned transactions.
 
 ```ts
 export type ReadOnlyClient = EffectToPromiseAPI<ReadOnlyClientEffect> & {
-  readonly newTx: (utxos?: ReadonlyArray<UTxO.UTxO>) => ReadOnlyTransactionBuilder
+  readonly newTx: (utxos?: ReadonlyArray<CoreUTxO.UTxO>) => ReadOnlyTransactionBuilder
   readonly Effect: ReadOnlyClientEffect
 }
 ```
@@ -337,7 +337,7 @@ ReadOnlyClient Effect - provider, read-only wallet, and utility methods.
 
 ```ts
 export interface ReadOnlyClientEffect extends Provider.ProviderEffect, ReadOnlyWalletEffect {
-  readonly getWalletUtxos: () => Effect.Effect<ReadonlyArray<UTxO.UTxO>, Provider.ProviderError>
+  readonly getWalletUtxos: () => Effect.Effect<ReadonlyArray<CoreUTxO.UTxO>, Provider.ProviderError>
   readonly getWalletDelegation: () => Effect.Effect<Delegation.Delegation, Provider.ProviderError>
 }
 ```
@@ -450,7 +450,7 @@ SigningClient Effect - provider, signing wallet, and utility methods.
 
 ```ts
 export interface SigningClientEffect extends Provider.ProviderEffect, SigningWalletEffect {
-  readonly getWalletUtxos: () => Effect.Effect<ReadonlyArray<UTxO.UTxO>, WalletError | Provider.ProviderError>
+  readonly getWalletUtxos: () => Effect.Effect<ReadonlyArray<CoreUTxO.UTxO>, WalletError | Provider.ProviderError>
   readonly getWalletDelegation: () => Effect.Effect<Delegation.Delegation, WalletError | Provider.ProviderError>
 }
 ```

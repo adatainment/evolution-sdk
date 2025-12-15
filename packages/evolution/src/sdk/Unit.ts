@@ -1,4 +1,4 @@
-import * as Label from "./Label.js"
+import * as Label from "../core/Assets/Label.js"
 import type * as PolicyId from "./PolicyId.js"
 
 export type Unit = string

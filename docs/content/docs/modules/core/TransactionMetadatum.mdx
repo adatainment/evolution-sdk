@@ -1,6 +1,6 @@
 ---
 title: core/TransactionMetadatum.ts
-nav_order: 126
+nav_order: 130
 parent: Modules
 ---
 

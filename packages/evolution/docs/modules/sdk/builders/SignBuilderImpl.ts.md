@@ -1,6 +1,6 @@
 ---
 title: sdk/builders/SignBuilderImpl.ts
-nav_order: 160
+nav_order: 166
 parent: Modules
 ---
 
@@ -42,7 +42,7 @@ export declare const makeSignBuilder: (params: {
   transaction: Transaction.Transaction
   transactionWithFakeWitnesses: Transaction.Transaction
   fee: bigint
-  utxos: ReadonlyArray<UTxO.UTxO>
+  utxos: ReadonlyArray<CoreUTxO.UTxO>
   provider: Provider.Provider
   wallet: Wallet
 }) => SignBuilder

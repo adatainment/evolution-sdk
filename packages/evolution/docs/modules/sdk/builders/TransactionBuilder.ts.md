@@ -1,6 +1,6 @@
 ---
 title: sdk/builders/TransactionBuilder.ts
-nav_order: 163
+nav_order: 169
 parent: Modules
 ---
 
@@ -304,7 +304,7 @@ export interface TransactionBuilderBase {
    *
    * @example
    * ```typescript
-   * import * as UTxO from "./UTxO.js"
+   * import * as UTxO from "../../core/UTxO.js"
    *
    * // Use reference script stored on-chain instead of attaching to transaction
    * const refScriptUtxo = await provider.getUtxoByTxHash("abc123...")
@@ -428,7 +428,7 @@ export interface TxBuilderConfig {
    * @default "Mainnet"
    * @since 2.0.0
    */
-  readonly network?: Network
+  readonly network?: Network.Network
 
   // Future fields:
   // readonly costModels?: Uint8Array // Cost models for script evaluation
@@ -638,9 +638,9 @@ of multi-transaction workflows. Current chain methods return stub implementation
 ```ts
 export interface ChainResult {
   readonly transaction: Transaction.Transaction
-  readonly newOutputs: ReadonlyArray<UTxO.UTxO> // UTxOs created by this transaction
-  readonly updatedUtxos: ReadonlyArray<UTxO.UTxO> // Available UTxOs for next transaction (original - spent + new)
-  readonly spentUtxos: ReadonlyArray<UTxO.UTxO> // UTxOs consumed by this transaction
+  readonly newOutputs: ReadonlyArray<CoreUTxO.UTxO> // UTxOs created by this transaction
+  readonly updatedUtxos: ReadonlyArray<CoreUTxO.UTxO> // Available UTxOs for next transaction (original - spent + new)
+  readonly spentUtxos: ReadonlyArray<CoreUTxO.UTxO> // UTxOs consumed by this transaction
 }
 ```
 
@@ -692,7 +692,7 @@ export interface Evaluator {
    */
   evaluate: (
     tx: string,
-    additionalUtxos: ReadonlyArray<UTxO.UTxO> | undefined,
+    additionalUtxos: ReadonlyArray<CoreUTxO.UTxO> | undefined,
     context: EvaluationContext
   ) => Effect.Effect<ReadonlyArray<EvalRedeemer>, EvaluationError>
 }
@@ -732,18 +732,18 @@ Contains all state needed during transaction construction.
 
 ```ts
 export interface TxBuilderState {
-  readonly selectedUtxos: ReadonlyArray<UTxO.UTxO> // SDK type: Array for ordering, converted at build
-  readonly outputs: ReadonlyArray<UTxO.TxOutput> // Transaction outputs (no txHash/outputIndex yet)
+  readonly selectedUtxos: ReadonlyArray<CoreUTxO.UTxO> // Core UTxO type
+  readonly outputs: ReadonlyArray<TxOut.TransactionOutput> // Transaction outputs (no txHash/outputIndex yet)
   readonly scripts: Map<string, CoreScript.Script> // Scripts attached to the transaction
-  readonly totalOutputAssets: Assets.Assets // Asset totals for balancing
-  readonly totalInputAssets: Assets.Assets // Asset totals for balancing
+  readonly totalOutputAssets: CoreAssets.Assets // Asset totals for balancing
+  readonly totalInputAssets: CoreAssets.Assets // Asset totals for balancing
   readonly redeemers: Map<string, RedeemerData> // Redeemer data for script inputs
-  readonly referenceInputs: ReadonlyArray<UTxO.UTxO> // Reference inputs (UTxOs with reference scripts)
+  readonly referenceInputs: ReadonlyArray<CoreUTxO.UTxO> // Reference inputs (UTxOs with reference scripts)
   readonly collateral?: {
     // Collateral data for script transactions
-    readonly inputs: ReadonlyArray<UTxO.UTxO>
+    readonly inputs: ReadonlyArray<CoreUTxO.UTxO>
     readonly totalAmount: bigint
-    readonly returnOutput?: UTxO.TxOutput // Optional: only if there are leftover assets
+    readonly returnOutput?: TxOut.TransactionOutput // Optional: only if there are leftover assets
   }
 }
 ```
@@ -915,7 +915,7 @@ export interface BuildOptions {
    *
    * @since 2.0.0
    */
-  readonly availableUtxos?: ReadonlyArray<UTxO.UTxO>
+  readonly availableUtxos?: ReadonlyArray<CoreUTxO.UTxO>
 
   /**
    * # Change Handling Strategy Matrix
@@ -1030,7 +1030,7 @@ export interface BuildOptions {
    *
    * @since 2.0.0
    */
-  readonly slotConfig?: SlotConfig
+  readonly slotConfig?: Time.SlotConfig.SlotConfig
 
   /**
    * Amount to set as collateral return output (in lovelace).

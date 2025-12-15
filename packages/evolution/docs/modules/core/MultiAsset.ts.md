@@ -1,6 +1,6 @@
 ---
 title: core/MultiAsset.ts
-nav_order: 74
+nav_order: 75
 parent: Modules
 ---
 
@@ -87,7 +87,7 @@ Create a MultiAsset from a single asset.
 export declare const singleton: (
   policyId: PolicyId.PolicyId,
   assetName: AssetName.AssetName,
-  amount: PositiveCoin.PositiveCoin
+  amount: bigint
 ) => MultiAsset
 ```
 
@@ -137,9 +137,15 @@ Added in v2.0.0
 
 Schema for MultiAsset representing native assets.
 
+This is a **base type** with no constraints on size or values.
+It supports arithmetic operations (merge, subtract, negate) which may
+produce empty maps or negative quantities during intermediate calculations.
+
+Constraints (non-empty, positive values) are applied at boundaries
+like `TransactionOutput` where CDDL requires `multiasset<positive_coin>`.
+
 ```
-multiasset<a0> = {+ policy_id => {+ asset_name => a0}}
-case: multiasset<positive_coin> = {+ policy_id => {+ asset_name => positive_coin}}
+multiasset<a0> = {* policy_id => {* asset_name => a0}}
 ```
 
 **Signature**
@@ -268,14 +274,23 @@ Added in v2.0.0
 
 ## AssetMap
 
-Schema for inner asset map (asset_name => positive_coin).
+Schema for inner asset map (asset_name => bigint).
+
+This is a **base type** with no constraints. Values can be positive,
+negative, or zero to support arithmetic operations.
+
+Constraints (positive values) are applied at boundaries like
+`TransactionOutput` where CDDL requires positive_coin.
 
 **Signature**
 
 ```ts
-export declare const AssetMap: Schema.refine<
-  Map<AssetName.AssetName, bigint>,
-  Schema.Map$<typeof AssetName.AssetName, Schema.refine<bigint, typeof Schema.BigInt>>
+export declare const AssetMap: Schema.transform<
+  Schema.Array$<Schema.Tuple2<typeof AssetName.AssetName, typeof Schema.BigInt>>,
+  Schema.MapFromSelf<
+    Schema.SchemaClass<AssetName.AssetName, AssetName.AssetName, never>,
+    Schema.SchemaClass<bigint, bigint, never>
+  >
 >
 ```
 
@@ -378,7 +393,7 @@ export declare const addAsset: (
   multiAsset: MultiAsset,
   policyId: PolicyId.PolicyId,
   assetName: AssetName.AssetName,
-  amount: PositiveCoin.PositiveCoin
+  amount: bigint
 ) => MultiAsset
 ```
 

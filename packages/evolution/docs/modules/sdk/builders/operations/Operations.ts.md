@@ -1,6 +1,6 @@
 ---
 title: sdk/builders/operations/Operations.ts
-nav_order: 148
+nav_order: 154
 parent: Modules
 ---
 
@@ -37,7 +37,7 @@ export interface CollectFromParams {
 
 ```ts
 export interface MintTokensParams {
-  readonly assets: Assets.Assets // Mandatory: Tokens to mint (excluding lovelace)
+  readonly assets: CoreAssets.Assets // Mandatory: Tokens to mint (excluding lovelace)
   readonly redeemer?: string // Optional: Redeemer for minting script
 }
 ```
@@ -49,7 +49,7 @@ export interface MintTokensParams {
 ```ts
 export interface PayToAddressParams {
   readonly address: Address.Address // Mandatory: Recipient address
-  readonly assets: Assets.Assets // Mandatory: ADA and/or native tokens to send
+  readonly assets: CoreAssets.Assets // Mandatory: ADA and/or native tokens to send
   readonly datum?: Datum.Datum // Optional: Datum to attach for script addresses
   readonly scriptRef?: Script.Script // Optional: Reference script to attach
 }

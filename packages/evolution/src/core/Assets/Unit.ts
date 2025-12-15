@@ -34,23 +34,6 @@ export interface UnitDetails {
  *
  * @since 2.0.0
  * @category conversions
- * @example
- * ```typescript
- * import * as Unit from "@evolution-sdk/core/Assets/Unit"
- *
- * // NFT with CIP-67 label 222
- * const details = Unit.fromUnit("a0b1c2...policyId...000de140...name...")
- * // => {
- * //   policyId: PolicyId,
- * //   assetName: AssetName,
- * //   name: AssetName (without label),
- * //   label: 222
- * // }
- *
- * // Regular token without label
- * const token = Unit.fromUnit("a0b1c2...policyId...tokenName")
- * // => { policyId, assetName, name, label: null }
- * ```
  */
 export const fromUnit = (unit: Unit): UnitDetails => {
   const policyIdHex = unit.slice(0, 56)
@@ -104,22 +87,6 @@ export const fromUnit = (unit: Unit): UnitDetails => {
  * @category conversions
  * @throws {Error} If asset name exceeds 32 bytes
  * @throws {Error} If policy ID is invalid length
- * @example
- * ```typescript
- * import * as Unit from "@evolution-sdk/core/Assets/Unit"
- *
- * // With CIP-67 label
- * const unit = Unit.toUnit(policyId, "name", 222)
- * // => "policyId" + "000de140" + "name"
- *
- * // Without label
- * const simple = Unit.toUnit(policyId, "tokenName")
- * // => "policyId" + "tokenName"
- *
- * // Policy only (no asset name)
- * const policyOnly = Unit.toUnit(policyId)
- * // => "policyId"
- * ```
  */
 export const toUnit = (
   policyId: PolicyId.PolicyId,

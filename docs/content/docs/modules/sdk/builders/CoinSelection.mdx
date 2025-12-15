@@ -1,6 +1,6 @@
 ---
 title: sdk/builders/CoinSelection.ts
-nav_order: 144
+nav_order: 150
 parent: Modules
 ---
 
@@ -83,7 +83,7 @@ export declare class CoinSelectionError
 ```ts
 export type CoinSelectionFunction = (
   availableUtxos: ReadonlyArray<UTxO.UTxO>,
-  requiredAssets: Assets.Assets
+  requiredAssets: CoreAssets.Assets
 ) => CoinSelectionResult
 ```
 

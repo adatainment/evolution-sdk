@@ -1,6 +1,6 @@
 ---
 title: core/message-signing/Label.ts
-nav_order: 69
+nav_order: 70
 parent: Modules
 ---
 

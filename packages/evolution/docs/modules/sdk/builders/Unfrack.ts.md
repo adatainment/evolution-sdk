@@ -1,6 +1,6 @@
 ---
 title: sdk/builders/Unfrack.ts
-nav_order: 166
+nav_order: 172
 parent: Modules
 ---
 
@@ -75,10 +75,10 @@ This ensures all outputs are always valid.
 ```ts
 export declare const createUnfrackedChangeOutputs: (
   changeAddress: string,
-  changeAssets: Assets.Assets,
+  changeAssets: CoreAssets.Assets,
   options: UnfrackOptions | undefined,
   coinsPerUtxoByte: bigint
-) => Effect.Effect<ReadonlyArray<UTxO.TxOutput>, Error, never>
+) => Effect.Effect<ReadonlyArray<TxOut.TransactionOutput>, Error, never>
 ```
 
 Added in v2.0.0
@@ -124,7 +124,7 @@ export type UnfrackResult = {
   /**
    * The change outputs if unfrack was affordable, undefined otherwise
    */
-  changeOutputs?: ReadonlyArray<UTxO.TxOutput>
+  changeOutputs?: ReadonlyArray<TxOut.TransactionOutput>
   /**
    * Total minimum lovelace required for all outputs
    * This is the sum of minUTxO for all N outputs
@@ -169,7 +169,7 @@ Extract tokens from assets
 **Signature**
 
 ```ts
-export declare const extractTokens: (assets: Assets.Assets) => ReadonlyArray<TokenInfo>
+export declare const extractTokens: (assets: CoreAssets.Assets) => ReadonlyArray<TokenInfo>
 ```
 
 ## groupByPolicy

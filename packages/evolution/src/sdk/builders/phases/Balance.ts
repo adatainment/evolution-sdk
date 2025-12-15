@@ -123,7 +123,8 @@ export const executeBalance = (): Effect.Effect<
     }
 
     // Step 4: Not balanced - check for native assets in delta (shouldn't happen)
-    const hasNativeAssets = CoreAssets.getUnits(delta).length > 0
+    // getUnits always includes "lovelace" at index 0, so length > 1 means native assets present
+    const hasNativeAssets = CoreAssets.getUnits(delta).length > 1
     if (hasNativeAssets) {
       return yield* Effect.fail(
         new TransactionBuilderError({

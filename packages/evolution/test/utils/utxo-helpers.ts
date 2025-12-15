@@ -252,10 +252,10 @@ export type CreateCoreTestUtxoOptions = {
    */
   nativeAssets?: Record<string, bigint>
   /**
-   * The output index. Defaults to 0.
+   * The output index. Defaults to 0. Accepts both number and bigint.
    * @default 0
    */
-  index?: number
+  index?: number | bigint
   /**
    * The transaction hash (64 hex chars). Defaults to 64 zeros.
    * @default "0".repeat(64)
@@ -288,11 +288,14 @@ export type CreateCoreTestUtxoOptions = {
 export const createCoreTestUtxo = (options: CreateCoreTestUtxoOptions): CoreUTxO.UTxO => {
   const {
     address = DEFAULT_TEST_ADDRESS,
-    index = 0,
+    index: rawIndex = 0,
     lovelace,
     nativeAssets,
     transactionId = "0".repeat(64)
   } = options
+  
+  // Convert bigint to number if needed
+  const index = typeof rawIndex === "bigint" ? Number(rawIndex) : rawIndex
 
   // Ensure transactionId is 64 hex characters
   const paddedTxId = transactionId.length === 64 && /^[0-9a-fA-F]+$/.test(transactionId)

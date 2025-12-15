@@ -1,8 +1,9 @@
 import { describe, expect, it } from "@effect/vitest"
 
-import * as Assets from "../src/sdk/Assets.js"
+import * as CoreAssets from "../src/core/Assets/index.js"
+import * as CoreUTxO from "../src/core/UTxO.js"
 import { makeTxBuilder } from "../src/sdk/builders/TransactionBuilder.js"
-import type * as UTxO from "../src/sdk/UTxO.js"
+import { createCoreTestUtxo } from "./utils/utxo-helpers.js"
 
 const PROTOCOL_PARAMS = {
   minFeeCoefficient: 44n,
@@ -24,9 +25,9 @@ const POLICY_A = "a".repeat(56)
 const POLICY_B = "b".repeat(56)
 const POLICY_C = "c".repeat(56)
 
-const token1 = `${POLICY_A}${toHex("TOKEN1")}`
-const token2 = `${POLICY_B}${toHex("TOKEN2")}`
-const token3 = `${POLICY_C}${toHex("TOKEN3")}`
+const _token1 = `${POLICY_A}${toHex("TOKEN1")}`
+const _token2 = `${POLICY_B}${toHex("TOKEN2")}`
+const _token3 = `${POLICY_C}${toHex("TOKEN3")}`
 
 // ============================================================================
 // TEST SUITE: Unfrack Change Handling Integration
@@ -35,26 +36,27 @@ const token3 = `${POLICY_C}${toHex("TOKEN3")}`
 describe("TxBuilder: Unfrack Change Handling Integration", () => {
   describe("Re-selection when token bundles unaffordable", () => {
     it("should trigger re-selection and add more UTxOs when initial funds insufficient for token bundles", async () => {
-      const initialUtxo: UTxO.UTxO = {
-        txHash: "a".repeat(64),
-        outputIndex: 0,
+      // Build initial UTxO with tokens
+      let initialAssets = CoreAssets.fromLovelace(1_000_000n)
+      initialAssets = CoreAssets.addByHex(initialAssets, POLICY_A, toHex("TOKEN1"), 100n)
+      initialAssets = CoreAssets.addByHex(initialAssets, POLICY_B, toHex("TOKEN2"), 200n)
+      initialAssets = CoreAssets.addByHex(initialAssets, POLICY_C, toHex("TOKEN3"), 300n)
+      const initialUtxoBase = createCoreTestUtxo({
+        transactionId: "a".repeat(64),
+        index: 0,
         address: CHANGE_ADDRESS,
-        assets: {
-          lovelace: 1_000_000n,
-          [token1]: 100n,
-          [token2]: 200n,
-          [token3]: 300n
-        }
-      }
+        lovelace: 1_000_000n
+      })
+      const initialUtxo = new CoreUTxO.UTxO({ ...initialUtxoBase, assets: initialAssets })
 
       // Additional UTxOs available for re-selection
-      const additionalUtxos: Array<UTxO.UTxO> = [
-        {
-          txHash: "b".repeat(64),
-          outputIndex: 0,
+      const additionalUtxos: Array<CoreUTxO.UTxO> = [
+        createCoreTestUtxo({
+          transactionId: "b".repeat(64),
+          index: 0,
           address: CHANGE_ADDRESS,
-          assets: { lovelace: 2_000_000n } // 2 ADA to make bundles affordable
-        }
+          lovelace: 2_000_000n // 2 ADA to make bundles affordable
+        })
       ]
 
       const builder = makeTxBuilder({
@@ -62,7 +64,7 @@ describe("TxBuilder: Unfrack Change Handling Integration", () => {
         .collectFrom({ inputs: [initialUtxo] })
         .payToAddress({
           address: DESTINATION_ADDRESS,
-          assets: Assets.fromLovelace(100_000n) // Small payment to maximize leftover
+          assets: CoreAssets.fromLovelace(100_000n) // Small payment to maximize leftover
         })
 
       const signBuilder = await builder.build({
@@ -114,22 +116,22 @@ describe("TxBuilder: Unfrack Change Handling Integration", () => {
 
   describe("Immediate fallback to single output when bundles unaffordable", () => {
     it("should fall back to single change output without reselection when bundles barely unaffordable", async () => {
-      const initialUtxo: UTxO.UTxO = {
-        txHash: "c".repeat(64),
-        outputIndex: 0,
+      let initialAssets = CoreAssets.fromLovelace(1_500_000n)
+      initialAssets = CoreAssets.addByHex(initialAssets, POLICY_A, toHex("TOKEN1"), 100n)
+      initialAssets = CoreAssets.addByHex(initialAssets, POLICY_B, toHex("TOKEN2"), 200n)
+      initialAssets = CoreAssets.addByHex(initialAssets, POLICY_C, toHex("TOKEN3"), 300n)
+      const initialUtxoBase = createCoreTestUtxo({
+        transactionId: "c".repeat(64),
+        index: 0,
         address: CHANGE_ADDRESS,
-        assets: {
-          lovelace: 1_500_000n,
-          [token1]: 100n,
-          [token2]: 200n,
-          [token3]: 300n
-        }
-      }
+        lovelace: 1_500_000n
+      })
+      const initialUtxo = new CoreUTxO.UTxO({ ...initialUtxoBase, assets: initialAssets })
 
       // Add tiny UTxOs that won't help (testing that no reselection occurs)
-      const tinyUtxos: Array<UTxO.UTxO> = [
-        { txHash: "d".repeat(64), outputIndex: 0, address: CHANGE_ADDRESS, assets: { lovelace: 100_000n } },
-        { txHash: "e".repeat(64), outputIndex: 0, address: CHANGE_ADDRESS, assets: { lovelace: 100_000n } }
+      const tinyUtxos: Array<CoreUTxO.UTxO> = [
+        createCoreTestUtxo({ transactionId: "d".repeat(64), index: 0, address: CHANGE_ADDRESS, lovelace: 100_000n }),
+        createCoreTestUtxo({ transactionId: "e".repeat(64), index: 0, address: CHANGE_ADDRESS, lovelace: 100_000n })
       ]
 
       const builder = makeTxBuilder({
@@ -137,7 +139,7 @@ describe("TxBuilder: Unfrack Change Handling Integration", () => {
         .collectFrom({ inputs: [initialUtxo] })
         .payToAddress({
           address: DESTINATION_ADDRESS,
-          assets: Assets.fromLovelace(100_000n)
+          assets: CoreAssets.fromLovelace(100_000n)
         })
 
       const signBuilder = await builder.build({
@@ -185,25 +187,24 @@ describe("TxBuilder: Unfrack Change Handling Integration", () => {
 
   describe("Error handling: Tokens + insufficient lovelace", () => {
     it("should throw clear error when tokens present but change below minUTxO and no UTxOs available", async () => {
-
-      const initialUtxo: UTxO.UTxO = {
-        txHash: "g".repeat(64),
-        outputIndex: 0,
+      let initialAssets = CoreAssets.fromLovelace(500_000n)
+      initialAssets = CoreAssets.addByHex(initialAssets, POLICY_A, toHex("TOKEN1"), 100n)
+      initialAssets = CoreAssets.addByHex(initialAssets, POLICY_B, toHex("TOKEN2"), 200n)
+      initialAssets = CoreAssets.addByHex(initialAssets, POLICY_C, toHex("TOKEN3"), 300n)
+      const initialUtxoBase = createCoreTestUtxo({
+        transactionId: "1".repeat(64),
+        index: 0,
         address: CHANGE_ADDRESS,
-        assets: {
-          lovelace: 500_000n,
-          [token1]: 100n,
-          [token2]: 200n,
-          [token3]: 300n
-        }
-      }
+        lovelace: 500_000n
+      })
+      const initialUtxo = new CoreUTxO.UTxO({ ...initialUtxoBase, assets: initialAssets })
 
       const builder = makeTxBuilder({
       })
         .collectFrom({ inputs: [initialUtxo] })
         .payToAddress({
           address: DESTINATION_ADDRESS,
-          assets: Assets.fromLovelace(200_000n)
+          assets: CoreAssets.fromLovelace(200_000n)
         })
 
       // Expect build to throw error
@@ -225,24 +226,24 @@ describe("TxBuilder: Unfrack Change Handling Integration", () => {
 
   describe("Subdivision strategy when remaining ADA above threshold", () => {
     it("should create separate ADA output when remaining above subdivideThreshold", async () => {
-      const initialUtxo: UTxO.UTxO = {
-        txHash: "1".repeat(64),
-        outputIndex: 0,
+      let initialAssets = CoreAssets.fromLovelace(4_100_000n)
+      initialAssets = CoreAssets.addByHex(initialAssets, POLICY_A, toHex("TOKEN1"), 100n)
+      initialAssets = CoreAssets.addByHex(initialAssets, POLICY_B, toHex("TOKEN2"), 200n)
+      initialAssets = CoreAssets.addByHex(initialAssets, POLICY_C, toHex("TOKEN3"), 300n)
+      const initialUtxoBase = createCoreTestUtxo({
+        transactionId: "2".repeat(64),
+        index: 0,
         address: CHANGE_ADDRESS,
-        assets: {
-          lovelace: 4_100_000n,
-          [token1]: 100n,
-          [token2]: 200n,
-          [token3]: 300n
-        }
-      }
+        lovelace: 4_100_000n
+      })
+      const initialUtxo = new CoreUTxO.UTxO({ ...initialUtxoBase, assets: initialAssets })
 
       const builder = makeTxBuilder({
       })
         .collectFrom({ inputs: [initialUtxo] })
         .payToAddress({
           address: DESTINATION_ADDRESS,
-          assets: Assets.fromLovelace(2_000_000n)
+          assets: CoreAssets.fromLovelace(2_000_000n)
         })
 
       const signBuilder = await builder.build({
@@ -266,24 +267,24 @@ describe("TxBuilder: Unfrack Change Handling Integration", () => {
 
   describe("Spread strategy when remaining ADA below threshold", () => {
     it("should spread remaining lovelace across token bundles when below subdivideThreshold", async () => {
-      const initialUtxo: UTxO.UTxO = {
-        txHash: "3".repeat(64),
-        outputIndex: 0,
+      let initialAssets = CoreAssets.fromLovelace(3_000_000n)
+      initialAssets = CoreAssets.addByHex(initialAssets, POLICY_A, toHex("TOKEN1"), 100n)
+      initialAssets = CoreAssets.addByHex(initialAssets, POLICY_B, toHex("TOKEN2"), 200n)
+      initialAssets = CoreAssets.addByHex(initialAssets, POLICY_C, toHex("TOKEN3"), 300n)
+      const initialUtxoBase = createCoreTestUtxo({
+        transactionId: "3".repeat(64),
+        index: 0,
         address: CHANGE_ADDRESS,
-        assets: {
-          lovelace: 3_000_000n,
-          [token1]: 100n,
-          [token2]: 200n,
-          [token3]: 300n
-        }
-      }
+        lovelace: 3_000_000n
+      })
+      const initialUtxo = new CoreUTxO.UTxO({ ...initialUtxoBase, assets: initialAssets })
 
       const builder = makeTxBuilder({
       })
         .collectFrom({ inputs: [initialUtxo] })
         .payToAddress({
           address: DESTINATION_ADDRESS,
-          assets: Assets.fromLovelace(1_200_000n)
+          assets: CoreAssets.fromLovelace(1_200_000n)
         })
 
       const signBuilder = await builder.build({
@@ -307,21 +308,19 @@ describe("TxBuilder: Unfrack Change Handling Integration", () => {
 
   describe("DrainTo fallback when change below minUTxO", () => {
     it("should drain leftover into specified output when change unaffordable", async () => {
-      const initialUtxo: UTxO.UTxO = {
-        txHash: "6".repeat(64),
-        outputIndex: 0,
+      const initialUtxo = createCoreTestUtxo({
+        transactionId: "6".repeat(64),
+        index: 0,
         address: CHANGE_ADDRESS,
-        assets: {
-          lovelace: 350_000n
-        }
-      }
+        lovelace: 350_000n
+      })
 
       const builder = makeTxBuilder({
       })
         .collectFrom({ inputs: [initialUtxo] })
         .payToAddress({
           address: DESTINATION_ADDRESS,
-          assets: Assets.fromLovelace(100_000n)
+          assets: CoreAssets.fromLovelace(100_000n)
         })
 
       const signBuilder = await builder.build({
@@ -347,21 +346,19 @@ describe("TxBuilder: Unfrack Change Handling Integration", () => {
 
   describe("Burn fallback when change below minUTxO", () => {
     it("should burn leftover as extra fee when change unaffordable and no drainTo", async () => {
-      const initialUtxo: UTxO.UTxO = {
-        txHash: "7".repeat(64),
-        outputIndex: 0,
+      const initialUtxo = createCoreTestUtxo({
+        transactionId: "7".repeat(64),
+        index: 0,
         address: CHANGE_ADDRESS,
-        assets: {
-          lovelace: 350_000n
-        }
-      }
+        lovelace: 350_000n
+      })
 
       const builder = makeTxBuilder({
       })
         .collectFrom({ inputs: [initialUtxo] })
         .payToAddress({
           address: DESTINATION_ADDRESS,
-          assets: Assets.fromLovelace(100_000n)
+          assets: CoreAssets.fromLovelace(100_000n)
         })
 
       const signBuilder = await builder.build({

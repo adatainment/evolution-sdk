@@ -62,10 +62,10 @@ export const extractTokens = (assets: CoreAssets.Assets): ReadonlyArray<TokenInf
     // Skip lovelace
     if (unit === "lovelace") continue
     
-    // Parse policy ID and asset name from "policyId.assetName" format
-    const dotIndex = unit.indexOf(".")
-    const policyId = dotIndex === -1 ? unit : unit.slice(0, dotIndex)
-    const assetName = dotIndex === -1 ? "" : unit.slice(dotIndex + 1)
+    // Parse policy ID and asset name from unit
+    // PolicyId is always 56 hex characters (28 bytes), asset name is the rest
+    const policyId = unit.slice(0, 56)
+    const assetName = unit.slice(56)
     const quantity = CoreAssets.getByUnit(assets, unit)
     
     // Simple heuristic: NFTs typically have quantity of 1

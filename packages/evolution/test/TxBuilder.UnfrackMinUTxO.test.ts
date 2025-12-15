@@ -1,10 +1,10 @@
 import { describe, expect, it } from "@effect/vitest"
 
 import * as Address from "../src/core/Address.js"
-import * as Assets from "../src/sdk/Assets.js"
+import * as CoreAssets from "../src/core/Assets/index.js"
 import type { TxBuilderConfig } from "../src/sdk/builders/TransactionBuilder.js"
 import { makeTxBuilder } from "../src/sdk/builders/TransactionBuilder.js"
-import type * as UTxO from "../src/sdk/UTxO.js"
+import { createCoreTestUtxo } from "./utils/utxo-helpers.js"
 
 // Test configuration
 const PROTOCOL_PARAMS = {
@@ -56,33 +56,31 @@ describe.concurrent("TxBuilder - Unfrack MinUTxO", () => {
    */
   it("should trigger reselection to satisfy native asset minUTxO requirement with unfrack", async () => {
     // Arrange: Multiple UTxOs with various tokens for unfrack bundling
-    const utxo1: UTxO.UTxO = {
-      txHash: "a".repeat(64),
-      outputIndex: 0,
+    const utxo1 = createCoreTestUtxo({
+      transactionId: "a".repeat(64),
+      index: 0,
       address: CHANGE_ADDRESS,
-      assets: {
-        lovelace: 2_400_000n, // 2.4 ADA - insufficient for unfrack bundles
+      lovelace: 2_400_000n, // 2.4 ADA - insufficient for unfrack bundles
+      nativeAssets: {
         [`${POLICY_ID}544f4b454e31`]: 1n, // TOKEN1
         [`${POLICY_ID}544f4b454e32`]: 1n, // TOKEN2
         [`${POLICY_ID}544f4b454e33`]: 1n, // TOKEN3
         [`${POLICY_ID}544f4b454e34`]: 1n, // TOKEN4
         [`${POLICY_ID}544f4b454e35`]: 1n  // TOKEN5
       }
-    }
+    })
 
-    const utxo2: UTxO.UTxO = {
-      txHash: "b".repeat(64),
-      outputIndex: 0,
+    const utxo2 = createCoreTestUtxo({
+      transactionId: "b".repeat(64),
+      index: 0,
       address: CHANGE_ADDRESS,
-      assets: {
-        lovelace: 1_500_000n // 1.5 ADA - provides additional lovelace for unfrack minUTxO
-      }
-    }
+      lovelace: 1_500_000n // 1.5 ADA - provides additional lovelace for unfrack minUTxO
+    })
 
     const builder = makeTxBuilder(baseConfig)
       .payToAddress({
         address: RECIPIENT_ADDRESS,
-        assets: Assets.fromLovelace(2_000_000n) // 2.0 ADA only
+        assets: CoreAssets.fromLovelace(2_000_000n) // 2.0 ADA only
       })
 
     // Act: Build transaction with unfrack enabled
@@ -137,12 +135,12 @@ describe.concurrent("TxBuilder - Unfrack MinUTxO", () => {
   it("should revalidate minUTxO when reselected UTxO adds more native assets with unfrack", async () => {
     // Arrange: First UTxO with 8 tokens, second UTxO with 7 more tokens (total 15)
     // With bundleSize=5, this requires 3 bundles (5+5+5)
-    const utxo1: UTxO.UTxO = {
-      txHash: "a".repeat(64),
-      outputIndex: 0,
+    const utxo1 = createCoreTestUtxo({
+      transactionId: "a".repeat(64),
+      index: 0,
       address: CHANGE_ADDRESS,
-      assets: {
-        lovelace: 2_400_000n, // 2.4 ADA
+      lovelace: 2_400_000n, // 2.4 ADA
+      nativeAssets: {
         [`${POLICY_ID}544f4b454e30`]: 1n, // TOKEN0
         [`${POLICY_ID}544f4b454e31`]: 1n, // TOKEN1
         [`${POLICY_ID}544f4b454e32`]: 1n, // TOKEN2
@@ -152,37 +150,35 @@ describe.concurrent("TxBuilder - Unfrack MinUTxO", () => {
         [`${POLICY_ID}544f4b454e36`]: 1n, // TOKEN6
         [`${POLICY_ID}544f4b454e37`]: 1n  // TOKEN7
       }
-    }
+    })
 
-    const utxo2: UTxO.UTxO = {
-      txHash: "b".repeat(64),
-      outputIndex: 0,
+    const utxo2 = createCoreTestUtxo({
+      transactionId: "b".repeat(64),
+      index: 0,
       address: CHANGE_ADDRESS,
-      assets: {
-        lovelace: 1_000_000n, // 1.0 ADA - Adding 7 more tokens increases minUTxO requirement
-        [`${POLICY_ID}544f4b454e38`]: 1n,  // TOKEN8
-        [`${POLICY_ID}544f4b454e39`]: 1n,  // TOKEN9
-        [`${POLICY_ID}544f4b454e41`]: 1n,  // TOKENA
-        [`${POLICY_ID}544f4b454e42`]: 1n,  // TOKENB
-        [`${POLICY_ID}544f4b454e43`]: 1n,  // TOKENC
-        [`${POLICY_ID}544f4b454e44`]: 1n,  // TOKEND
-        [`${POLICY_ID}544f4b454e45`]: 1n   // TOKENE
+      lovelace: 1_000_000n, // 1.0 ADA - Adding 7 more tokens increases minUTxO requirement
+      nativeAssets: {
+        [`${POLICY_ID}544f4b454e38`]: 1n, // TOKEN8
+        [`${POLICY_ID}544f4b454e39`]: 1n, // TOKEN9
+        [`${POLICY_ID}544f4b454e41`]: 1n, // TOKENA
+        [`${POLICY_ID}544f4b454e42`]: 1n, // TOKENB
+        [`${POLICY_ID}544f4b454e43`]: 1n, // TOKENC
+        [`${POLICY_ID}544f4b454e44`]: 1n, // TOKEND
+        [`${POLICY_ID}544f4b454e45`]: 1n  // TOKENE
       }
-    }
+    })
 
-    const utxo3: UTxO.UTxO = {
-      txHash: "c".repeat(64),
-      outputIndex: 0,
+    const utxo3 = createCoreTestUtxo({
+      transactionId: "c".repeat(64),
+      index: 0,
       address: CHANGE_ADDRESS,
-      assets: {
-        lovelace: 2_000_000n // 2.0 ADA - Extra lovelace to satisfy 3-bundle minUTxO (15 tokens / bundleSize=5)
-      }
-    }
+      lovelace: 2_000_000n // 2.0 ADA - Extra lovelace to satisfy 3-bundle minUTxO (15 tokens / bundleSize=5)
+    })
 
     const builder = makeTxBuilder(baseConfig)
       .payToAddress({
         address: RECIPIENT_ADDRESS,
-        assets: Assets.fromLovelace(2_000_000n)
+        assets: CoreAssets.fromLovelace(2_000_000n)
       })
 
     // Act: Build transaction with unfrack (bundleSize=5 → 3 bundles for 15 tokens)
@@ -234,20 +230,20 @@ describe.concurrent("TxBuilder - Unfrack MinUTxO", () => {
    * Validates drainTo behavior when leftover contains native assets.
    */
   it("should create proper change when leftover contains native assets (drainTo scenario)", async () => {
-    const utxo: UTxO.UTxO = {
-      txHash: "a".repeat(64),
-      outputIndex: 0,
+    const utxo = createCoreTestUtxo({
+      transactionId: "a".repeat(64),
+      index: 0,
       address: CHANGE_ADDRESS,
-      assets: {
-        lovelace: 3_000_000n, // 3.0 ADA - sufficient for outputs + fee + changeMinUTxO
+      lovelace: 3_000_000n, // 3.0 ADA - sufficient for outputs + fee + changeMinUTxO
+      nativeAssets: {
         [`${POLICY_ID}${ASSET_NAME_HEX}`]: 1n
       }
-    }
+    })
 
     const builder = makeTxBuilder(baseConfig)
       .payToAddress({
         address: RECIPIENT_ADDRESS,
-        assets: Assets.fromLovelace(2_000_000n)
+        assets: CoreAssets.fromLovelace(2_000_000n)
       })
 
     // Build with drainTo option
@@ -281,20 +277,20 @@ describe.concurrent("TxBuilder - Unfrack MinUTxO", () => {
    * to prevent accidental burning of user tokens.
    */
   it("should reject burnAsFee when leftover contains native assets", async () => {
-    const utxo: UTxO.UTxO = {
-      txHash: "a".repeat(64),
-      outputIndex: 0,
+    const utxo = createCoreTestUtxo({
+      transactionId: "a".repeat(64),
+      index: 0,
       address: CHANGE_ADDRESS,
-      assets: {
-        lovelace: 2_200_000n,
+      lovelace: 2_200_000n,
+      nativeAssets: {
         [`${POLICY_ID}${ASSET_NAME_HEX}`]: 1n
       }
-    }
+    })
 
     const builder = makeTxBuilder(baseConfig)
       .payToAddress({
         address: RECIPIENT_ADDRESS,
-        assets: Assets.fromLovelace(2_000_000n)
+        assets: CoreAssets.fromLovelace(2_000_000n)
       })
 
     // Try with burnAsFee - should fail because of native assets

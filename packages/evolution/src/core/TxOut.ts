@@ -31,7 +31,11 @@ const decScriptRef = ParseResult.decodeUnknownEither(ScriptRef.FromCDDL)
  */
 export class TransactionOutput extends Schema.TaggedClass<TransactionOutput>()("TransactionOutput", {
   address: Address.Address,
-  assets: Assets.Assets, // 1
+  assets: Assets.Assets.pipe(
+    Schema.filter(Assets.allPositive, {
+      message: () => "Transaction output assets must have non-negative lovelace and positive token quantities"
+    })
+  ),
   datumOption: Schema.optional(DatumOption.DatumOptionSchema), // 2
   scriptRef: Schema.optional(ScriptRef.ScriptRef) // 3
 }) {

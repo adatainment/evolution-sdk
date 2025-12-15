@@ -5,22 +5,23 @@ import * as CBOR from "../CBOR.js"
 import * as Coin from "../Coin.js"
 import * as MultiAsset from "../MultiAsset.js"
 import * as PolicyId from "../PolicyId.js"
-import * as PositiveCoin from "../PositiveCoin.js"
+
 
 /**
  * Assets representing both ADA and native tokens.
  *
- * This is a simplified, unified structure where:
- * - `coin` always represents the ADA/Lovelace amount
- * - `multiAsset` optionally contains native tokens
+ * This is a **base type** with no constraints on values.
+ * Lovelace and token quantities can be positive, negative, or zero
+ * to support arithmetic operations (merge, subtract, negate).
  *
- * CDDL spec: `value = coin / [coin, multiasset<positive_coin>]`
+ * Constraints (positive values) are applied at boundaries like
+ * `TransactionOutput` where CDDL requires `value = coin / [coin, multiasset<positive_coin>]`.
  *
  * @since 2.0.0
  * @category model
  */
 export class Assets extends Schema.Class<Assets>("Assets")({
-  lovelace: Coin.Coin,
+  lovelace: Schema.BigInt,
   multiAsset: Schema.optional(MultiAsset.MultiAsset)
 }) {
   toJSON() {
@@ -60,7 +61,7 @@ export class Assets extends Schema.Class<Assets>("Assets")({
  * @since 2.0.0
  * @category constructors
  */
-export const fromLovelace = (lovelace: Coin.Coin): Assets => new Assets({ lovelace })
+export const fromLovelace = (lovelace: bigint): Assets => new Assets({ lovelace })
 
 /**
  * Create Assets containing ADA and native tokens.
@@ -68,7 +69,7 @@ export const fromLovelace = (lovelace: Coin.Coin): Assets => new Assets({ lovela
  * @since 2.0.0
  * @category constructors
  */
-export const withMultiAsset = (lovelace: Coin.Coin, multiAsset: MultiAsset.MultiAsset): Assets =>
+export const withMultiAsset = (lovelace: bigint, multiAsset: MultiAsset.MultiAsset): Assets =>
   new Assets({ lovelace, multiAsset })
 
 /**
@@ -80,8 +81,8 @@ export const withMultiAsset = (lovelace: Coin.Coin, multiAsset: MultiAsset.Multi
 export const fromAsset = (
   policyId: PolicyId.PolicyId,
   assetName: AssetName.AssetName,
-  quantity: PositiveCoin.PositiveCoin,
-  lovelace: Coin.Coin = 0n
+  quantity: bigint,
+  lovelace: bigint = 0n
 ): Assets => {
   const assetMap = new Map([[assetName, quantity]])
   const multiAsset = new MultiAsset.MultiAsset({ map: new Map([[policyId, assetMap]]) })
@@ -97,7 +98,7 @@ export const fromAsset = (
 export const fromUnit = (
   unit: string,
   quantity: bigint,
-  lovelace: Coin.Coin = 0n
+  lovelace: bigint = 0n
 ): Eff.Effect<Assets, Error> =>
   Eff.gen(function* () {
     // Parse "policyId.assetName" or "policyId" (empty asset name)
@@ -115,7 +116,7 @@ export const fromUnit = (
       : new Uint8Array(0)
     const assetName = new AssetName.AssetName({ bytes: assetNameBytes })
     
-    return fromAsset(policyId, assetName, quantity as PositiveCoin.PositiveCoin, lovelace)
+    return fromAsset(policyId, assetName, quantity, lovelace)
   })
 
 /**
@@ -129,19 +130,48 @@ export const fromHexStrings = (
   policyIdHex: string,
   assetNameHex: string,
   quantity: bigint,
-  lovelace: Coin.Coin = 0n
+  lovelace: bigint = 0n
 ): Assets => {
-  // Decode policy ID from hex (28 bytes = 56 hex chars)
-  const policyIdBytes = new Uint8Array(Buffer.from(policyIdHex, "hex"))
-  const policyId = new PolicyId.PolicyId({ hash: policyIdBytes })
+  // Use schema-validated parsers (will throw on invalid hex/length)
+  const policyId = PolicyId.fromHex(policyIdHex)
+  const assetName = AssetName.fromHex(assetNameHex)
   
-  // Decode asset name from hex (empty string yields empty bytes)
-  const assetNameBytes = assetNameHex 
-    ? new Uint8Array(Buffer.from(assetNameHex, "hex"))
-    : new Uint8Array(0)
-  const assetName = new AssetName.AssetName({ bytes: assetNameBytes })
+  return fromAsset(policyId, assetName, quantity, lovelace)
+}
+
+/**
+ * Create Assets from a record format (for convenience/testing).
+ * 
+ * Record format:
+ * - `lovelace`: bigint for ADA amount
+ * - `"<policyIdHex><assetNameHex>"`: bigint for native asset quantity
+ *   where policyId is exactly 56 hex chars and assetName is remaining hex chars
+ * 
+ * @example
+ * ```ts
+ * const assets = fromRecord({
+ *   lovelace: 5_000_000n,
+ *   "aabbcc...def456aabbccdd": 100n  // 56 char policyId hex + assetName hex
+ * })
+ * ```
+ *
+ * @since 2.0.0
+ * @category constructors
+ */
+export const fromRecord = (record: Record<string, bigint>): Assets => {
+  let result = fromLovelace(record.lovelace ?? 0n)
   
-  return fromAsset(policyId, assetName, quantity as PositiveCoin.PositiveCoin, lovelace)
+  for (const [key, value] of Object.entries(record)) {
+    if (key === "lovelace") continue
+    
+    // First 56 chars are policyId, rest is assetName
+    // Schema validation in addByHex will handle invalid inputs
+    const policyIdHex = key.slice(0, 56)
+    const assetNameHex = key.slice(56)
+    result = addByHex(result, policyIdHex, assetNameHex, value)
+  }
+  
+  return result
 }
 
 /**
@@ -162,7 +192,7 @@ export const zero: Assets = new Assets({ lovelace: 0n })
  * @since 2.0.0
  * @category inspection
  */
-export const lovelaceOf = (assets: Assets): Coin.Coin => assets.lovelace
+export const lovelaceOf = (assets: Assets): bigint => assets.lovelace
 
 /**
  * Check if Assets contains native tokens.
@@ -187,6 +217,30 @@ export const getMultiAsset = (assets: Assets): MultiAsset.MultiAsset | undefined
  * @category inspection
  */
 export const isZero = (assets: Assets): boolean => assets.lovelace === 0n && !hasMultiAsset(assets)
+
+/**
+ * Check if all quantities are positive (lovelace >= 0, tokens > 0).
+ * Used for validation at transaction output boundaries per CDDL:
+ * `value = coin / [coin, multiasset<positive_coin>]`
+ *
+ * @since 2.0.0
+ * @category inspection
+ */
+export const allPositive = (assets: Assets): boolean => {
+  // Lovelace must be non-negative
+  if (assets.lovelace < 0n) return false
+  
+  // All token quantities must be positive
+  if (assets.multiAsset) {
+    for (const [, assetMap] of assets.multiAsset.map.entries()) {
+      for (const [, quantity] of assetMap.entries()) {
+        if (quantity <= 0n) return false
+      }
+    }
+  }
+  
+  return true
+}
 
 /**
  * Get quantity of a specific asset.
@@ -244,7 +298,7 @@ export const tokens = (assets: Assets, policyId: PolicyId.PolicyId): Map<AssetNa
  * @category combining
  */
 export const merge = (a: Assets, b: Assets): Assets => {
-  const totalLovelace = Coin.add(a.lovelace, b.lovelace)
+  const totalLovelace = a.lovelace + b.lovelace
 
   // Both have no multiAsset
   if (!a.multiAsset && !b.multiAsset) {
@@ -282,7 +336,7 @@ export const add = (
   assetName: AssetName.AssetName,
   quantity: bigint
 ): Assets => {
-  const toAdd = fromAsset(policyId, assetName, quantity as PositiveCoin.PositiveCoin, 0n)
+  const toAdd = fromAsset(policyId, assetName, quantity, 0n)
   return merge(assets, toAdd)
 }
 
@@ -317,9 +371,9 @@ export const negate = (assets: Assets): Assets => {
 
   const negatedMap = new Map<PolicyId.PolicyId, MultiAsset.AssetMap>()
   for (const [policyId, assetMap] of assets.multiAsset.map.entries()) {
-    const negatedAssets = new Map<AssetName.AssetName, PositiveCoin.PositiveCoin>()
+    const negatedAssets = new Map<AssetName.AssetName, bigint>()
     for (const [assetName, quantity] of assetMap.entries()) {
-      negatedAssets.set(assetName, -quantity as PositiveCoin.PositiveCoin)
+      negatedAssets.set(assetName, -quantity)
     }
     negatedMap.set(policyId, negatedAssets)
   }
@@ -349,7 +403,7 @@ export const withoutLovelace = (assets: Assets): Assets => {
  * @since 2.0.0
  * @category combining
  */
-export const withLovelace = (assets: Assets, lovelace: Coin.Coin): Assets => {
+export const withLovelace = (assets: Assets, lovelace: bigint): Assets => {
   return new Assets({ lovelace, multiAsset: assets.multiAsset })
 }
 
@@ -359,7 +413,7 @@ export const withLovelace = (assets: Assets, lovelace: Coin.Coin): Assets => {
  * @since 2.0.0
  * @category combining
  */
-export const addLovelace = (assets: Assets, additionalLovelace: Coin.Coin): Assets => {
+export const addLovelace = (assets: Assets, additionalLovelace: bigint): Assets => {
   return new Assets({ lovelace: assets.lovelace + additionalLovelace, multiAsset: assets.multiAsset })
 }
 
@@ -369,7 +423,7 @@ export const addLovelace = (assets: Assets, additionalLovelace: Coin.Coin): Asse
  * @since 2.0.0
  * @category combining
  */
-export const subtractLovelace = (assets: Assets, lovelaceToSubtract: Coin.Coin): Assets => {
+export const subtractLovelace = (assets: Assets, lovelaceToSubtract: bigint): Assets => {
   return new Assets({ lovelace: assets.lovelace - lovelaceToSubtract, multiAsset: assets.multiAsset })
 }
 
@@ -402,7 +456,7 @@ export const filter = (assets: Assets, predicate: (unit: string, amount: bigint)
   const filteredMap = new Map<PolicyId.PolicyId, MultiAsset.AssetMap>()
   for (const [policyId, assetMap] of assets.multiAsset.map.entries()) {
     const policyIdHex = PolicyId.toHex(policyId)
-    const filteredAssets = new Map<AssetName.AssetName, PositiveCoin.PositiveCoin>()
+    const filteredAssets = new Map<AssetName.AssetName, bigint>()
     for (const [assetName, quantity] of assetMap.entries()) {
       const assetNameHex = AssetName.toHex(assetName)
       const unit = assetNameHex ? `${policyIdHex}.${assetNameHex}` : policyIdHex
@@ -507,9 +561,12 @@ export const getUnits = (assets: Assets): Array<string> => {
   if (assets.multiAsset) {
     for (const [policyId, assetMap] of assets.multiAsset.map.entries()) {
       const policyIdHex = PolicyId.toHex(policyId)
-      for (const [assetName] of assetMap.entries()) {
-        const assetNameHex = AssetName.toHex(assetName)
-        units.push(`${policyIdHex}${assetNameHex}`)
+      for (const [assetName, amount] of assetMap.entries()) {
+        // Only include units with non-zero amounts
+        if (amount !== 0n) {
+          const assetNameHex = AssetName.toHex(assetName)
+          units.push(`${policyIdHex}${assetNameHex}`)
+        }
       }
     }
   }
@@ -644,11 +701,10 @@ export const FromCDDL = Schema.transformOrFail(CDDLSchema, Schema.typeSchema(Ass
         for (const [policyIdBytes, assetMapCddl] of multiAssetCddl.entries()) {
           const policyId = yield* ParseResult.decode(PolicyId.FromBytes)(policyIdBytes)
 
-          const assetMap = new Map<AssetName.AssetName, PositiveCoin.PositiveCoin>()
+          const assetMap = new Map<AssetName.AssetName, bigint>()
           for (const [assetNameBytes, amount] of assetMapCddl.entries()) {
             const assetName = yield* ParseResult.decode(AssetName.FromBytes)(assetNameBytes)
-            const positiveCoin = yield* ParseResult.decodeUnknown(Schema.typeSchema(PositiveCoin.PositiveCoinSchema))(amount)
-            assetMap.set(assetName, positiveCoin)
+            assetMap.set(assetName, amount)
           }
 
           result.set(policyId, assetMap)

@@ -168,7 +168,9 @@ export const executeChangeCreation = (): Effect.Effect<
     const outputAssets = state.totalOutputAssets
     const leftoverBeforeFee = CoreAssets.subtract(inputAssets, outputAssets)
 
-    const tentativeLeftover = CoreAssets.subtractLovelace(leftoverBeforeFee, buildCtx.calculatedFee)
+    // Subtract fee and filter out zero-quantity tokens (they shouldn't go into change output)
+    const rawLeftover = CoreAssets.subtractLovelace(leftoverBeforeFee, buildCtx.calculatedFee)
+    const tentativeLeftover = CoreAssets.filter(rawLeftover, (_unit, amount) => amount > 0n)
 
     // Step 3: Check if negative - return to selection immediately
     const leftoverLovelace = CoreAssets.lovelaceOf(tentativeLeftover)

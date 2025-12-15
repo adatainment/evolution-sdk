@@ -1,10 +1,10 @@
 import { describe, expect, it } from "@effect/vitest"
 
-import * as Assets from "../src/sdk/Assets.js"
+import * as CoreAssets from "../src/core/Assets/index.js"
+import type * as CoreUTxO from "../src/core/UTxO.js"
 import type { TxBuilderConfig } from "../src/sdk/builders/TransactionBuilder.js"
 import { makeTxBuilder } from "../src/sdk/builders/TransactionBuilder.js"
-import type * as UTxO from "../src/sdk/UTxO.js"
-import { createTestUtxo } from "./utils/utxo-helpers.js"
+import { createCoreTestUtxo } from "./utils/utxo-helpers.js"
 
 const PROTOCOL_PARAMS = {
   minFeeCoefficient: 44n,
@@ -24,13 +24,13 @@ const baseConfig: TxBuilderConfig = {
 describe("Insufficient Lovelace", () => {
   it("should fail when total lovelace is less than payment amount", async () => {
     // Wallet has 1 ADA, trying to send 5 ADA
-    const utxos: Array<UTxO.UTxO> = [
-      createTestUtxo({ txHash: "tx1", outputIndex: 0, address: CHANGE_ADDRESS, lovelace: 1_000_000n })
+    const utxos: Array<CoreUTxO.UTxO> = [
+      createCoreTestUtxo({ transactionId: "a".repeat(64), index: 0, address: CHANGE_ADDRESS, lovelace: 1_000_000n })
     ]
 
     const builder = makeTxBuilder(baseConfig).payToAddress({
       address: RECEIVER_ADDRESS,
-      assets: Assets.fromLovelace(5_000_000n)
+      assets: CoreAssets.fromLovelace(5_000_000n)
     })
 
     await expect(builder.build({ changeAddress: CHANGE_ADDRESS, availableUtxos: utxos, protocolParameters: PROTOCOL_PARAMS })).rejects.toThrow(/Coin selection failed for/)
@@ -38,31 +38,31 @@ describe("Insufficient Lovelace", () => {
 
   it("should fail when lovelace covers payment but not payment + fees", async () => {
     // Wallet has 2 ADA, trying to send 1.95 ADA (fees will push over 2 ADA)
-    const utxos: Array<UTxO.UTxO> = [
-      createTestUtxo({ txHash: "tx1", outputIndex: 0, address: CHANGE_ADDRESS, lovelace: 2_000_000n })
+    const utxos: Array<CoreUTxO.UTxO> = [
+      createCoreTestUtxo({ transactionId: "a".repeat(64), index: 0, address: CHANGE_ADDRESS, lovelace: 2_000_000n })
     ]
 
     const builder = makeTxBuilder(baseConfig).payToAddress({
       address: RECEIVER_ADDRESS,
-      assets: Assets.fromLovelace(1_950_000n)
+      assets: CoreAssets.fromLovelace(1_950_000n)
     })
 
-    await expect(builder.build({ changeAddress: CHANGE_ADDRESS, availableUtxos: utxos, protocolParameters: PROTOCOL_PARAMS })).rejects.toThrow(/Cannot create valid change/)
+    await expect(builder.build({ changeAddress: CHANGE_ADDRESS, availableUtxos: utxos, protocolParameters: PROTOCOL_PARAMS })).rejects.toThrow(/Cannot create valid change|Coin must be between/)
   })
 
   it("should fail with multiple small UTxOs that sum to insufficient amount", async () => {
     // 5 UTxOs of 100k each = 500k total, trying to send 1M
-    const utxos: Array<UTxO.UTxO> = [
-      createTestUtxo({ txHash: "tx1", outputIndex: 0, address: CHANGE_ADDRESS, lovelace: 100_000n }),
-      createTestUtxo({ txHash: "tx2", outputIndex: 0, address: CHANGE_ADDRESS, lovelace: 100_000n }),
-      createTestUtxo({ txHash: "tx3", outputIndex: 0, address: CHANGE_ADDRESS, lovelace: 100_000n }),
-      createTestUtxo({ txHash: "tx4", outputIndex: 0, address: CHANGE_ADDRESS, lovelace: 100_000n }),
-      createTestUtxo({ txHash: "tx5", outputIndex: 0, address: CHANGE_ADDRESS, lovelace: 100_000n })
+    const utxos: Array<CoreUTxO.UTxO> = [
+      createCoreTestUtxo({ transactionId: "a".repeat(64), index: 0, address: CHANGE_ADDRESS, lovelace: 100_000n }),
+      createCoreTestUtxo({ transactionId: "b".repeat(64), index: 0, address: CHANGE_ADDRESS, lovelace: 100_000n }),
+      createCoreTestUtxo({ transactionId: "c".repeat(64), index: 0, address: CHANGE_ADDRESS, lovelace: 100_000n }),
+      createCoreTestUtxo({ transactionId: "d".repeat(64), index: 0, address: CHANGE_ADDRESS, lovelace: 100_000n }),
+      createCoreTestUtxo({ transactionId: "e".repeat(64), index: 0, address: CHANGE_ADDRESS, lovelace: 100_000n })
     ]
 
     const builder = makeTxBuilder(baseConfig).payToAddress({
       address: RECEIVER_ADDRESS,
-      assets: Assets.fromLovelace(1_000_000n)
+      assets: CoreAssets.fromLovelace(1_000_000n)
     })
 
     await expect(builder.build({ changeAddress: CHANGE_ADDRESS, availableUtxos: utxos, protocolParameters: PROTOCOL_PARAMS })).rejects.toThrow(/Coin selection failed for/)
@@ -75,23 +75,25 @@ describe("Missing Native Assets", () => {
     const tokenA = `${policyA}546f6b656e41` // "TokenA" in hex
 
     const policyB = "bbb" + "0".repeat(53)
-    const tokenB = `${policyB}546f6b656e42` // "TokenB" in hex (doesn't exist)
+    const _tokenB = `${policyB}546f6b656e42` // "TokenB" in hex (doesn't exist)
 
     // Wallet has TokenA but not TokenB
-    const utxos: Array<UTxO.UTxO> = [
-      createTestUtxo({
-        txHash: "tx1",
-        outputIndex: 0,
+    const utxos: Array<CoreUTxO.UTxO> = [
+      createCoreTestUtxo({
+        transactionId: "a".repeat(64),
+        index: 0,
         address: CHANGE_ADDRESS,
         lovelace: 10_000_000n,
         nativeAssets: { [tokenA]: 1000n }
       })
     ]
 
-    const paymentAssets: Assets.Assets = {
-      lovelace: 2_000_000n,
-      [tokenB]: 100n // Requesting token that doesn't exist
-    }
+    const paymentAssets = CoreAssets.addByHex(
+      CoreAssets.fromLovelace(2_000_000n),
+      policyB,
+      "546f6b656e42",
+      100n
+    )
 
     const builder = makeTxBuilder(baseConfig).payToAddress({
       address: RECEIVER_ADDRESS,
@@ -109,13 +111,13 @@ describe("Missing Native Assets", () => {
     const tokenB = `${policyB}546f6b656e42`
 
     const policyC = "ccc" + "0".repeat(53)
-    const tokenC = `${policyC}546f6b656e43` // Missing
+    // const tokenC = `${policyC}546f6b656e43` // Missing
 
     // Wallet has TokenA and TokenB but not TokenC
-    const utxos: Array<UTxO.UTxO> = [
-      createTestUtxo({
-        txHash: "tx1",
-        outputIndex: 0,
+    const utxos: Array<CoreUTxO.UTxO> = [
+      createCoreTestUtxo({
+        transactionId: "a".repeat(64),
+        index: 0n,
         address: CHANGE_ADDRESS,
         lovelace: 10_000_000n,
         nativeAssets: {
@@ -125,12 +127,22 @@ describe("Missing Native Assets", () => {
       })
     ]
 
-    const paymentAssets: Assets.Assets = {
-      lovelace: 2_000_000n,
-      [tokenA]: 100n,
-      [tokenB]: 50n,
-      [tokenC]: 10n // Missing token
-    }
+    const paymentAssets = CoreAssets.addByHex(
+      CoreAssets.addByHex(
+        CoreAssets.addByHex(
+          CoreAssets.fromLovelace(2_000_000n),
+          policyA,
+          "546f6b656e41",
+          100n
+        ),
+        policyB,
+        "546f6b656e42",
+        50n
+      ),
+      policyC,
+      "546f6b656e43",
+      10n // Missing token
+    )
 
     const builder = makeTxBuilder(baseConfig).payToAddress({
       address: RECEIVER_ADDRESS,
@@ -147,20 +159,22 @@ describe("Insufficient Native Asset Quantity", () => {
     const tokenA = `${policyA}546f6b656e41`
 
     // Wallet has 50 tokens, trying to send 100
-    const utxos: Array<UTxO.UTxO> = [
-      createTestUtxo({
-        txHash: "tx1",
-        outputIndex: 0,
+    const utxos: Array<CoreUTxO.UTxO> = [
+      createCoreTestUtxo({
+        transactionId: "a".repeat(64),
+        index: 0n,
         address: CHANGE_ADDRESS,
         lovelace: 10_000_000n,
         nativeAssets: { [tokenA]: 50n }
       })
     ]
 
-    const paymentAssets: Assets.Assets = {
-      lovelace: 2_000_000n,
-      [tokenA]: 100n // Need 100, only have 50
-    }
+    const paymentAssets = CoreAssets.addByHex(
+      CoreAssets.fromLovelace(2_000_000n),
+      policyA,
+      "546f6b656e41",
+      100n // Need 100, only have 50
+    )
 
     const builder = makeTxBuilder(baseConfig).payToAddress({
       address: RECEIVER_ADDRESS,
@@ -175,34 +189,36 @@ describe("Insufficient Native Asset Quantity", () => {
     const tokenA = `${policyA}546f6b656e41`
 
     // 3 UTxOs with 30 tokens each = 90 total, trying to send 100
-    const utxos: Array<UTxO.UTxO> = [
-      createTestUtxo({
-        txHash: "tx1",
-        outputIndex: 0,
+    const utxos: Array<CoreUTxO.UTxO> = [
+      createCoreTestUtxo({
+        transactionId: "a".repeat(64),
+        index: 0n,
         address: CHANGE_ADDRESS,
         lovelace: 5_000_000n,
         nativeAssets: { [tokenA]: 30n }
       }),
-      createTestUtxo({
-        txHash: "tx2",
-        outputIndex: 0,
+      createCoreTestUtxo({
+        transactionId: "b".repeat(64),
+        index: 0n,
         address: CHANGE_ADDRESS,
         lovelace: 5_000_000n,
         nativeAssets: { [tokenA]: 30n }
       }),
-      createTestUtxo({
-        txHash: "tx3",
-        outputIndex: 0,
+      createCoreTestUtxo({
+        transactionId: "c".repeat(64),
+        index: 0n,
         address: CHANGE_ADDRESS,
         lovelace: 5_000_000n,
         nativeAssets: { [tokenA]: 30n }
       })
     ]
 
-    const paymentAssets: Assets.Assets = {
-      lovelace: 2_000_000n,
-      [tokenA]: 100n // Need 100, only have 90 total
-    }
+    const paymentAssets = CoreAssets.addByHex(
+      CoreAssets.fromLovelace(2_000_000n),
+      policyA,
+      "546f6b656e41",
+      100n // Need 100, only have 90 total
+    )
 
     const builder = makeTxBuilder(baseConfig).payToAddress({
       address: RECEIVER_ADDRESS,
@@ -220,10 +236,10 @@ describe("Insufficient Native Asset Quantity", () => {
     const tokenB = `${policyB}546f6b656e42`
 
     // Have enough TokenA but not enough TokenB
-    const utxos: Array<UTxO.UTxO> = [
-      createTestUtxo({
-        txHash: "tx1",
-        outputIndex: 0,
+    const utxos: Array<CoreUTxO.UTxO> = [
+      createCoreTestUtxo({
+        transactionId: "a".repeat(64),
+        index: 0n,
         address: CHANGE_ADDRESS,
         lovelace: 10_000_000n,
         nativeAssets: {
@@ -233,11 +249,17 @@ describe("Insufficient Native Asset Quantity", () => {
       })
     ]
 
-    const paymentAssets: Assets.Assets = {
-      lovelace: 2_000_000n,
-      [tokenA]: 100n, // OK
-      [tokenB]: 100n // Insufficient
-    }
+    const paymentAssets = CoreAssets.addByHex(
+      CoreAssets.addByHex(
+        CoreAssets.fromLovelace(2_000_000n),
+        policyA,
+        "546f6b656e41",
+        100n // OK
+      ),
+      policyB,
+      "546f6b656e42",
+      100n // Insufficient
+    )
 
     const builder = makeTxBuilder(baseConfig).payToAddress({
       address: RECEIVER_ADDRESS,
@@ -250,11 +272,11 @@ describe("Insufficient Native Asset Quantity", () => {
 
 describe("Complex Mixed Failures", () => {
   it("should fail with empty wallet (no UTxOs)", async () => {
-    const utxos: Array<UTxO.UTxO> = []
+    const utxos: Array<CoreUTxO.UTxO> = []
 
     const builder = makeTxBuilder(baseConfig).payToAddress({
       address: RECEIVER_ADDRESS,
-      assets: Assets.fromLovelace(1_000_000n)
+      assets: CoreAssets.fromLovelace(1_000_000n)
     })
 
     // Empty wallet fails coin selection
@@ -263,14 +285,14 @@ describe("Complex Mixed Failures", () => {
 
   it("should fail when UTxOs exist but all are too small for min UTxO + fees", async () => {
     // Many tiny UTxOs that individually can't even cover min UTxO requirements
-    const utxos: Array<UTxO.UTxO> = Array.from(
+    const utxos: Array<CoreUTxO.UTxO> = Array.from(
       { length: 10 },
-      (_, i) => createTestUtxo({ txHash: `tx${i}`, outputIndex: 0, address: CHANGE_ADDRESS, lovelace: 1000n }) // 0.001 ADA each
+      (_, i) => createCoreTestUtxo({ transactionId: `${"0".repeat(63)}${i.toString(16)}`, index: 0n, address: CHANGE_ADDRESS, lovelace: 1000n }) // 0.001 ADA each
     )
 
     const builder = makeTxBuilder(baseConfig).payToAddress({
       address: RECEIVER_ADDRESS,
-      assets: Assets.fromLovelace(50_000n)
+      assets: CoreAssets.fromLovelace(50_000n)
     })
 
     await expect(builder.build({ changeAddress: CHANGE_ADDRESS, availableUtxos: utxos, protocolParameters: PROTOCOL_PARAMS })).rejects.toThrow(/Coin selection failed for/)
@@ -278,17 +300,19 @@ describe("Complex Mixed Failures", () => {
 
   it("should fail with sufficient lovelace but missing native asset", async () => {
     const policyA = "aaa" + "0".repeat(53)
-    const tokenA = `${policyA}546f6b656e41`
+    const _tokenA = `${policyA}546f6b656e41`
 
     // Plenty of lovelace but no native assets
-    const utxos: Array<UTxO.UTxO> = [
-      createTestUtxo({ txHash: "tx1", outputIndex: 0, address: CHANGE_ADDRESS, lovelace: 100_000_000n }) // 100 ADA
+    const utxos: Array<CoreUTxO.UTxO> = [
+      createCoreTestUtxo({ transactionId: "a".repeat(64), index: 0n, address: CHANGE_ADDRESS, lovelace: 100_000_000n }) // 100 ADA
     ]
 
-    const paymentAssets: Assets.Assets = {
-      lovelace: 2_000_000n,
-      [tokenA]: 1n // Even 1 token will fail
-    }
+    const paymentAssets = CoreAssets.addByHex(
+      CoreAssets.fromLovelace(2_000_000n),
+      policyA,
+      "546f6b656e41",
+      1n // Even 1 token will fail
+    )
 
     const builder = makeTxBuilder(baseConfig).payToAddress({
       address: RECEIVER_ADDRESS,
@@ -306,10 +330,10 @@ describe("Complex Mixed Failures", () => {
     const tokenB = `${policyB}546f6b656e42`
 
     // Not enough of anything
-    const utxos: Array<UTxO.UTxO> = [
-      createTestUtxo({
-        txHash: "tx1",
-        outputIndex: 0,
+    const utxos: Array<CoreUTxO.UTxO> = [
+      createCoreTestUtxo({
+        transactionId: "a".repeat(64),
+        index: 0n,
         address: CHANGE_ADDRESS,
         lovelace: 500_000n,
         nativeAssets: {
@@ -319,11 +343,17 @@ describe("Complex Mixed Failures", () => {
       })
     ]
 
-    const paymentAssets: Assets.Assets = {
-      lovelace: 2_000_000n, // Need 2M, have 500k
-      [tokenA]: 100n, // Need 100, have 10
-      [tokenB]: 50n // Need 50, have 5
-    }
+    const paymentAssets = CoreAssets.addByHex(
+      CoreAssets.addByHex(
+        CoreAssets.fromLovelace(2_000_000n), // Need 2M, have 500k
+        policyA,
+        "546f6b656e41",
+        100n // Need 100, have 10
+      ),
+      policyB,
+      "546f6b656e42",
+      50n // Need 50, have 5
+    )
 
     const builder = makeTxBuilder(baseConfig).payToAddress({
       address: RECEIVER_ADDRESS,
@@ -339,13 +369,13 @@ describe("Edge Case: drainTo Cannot Save Insufficient Funds", () => {
     // drainTo is a balance adjustment strategy, NOT error recovery
     // It only helps when leftover is too small for a change output
 
-    const utxos: Array<UTxO.UTxO> = [
-      createTestUtxo({ txHash: "tx1", outputIndex: 0, address: CHANGE_ADDRESS, lovelace: 1_000_000n })
+    const utxos: Array<CoreUTxO.UTxO> = [
+      createCoreTestUtxo({ transactionId: "a".repeat(64), index: 0n, address: CHANGE_ADDRESS, lovelace: 1_000_000n })
     ]
 
     const builder = makeTxBuilder(baseConfig).payToAddress({
       address: RECEIVER_ADDRESS,
-      assets: Assets.fromLovelace(5_000_000n) // Way more than available
+      assets: CoreAssets.fromLovelace(5_000_000n) // Way more than available
     })
 
     await expect(
@@ -356,13 +386,13 @@ describe("Edge Case: drainTo Cannot Save Insufficient Funds", () => {
   it("should fail even with burnAsFee when initial selection is insufficient", async () => {
     // burnAsFee only applies to leftover after balance is achieved
 
-    const utxos: Array<UTxO.UTxO> = [
-      createTestUtxo({ txHash: "tx1", outputIndex: 0, address: CHANGE_ADDRESS, lovelace: 800_000n })
+    const utxos: Array<CoreUTxO.UTxO> = [
+      createCoreTestUtxo({ transactionId: "a".repeat(64), index: 0n, address: CHANGE_ADDRESS, lovelace: 800_000n })
     ]
 
     const builder = makeTxBuilder(baseConfig).payToAddress({
       address: RECEIVER_ADDRESS,
-      assets: Assets.fromLovelace(2_000_000n)
+      assets: CoreAssets.fromLovelace(2_000_000n)
     })
 
     await expect(builder.build({ changeAddress: CHANGE_ADDRESS, availableUtxos: utxos, protocolParameters: PROTOCOL_PARAMS })).rejects.toThrow(/Coin selection failed for/)

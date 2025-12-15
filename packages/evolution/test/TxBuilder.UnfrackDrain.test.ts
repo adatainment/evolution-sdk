@@ -1,10 +1,10 @@
 import { describe, expect, it } from "@effect/vitest"
 
-import * as Assets from "../src/sdk/Assets.js"
+import * as CoreAssets from "../src/core/Assets/index.js"
+import * as CoreUTxO from "../src/core/UTxO.js"
 import type { TxBuilderConfig } from "../src/sdk/builders/TransactionBuilder.js"
 import { makeTxBuilder } from "../src/sdk/builders/TransactionBuilder.js"
-import type * as UTxO from "../src/sdk/UTxO.js"
-import { createTestUtxo } from "./utils/utxo-helpers.js"
+import { createCoreTestUtxo } from "./utils/utxo-helpers.js"
 
 const PROTOCOL_PARAMS = {
   minFeeCoefficient: 44n,
@@ -39,83 +39,90 @@ function toHex(str: string): string {
  * Create fragmented wallet with multiple UTxOs containing mixed assets.
  * Simulates a real-world wallet that needs consolidation.
  */
-const createFragmentedWallet = (): Array<UTxO.UTxO> => [
+const createFragmentedWallet = (): Array<CoreUTxO.UTxO> => {
   // UTxO 1: Large ADA + some fungible tokens + NFT
-  createTestUtxo({
-    txHash: "1".repeat(64),
-    outputIndex: 0,
+  let assets1 = CoreAssets.fromLovelace(150_000_000n)
+  assets1 = CoreAssets.addByHex(assets1, FUNGIBLE_POLICY_A, toHex("HOSKY"), 500_000n)
+  assets1 = CoreAssets.addByHex(assets1, NFT_POLICY_C, toHex("NFT001"), 1n)
+  const utxo1Base = createCoreTestUtxo({
+    transactionId: "1".repeat(64),
+    index: 0,
     address: SOURCE_ADDRESS,
-    lovelace: 150_000_000n, // 150 ADA
-    nativeAssets: {
-      [`${FUNGIBLE_POLICY_A}${toHex("HOSKY")}`]: 500_000n,
-      [`${NFT_POLICY_C}${toHex("NFT001")}`]: 1n
-    }
-  }),
-  // UTxO 2: Just ADA
-  createTestUtxo({
-    txHash: "2".repeat(64),
-    outputIndex: 0,
-    address: SOURCE_ADDRESS,
-    lovelace: 50_000_000n // 50 ADA
-  }),
-  // UTxO 3: Mixed tokens from different policies
-  createTestUtxo({
-    txHash: "3".repeat(64),
-    outputIndex: 0,
-    address: SOURCE_ADDRESS,
-    lovelace: 10_000_000n, // 10 ADA
-    nativeAssets: {
-      [`${FUNGIBLE_POLICY_A}${toHex("SNEK")}`]: 250_000n,
-      [`${FUNGIBLE_POLICY_B}${toHex("SUNDAE")}`]: 100_000n,
-      [`${NFT_POLICY_C}${toHex("NFT002")}`]: 1n,
-      [`${NFT_POLICY_C}${toHex("NFT003")}`]: 1n
-    }
-  }),
-  // UTxO 4: Large ADA only
-  createTestUtxo({
-    txHash: "4".repeat(64),
-    outputIndex: 0,
-    address: SOURCE_ADDRESS,
-    lovelace: 300_000_000n // 300 ADA
-  }),
-  // UTxO 5: More tokens + NFTs
-  createTestUtxo({
-    txHash: "5".repeat(64),
-    outputIndex: 0,
-    address: SOURCE_ADDRESS,
-    lovelace: 5_000_000n, // 5 ADA
-    nativeAssets: {
-      [`${FUNGIBLE_POLICY_A}${toHex("HOSKY")}`]: 300_000n, // More HOSKY (same as UTxO 1)
-      [`${NFT_POLICY_D}${toHex("CNFT001")}`]: 1n,
-      [`${NFT_POLICY_D}${toHex("CNFT002")}`]: 1n
-    }
-  }),
-  // UTxO 6: Small ADA
-  createTestUtxo({
-    txHash: "6".repeat(64),
-    outputIndex: 0,
-    address: SOURCE_ADDRESS,
-    lovelace: 25_000_000n // 25 ADA
+    lovelace: 150_000_000n
   })
-];
+  const utxo1 = new CoreUTxO.UTxO({ ...utxo1Base, assets: assets1 })
+
+  // UTxO 2: Just ADA
+  const utxo2 = createCoreTestUtxo({
+    transactionId: "2".repeat(64),
+    index: 0,
+    address: SOURCE_ADDRESS,
+    lovelace: 50_000_000n
+  })
+
+  // UTxO 3: Mixed tokens from different policies
+  let assets3 = CoreAssets.fromLovelace(10_000_000n)
+  assets3 = CoreAssets.addByHex(assets3, FUNGIBLE_POLICY_A, toHex("SNEK"), 250_000n)
+  assets3 = CoreAssets.addByHex(assets3, FUNGIBLE_POLICY_B, toHex("SUNDAE"), 100_000n)
+  assets3 = CoreAssets.addByHex(assets3, NFT_POLICY_C, toHex("NFT002"), 1n)
+  assets3 = CoreAssets.addByHex(assets3, NFT_POLICY_C, toHex("NFT003"), 1n)
+  const utxo3Base = createCoreTestUtxo({
+    transactionId: "3".repeat(64),
+    index: 0,
+    address: SOURCE_ADDRESS,
+    lovelace: 10_000_000n
+  })
+  const utxo3 = new CoreUTxO.UTxO({ ...utxo3Base, assets: assets3 })
+
+  // UTxO 4: Large ADA only
+  const utxo4 = createCoreTestUtxo({
+    transactionId: "4".repeat(64),
+    index: 0,
+    address: SOURCE_ADDRESS,
+    lovelace: 300_000_000n
+  })
+
+  // UTxO 5: More tokens + NFTs
+  let assets5 = CoreAssets.fromLovelace(5_000_000n)
+  assets5 = CoreAssets.addByHex(assets5, FUNGIBLE_POLICY_A, toHex("HOSKY"), 300_000n)
+  assets5 = CoreAssets.addByHex(assets5, NFT_POLICY_D, toHex("CNFT001"), 1n)
+  assets5 = CoreAssets.addByHex(assets5, NFT_POLICY_D, toHex("CNFT002"), 1n)
+  const utxo5Base = createCoreTestUtxo({
+    transactionId: "5".repeat(64),
+    index: 0,
+    address: SOURCE_ADDRESS,
+    lovelace: 5_000_000n
+  })
+  const utxo5 = new CoreUTxO.UTxO({ ...utxo5Base, assets: assets5 })
+
+  // UTxO 6: Small ADA
+  const utxo6 = createCoreTestUtxo({
+    transactionId: "6".repeat(64),
+    index: 0,
+    address: SOURCE_ADDRESS,
+    lovelace: 25_000_000n
+  })
+
+  return [utxo1, utxo2, utxo3, utxo4, utxo5, utxo6]
+}
 
 /**
  * Create simple ADA-only wallet for basic tests
  */
-const createSimpleAdaWallet = (): Array<UTxO.UTxO> => [
-  createTestUtxo({
-    txHash: "a".repeat(64),
-    outputIndex: 0,
+const createSimpleAdaWallet = (): Array<CoreUTxO.UTxO> => [
+  createCoreTestUtxo({
+    transactionId: "a".repeat(64),
+    index: 0,
     address: SOURCE_ADDRESS,
     lovelace: 200_000_000n // 200 ADA
   }),
-  createTestUtxo({
-    txHash: "b".repeat(64),
-    outputIndex: 0,
+  createCoreTestUtxo({
+    transactionId: "b".repeat(64),
+    index: 0,
     address: SOURCE_ADDRESS,
     lovelace: 150_000_000n // 150 ADA
   })
-];
+]
 
 // ============================================================================
 // Test Suite
@@ -138,7 +145,7 @@ describe("TxBuilder Unfrack + DrainTo Integration", () => {
       const builder = makeTxBuilder(baseConfig)
         .payToAddress({
           address: DESTINATION_ADDRESS,
-          assets: Assets.fromLovelace(1_000_000n) // 1 ADA minimum payment
+          assets: CoreAssets.fromLovelace(1_000_000n) // 1 ADA minimum payment
         })
 
       // Act: Drain to output 0 with ADA subdivision
@@ -176,25 +183,25 @@ describe("TxBuilder Unfrack + DrainTo Integration", () => {
 
     it("should drain without subdivision when below threshold", async () => {
       // Arrange: Small ADA amounts below subdivision threshold
-      const utxos: Array<UTxO.UTxO> = [
-        {
-          txHash: "a".repeat(64),
-          outputIndex: 0,
+      const utxos: Array<CoreUTxO.UTxO> = [
+        createCoreTestUtxo({
+          transactionId: "a".repeat(64),
+          index: 0,
           address: SOURCE_ADDRESS,
-          assets: { lovelace: 50_000_000n } // 50 ADA
-        },
-        {
-          txHash: "b".repeat(64),
-          outputIndex: 0,
+          lovelace: 50_000_000n // 50 ADA
+        }),
+        createCoreTestUtxo({
+          transactionId: "b".repeat(64),
+          index: 0,
           address: SOURCE_ADDRESS,
-          assets: { lovelace: 30_000_000n } // 30 ADA
-        }
+          lovelace: 30_000_000n // 30 ADA
+        })
       ]
 
       const builder = makeTxBuilder(baseConfig)
         .payToAddress({
           address: DESTINATION_ADDRESS,
-          assets: Assets.fromLovelace(1_000_000n)
+          assets: CoreAssets.fromLovelace(1_000_000n)
         })
 
       // Act: Drain with subdivision threshold of 100 ADA (total is 80 ADA, below threshold)
@@ -241,7 +248,7 @@ describe("TxBuilder Unfrack + DrainTo Integration", () => {
         .collectFrom({ inputs: utxos })
         .payToAddress({
           address: DESTINATION_ADDRESS,
-          assets: Assets.fromLovelace(1_000_000n)
+          assets: CoreAssets.fromLovelace(1_000_000n)
         })
 
       // Act: Drain with token bundling (no isolation or grouping)
@@ -282,7 +289,7 @@ describe("TxBuilder Unfrack + DrainTo Integration", () => {
         .collectFrom({ inputs: utxos })
         .payToAddress({
           address: DESTINATION_ADDRESS,
-          assets: Assets.fromLovelace(1_000_000n)
+          assets: CoreAssets.fromLovelace(1_000_000n)
         })
 
       // Act: Drain with fungible isolation
@@ -324,7 +331,7 @@ describe("TxBuilder Unfrack + DrainTo Integration", () => {
         .collectFrom({ inputs: utxos })
         .payToAddress({
           address: DESTINATION_ADDRESS,
-          assets: Assets.fromLovelace(1_000_000n)
+          assets: CoreAssets.fromLovelace(1_000_000n)
         })
 
       // Act: Drain with NFT policy grouping
@@ -366,7 +373,7 @@ describe("TxBuilder Unfrack + DrainTo Integration", () => {
         .collectFrom({ inputs: utxos })
         .payToAddress({
           address: DESTINATION_ADDRESS,
-          assets: Assets.fromLovelace(1_000_000n)
+          assets: CoreAssets.fromLovelace(1_000_000n)
         })
 
       // Act: Drain with full Unfrack.It optimization
@@ -422,7 +429,7 @@ describe("TxBuilder Unfrack + DrainTo Integration", () => {
         .collectFrom({ inputs: utxos })
         .payToAddress({
           address: DESTINATION_ADDRESS,
-          assets: Assets.fromLovelace(1_000_000n)
+          assets: CoreAssets.fromLovelace(1_000_000n)
         })
 
       // Act: Drain without any unfracking (standard consolidation)
@@ -441,7 +448,7 @@ describe("TxBuilder Unfrack + DrainTo Integration", () => {
       expect(tx.body.outputs.length).toBeGreaterThanOrEqual(1) // At least payment output
       expect(tx.body.fee).toBeGreaterThan(0n) // Fee must be positive
 
-      const totalInput = utxos.reduce((sum, utxo) => sum + Assets.getLovelace(utxo.assets), 0n)
+      const totalInput = utxos.reduce((sum, utxo) => sum + utxo.assets.lovelace, 0n)
       const totalOutput = tx.body.outputs.reduce((sum, output) => sum + output.assets.lovelace, 0n)
       
       // Verify balance: inputs = outputs + fee
@@ -461,7 +468,7 @@ describe("TxBuilder Unfrack + DrainTo Integration", () => {
         .collectFrom({ inputs: utxos })
         .payToAddress({
           address: DESTINATION_ADDRESS,
-          assets: Assets.fromLovelace(1_000_000n)
+          assets: CoreAssets.fromLovelace(1_000_000n)
         })
 
       // Act: Drain with empty token options (only ADA subdivision active)
@@ -496,26 +503,26 @@ describe("TxBuilder Unfrack + DrainTo Integration", () => {
 
     it("should handle very small leftover amounts with unfracking", async () => {
       // Arrange: UTxOs with small total that won't subdivide
-      const utxos: Array<UTxO.UTxO> = [
-        {
-          txHash: "a".repeat(64),
-          outputIndex: 0,
+      const utxos: Array<CoreUTxO.UTxO> = [
+        createCoreTestUtxo({
+          transactionId: "a".repeat(64),
+          index: 0,
           address: SOURCE_ADDRESS,
-          assets: { lovelace: 10_000_000n } // 10 ADA
-        },
-        {
-          txHash: "b".repeat(64),
-          outputIndex: 0,
+          lovelace: 10_000_000n // 10 ADA
+        }),
+        createCoreTestUtxo({
+          transactionId: "b".repeat(64),
+          index: 0,
           address: SOURCE_ADDRESS,
-          assets: { lovelace: 5_000_000n } // 5 ADA
-        }
+          lovelace: 5_000_000n // 5 ADA
+        })
       ]
 
       const builder = makeTxBuilder(baseConfig)
         .collectFrom({ inputs: utxos })
         .payToAddress({
           address: DESTINATION_ADDRESS,
-          assets: Assets.fromLovelace(10_000_000n) // 10 ADA payment
+          assets: CoreAssets.fromLovelace(10_000_000n) // 10 ADA payment
         })
 
       // Act: Drain with subdivision threshold much higher than leftover
@@ -554,11 +561,11 @@ describe("TxBuilder Unfrack + DrainTo Integration", () => {
         .collectFrom({ inputs: utxos })
         .payToAddress({
           address: DESTINATION_ADDRESS,
-          assets: Assets.fromLovelace(5_000_000n) // First payment
+          assets: CoreAssets.fromLovelace(5_000_000n) // First payment
         })
         .payToAddress({
           address: DESTINATION_ADDRESS,
-          assets: Assets.fromLovelace(3_000_000n) // Second payment
+          assets: CoreAssets.fromLovelace(3_000_000n) // Second payment
         })
 
       // Act: Drain to first output with unfracking
@@ -595,19 +602,19 @@ describe("TxBuilder Unfrack + DrainTo Integration", () => {
     it("should respect minimum UTxO requirements when subdividing small amounts", async () => {
       // Arrange: Small wallet that would violate min UTxO if subdivided naively
       const utxos = [
-        {
-          txHash: "a".repeat(64),
-          outputIndex: 0,
+        createCoreTestUtxo({
+          transactionId: "a".repeat(64),
+          index: 0,
           address: SOURCE_ADDRESS,
-          assets: { lovelace: 3_000_000n } // 3 ADA total
-        }
+          lovelace: 3_000_000n // 3 ADA total
+        })
       ]
 
       const builder = makeTxBuilder(baseConfig)
         .collectFrom({ inputs: utxos })
         .payToAddress({
           address: DESTINATION_ADDRESS,
-          assets: Assets.fromLovelace(1_000_000n) // 1 ADA payment
+          assets: CoreAssets.fromLovelace(1_000_000n) // 1 ADA payment
         })
 
       // Act: Try to subdivide into percentages that would create tiny outputs
@@ -658,7 +665,7 @@ describe("TxBuilder Unfrack + DrainTo Integration", () => {
         .collectFrom({ inputs: utxos })
         .payToAddress({
           address: DESTINATION_ADDRESS,
-          assets: Assets.fromLovelace(1_000_000n) // Minimal payment to trigger consolidation
+          assets: CoreAssets.fromLovelace(1_000_000n) // Minimal payment to trigger consolidation
         })
 
       // Act: Full wallet optimization
@@ -705,7 +712,7 @@ describe("TxBuilder Unfrack + DrainTo Integration", () => {
         .collectFrom({ inputs: utxos })
         .payToAddress({
           address: DESTINATION_ADDRESS,
-          assets: Assets.fromLovelace(1_000_000n)
+          assets: CoreAssets.fromLovelace(1_000_000n)
         })
 
       // Act: Migrate everything to destination with optimization

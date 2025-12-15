@@ -27,7 +27,11 @@ export class UTxO extends Schema.TaggedClass<UTxO>()("UTxO", {
   transactionId: TransactionHash.TransactionHash,
   index: Numeric.Uint16Schema,
   address: Address.Address,
-  assets: Assets.Assets,
+  assets: Assets.Assets.pipe(
+    Schema.filter(Assets.allPositive, {
+      message: () => "UTxO assets must have non-negative lovelace and positive token quantities"
+    })
+  ),
   datumOption: Schema.optional(DatumOption.DatumOptionSchema),
   scriptRef: Schema.optional(ScriptRef.ScriptRef)
 }) {

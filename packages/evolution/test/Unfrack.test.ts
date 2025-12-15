@@ -1,7 +1,8 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect } from "effect"
 
-import * as Assets from "../src/sdk/Assets.js"
+import * as Address from "../src/core/Address.js"
+import * as CoreAssets from "../src/core/Assets/index.js"
 import type { UnfrackOptions } from "../src/sdk/builders/TransactionBuilder.js"
 import * as Unfrack from "../src/sdk/builders/Unfrack.js"
 
@@ -44,13 +45,15 @@ describe("Unfrack UTxO Optimization", () => {
     it("should extract tokens from assets correctly", () => {
       const policyA = "a".repeat(56)
       const policyB = "b".repeat(56)
+      const nft1Hex = "6e667431" // "nft1" in hex
+      const token1Hex = "746f6b656e31" // "token1" in hex
 
-      const assets: Assets.Assets = {
+      const assets = CoreAssets.fromRecord({
         lovelace: 10_000000n,
-        [`${policyA}nft1`]: 1n, // NFT (quantity = 1)
-        [`${policyA}token1`]: 1000n, // Fungible (quantity > 1)
-        [`${policyB}nft1`]: 1n // NFT from different policy
-      }
+        [`${policyA}${nft1Hex}`]: 1n, // NFT (quantity = 1)
+        [`${policyA}${token1Hex}`]: 1000n, // Fungible (quantity > 1)
+        [`${policyB}${nft1Hex}`]: 1n // NFT from different policy
+      })
 
       const tokens = Unfrack.extractTokens(assets)
 
@@ -62,10 +65,12 @@ describe("Unfrack UTxO Optimization", () => {
     })
 
     it("should correctly identify fungible tokens (quantity > 1)", () => {
-      const assets: Assets.Assets = {
+      const policyId = "a".repeat(56)
+      const token1Hex = "746f6b656e31" // "token1" in hex
+      const assets = CoreAssets.fromRecord({
         lovelace: 5_000000n,
-        abc123456789012345678901234567890123456789012345678901234567token1: 500n
-      }
+        [`${policyId}${token1Hex}`]: 500n
+      })
 
       const tokens = Unfrack.extractTokens(assets)
 
@@ -75,10 +80,12 @@ describe("Unfrack UTxO Optimization", () => {
     })
 
     it("should correctly identify NFTs (quantity = 1)", () => {
-      const assets: Assets.Assets = {
+      const policyId = "a".repeat(56)
+      const nftHex = "6e6674303031" // "nft001" in hex
+      const assets = CoreAssets.fromRecord({
         lovelace: 5_000000n,
-        abc123456789012345678901234567890123456789012345678901234567nft001: 1n
-      }
+        [`${policyId}${nftHex}`]: 1n
+      })
 
       const tokens = Unfrack.extractTokens(assets)
 
@@ -88,10 +95,10 @@ describe("Unfrack UTxO Optimization", () => {
     })
 
     it("should skip lovelace when extracting tokens", () => {
-      const assets: Assets.Assets = {
+      const assets = CoreAssets.fromRecord({
         lovelace: 100_000000n
         // No native assets
-      }
+      })
 
       const tokens = Unfrack.extractTokens(assets)
 
@@ -501,9 +508,9 @@ describe("Unfrack UTxO Optimization", () => {
 
     it.effect("should create single output for ADA-only change", () =>
       Effect.gen(function* () {
-        const changeAssets: Assets.Assets = {
+        const changeAssets = CoreAssets.fromRecord({
           lovelace: 50_000000n
-        }
+        })
 
         const options: UnfrackOptions = {
           ada: {
@@ -523,16 +530,16 @@ describe("Unfrack UTxO Optimization", () => {
 
         expect(outputs).toBeDefined()
         expect(outputs).toHaveLength(1)
-        expect(Assets.getLovelace(outputs![0].assets)).toBe(50_000000n)
-        expect(outputs![0].address).toBe(changeTestAddress)
+        expect(outputs![0].assets.lovelace).toBe(50_000000n)
+        expect(Address.toBech32(outputs![0].address)).toBe(changeTestAddress)
       })
     )
 
     it.effect("should subdivide large ADA-only change", () =>
       Effect.gen(function* () {
-        const changeAssets: Assets.Assets = {
+        const changeAssets = CoreAssets.fromRecord({
           lovelace: 200_000000n // 200 ADA
-        }
+        })
 
         const options: UnfrackOptions = {
           ada: {
@@ -550,20 +557,22 @@ describe("Unfrack UTxO Optimization", () => {
 
         expect(outputs).toBeDefined()
         expect(outputs).toHaveLength(3)
-        expect(Assets.getLovelace(outputs![0].assets)).toBe(100_000000n)
-        expect(Assets.getLovelace(outputs![1].assets)).toBe(50_000000n)
+        expect(outputs![0].assets.lovelace).toBe(100_000000n)
+        expect(outputs![1].assets.lovelace).toBe(50_000000n)
       })
     )
 
     it.effect("should create bundled outputs for tokens", () =>
       Effect.gen(function* () {
         const policyA = "a".repeat(56)
+        const token1Hex = toHex("token1")
+        const token2Hex = toHex("token2")
 
-        const changeAssets: Assets.Assets = {
+        const changeAssets = CoreAssets.fromRecord({
           lovelace: 10_000000n,
-          [`${policyA}${toHex("token1")}`]: 100n,
-          [`${policyA}${toHex("token2")}`]: 200n
-        }
+          [`${policyA}${token1Hex}`]: 100n,
+          [`${policyA}${token2Hex}`]: 200n
+        })
 
         const options: UnfrackOptions = {
           tokens: {
@@ -587,9 +596,9 @@ describe("Unfrack UTxO Optimization", () => {
 
     it.effect("should return empty array for empty change", () =>
       Effect.gen(function* () {
-        const changeAssets: Assets.Assets = {
+        const changeAssets = CoreAssets.fromRecord({
           lovelace: 1_000000n // Need minimum ADA, but test that empty tokens don't create outputs
-        }
+        })
 
         const options: UnfrackOptions = {
           ada: {
@@ -607,7 +616,7 @@ describe("Unfrack UTxO Optimization", () => {
         // Should have 1 ADA-only output (1 ADA, no tokens)
         expect(outputs).toBeDefined()
         expect(outputs).toHaveLength(1)
-        expect(Assets.getLovelace(outputs![0].assets)).toBe(1_000000n)
+        expect(outputs![0].assets.lovelace).toBe(1_000000n)
       })
     )
   })
@@ -616,16 +625,17 @@ describe("Unfrack UTxO Optimization", () => {
     it.effect("should prioritize token bundling over ADA subdivision", () =>
       Effect.gen(function* () {
         const policyA = "a".repeat(56)
+        const token1Hex = toHex("token1")
 
         // Total: 100 ADA
         // Expected flow:
         // 1. Bundle tokens first (uses ~2 ADA for minUTxO)
         // 2. Remaining ~98 ADA available for subdivision
         // 3. 98 ADA > 50 ADA threshold → subdivide
-        const changeAssets: Assets.Assets = {
+        const changeAssets = CoreAssets.fromRecord({
           lovelace: 100_000000n,
-          [`${policyA}${toHex("token1")}`]: 100n
-        }
+          [`${policyA}${token1Hex}`]: 100n
+        })
 
         const options: UnfrackOptions = {
           tokens: {
@@ -651,24 +661,25 @@ describe("Unfrack UTxO Optimization", () => {
 
           // Exactly one token bundle
           const tokenOutputs = outputs.filter(output =>
-            Object.keys(output.assets).some(key => key.includes(policyA))
+            output.assets.multiAsset !== undefined && output.assets.multiAsset.map.size > 0
           )
           expect(tokenOutputs.length).toBe(1)
 
           // Verify token output has its minUTxO + tokens
           const tokenOutput = tokenOutputs[0]
-          expect(Assets.getLovelace(tokenOutput.assets)).toBeGreaterThan(0n) // Has minUTxO (typically ~0.45-2 ADA depending on tokens)
-          expect(Assets.getLovelace(tokenOutput.assets)).toBeLessThan(10_000000n) // But not excessive
-          expect(tokenOutput.assets[`${policyA}${toHex("token1")}`]).toBe(100n)
+          expect(tokenOutput.assets.lovelace).toBeGreaterThan(0n) // Has minUTxO (typically ~0.45-2 ADA depending on tokens)
+          expect(tokenOutput.assets.lovelace).toBeLessThan(10_000000n) // But not excessive
+          // Check token quantity via CoreAssets.getByUnit
+          expect(CoreAssets.getByUnit(tokenOutput.assets, `${policyA}${token1Hex}`)).toBe(100n)
 
           // Exactly 2 ADA-only outputs from 60/40 split
           const adaOnlyOutputs = outputs.filter(output =>
-            Object.keys(output.assets).length === 1 && Assets.getLovelace(output.assets) > 0n
+            output.assets.multiAsset === undefined && output.assets.lovelace > 0n
           )
           expect(adaOnlyOutputs.length).toBe(2)
           
           // Verify the total ADA in outputs equals original (minus what's locked in bundles)
-          const totalOutputLovelace = outputs.reduce((sum, out) => sum + Assets.getLovelace(out.assets), 0n)
+          const totalOutputLovelace = outputs.reduce((sum, out) => sum + out.assets.lovelace, 0n)
           expect(totalOutputLovelace).toBe(100_000000n) // All 100 ADA accounted for
         }
       })
@@ -677,12 +688,14 @@ describe("Unfrack UTxO Optimization", () => {
     it.effect("should create token bundles AND subdivide remaining ADA", () =>
       Effect.gen(function* () {
         const policyA = "a".repeat(56)
+        const token1Hex = toHex("token1")
+        const token2Hex = toHex("token2")
 
-        const changeAssets: Assets.Assets = {
+        const changeAssets = CoreAssets.fromRecord({
           lovelace: 250_000000n, // 250 ADA
-          [`${policyA}${toHex("token1")}`]: 100n,
-          [`${policyA}${toHex("token2")}`]: 200n
-        }
+          [`${policyA}${token1Hex}`]: 100n,
+          [`${policyA}${token2Hex}`]: 200n
+        })
 
         const options: UnfrackOptions = {
           tokens: {
@@ -704,14 +717,14 @@ describe("Unfrack UTxO Optimization", () => {
         expect(outputs).toBeDefined()
         if (outputs !== undefined) {
           // FUNDAMENTAL: Asset Conservation Check (Delta = 0)
-          const totalOutputAssets = Assets.merge(...outputs.map(out => out.assets))
-          const delta = Assets.subtract(changeAssets, totalOutputAssets)
+          const totalOutputAssets = outputs.map(out => out.assets).reduce(CoreAssets.merge, CoreAssets.zero)
+          const delta = CoreAssets.subtract(changeAssets, totalOutputAssets)
           
           // All assets must be conserved exactly
-          expect(Assets.getLovelace(delta)).toBe(0n)
-          const deltaUnits = Assets.getUnits(delta).filter(unit => unit !== 'lovelace')
+          expect(delta.lovelace).toBe(0n)
+          const deltaUnits = CoreAssets.getUnits(delta).filter(unit => unit !== 'lovelace')
           for (const unit of deltaUnits) {
-            expect(delta[unit]).toBe(0n)
+            expect(CoreAssets.getByUnit(delta, unit)).toBe(0n)
           }
           
           // Should have: 1 token bundle + 2 ADA outputs = 3 total
@@ -719,18 +732,18 @@ describe("Unfrack UTxO Optimization", () => {
 
           // Exactly one output should have tokens (both tokens bundled together)
           const tokenOutputs = outputs.filter(output =>
-            Object.keys(output.assets).some(key => key.includes(policyA))
+            output.assets.multiAsset !== undefined && output.assets.multiAsset.map.size > 0
           )
           expect(tokenOutputs.length).toBe(1)
           
           // Verify both tokens are in the same bundle
           const tokenOutput = tokenOutputs[0]
-          expect(tokenOutput.assets[`${policyA}${toHex("token1")}`]).toBe(100n)
-          expect(tokenOutput.assets[`${policyA}${toHex("token2")}`]).toBe(200n)
+          expect(CoreAssets.getByUnit(tokenOutput.assets, `${policyA}${token1Hex}`)).toBe(100n)
+          expect(CoreAssets.getByUnit(tokenOutput.assets, `${policyA}${token2Hex}`)).toBe(200n)
 
           // Exactly 2 ADA-only outputs from 60/40 subdivision
           const adaOnlyOutputs = outputs.filter(output =>
-            Object.keys(output.assets).length === 1 && Assets.getLovelace(output.assets) > 0n
+            output.assets.multiAsset === undefined && output.assets.lovelace > 0n
           )
           expect(adaOnlyOutputs.length).toBe(2)
         }
@@ -741,12 +754,14 @@ describe("Unfrack UTxO Optimization", () => {
       Effect.gen(function* () {
         const policyA = "a".repeat(56)
         const policyB = "b".repeat(56)
+        const fungible1Hex = toHex("fungible1")
+        const fungible2Hex = toHex("fungible2")
 
-        const changeAssets: Assets.Assets = {
+        const changeAssets = CoreAssets.fromRecord({
           lovelace: 150_000000n, // 150 ADA
-          [`${policyA}${toHex("fungible1")}`]: 500n,
-          [`${policyB}${toHex("fungible2")}`]: 1000n
-        }
+          [`${policyA}${fungible1Hex}`]: 500n,
+          [`${policyB}${fungible2Hex}`]: 1000n
+        })
 
         const options: UnfrackOptions = {
           tokens: {
@@ -773,26 +788,26 @@ describe("Unfrack UTxO Optimization", () => {
 
           // Exactly 1 output with policyA tokens (isolated)
           const policyAOutputs = outputs.filter(output =>
-            Object.keys(output.assets).some(key => key.includes(policyA))
+            CoreAssets.getUnits(output.assets).some(unit => unit.startsWith(policyA))
           )
           expect(policyAOutputs.length).toBe(1)
-          expect(policyAOutputs[0].assets[`${policyA}${toHex("fungible1")}`]).toBe(500n)
+          expect(CoreAssets.getByUnit(policyAOutputs[0].assets, `${policyA}${fungible1Hex}`)).toBe(500n)
 
           // Exactly 1 output with policyB tokens (isolated)
           const policyBOutputs = outputs.filter(output =>
-            Object.keys(output.assets).some(key => key.includes(policyB))
+            CoreAssets.getUnits(output.assets).some(unit => unit.startsWith(policyB))
           )
           expect(policyBOutputs.length).toBe(1)
-          expect(policyBOutputs[0].assets[`${policyB}${toHex("fungible2")}`]).toBe(1000n)
+          expect(CoreAssets.getByUnit(policyBOutputs[0].assets, `${policyB}${fungible2Hex}`)).toBe(1000n)
           
           // Exactly 3 ADA-only outputs from subdivision (50/30/20 split)
           const adaOnlyOutputs = outputs.filter(output =>
-            Object.keys(output.assets).length === 1 && Assets.getLovelace(output.assets) > 0n
+            output.assets.multiAsset === undefined && output.assets.lovelace > 0n
           )
           expect(adaOnlyOutputs.length).toBe(3)
           
           // Verify total lovelace is conserved
-          const totalOutputLovelace = outputs.reduce((sum, out) => sum + Assets.getLovelace(out.assets), 0n)
+          const totalOutputLovelace = outputs.reduce((sum, out) => sum + out.assets.lovelace, 0n)
           expect(totalOutputLovelace).toBe(150_000000n)
         }
       })
@@ -802,14 +817,18 @@ describe("Unfrack UTxO Optimization", () => {
       Effect.gen(function* () {
         const policyA = "a".repeat(56)
         const policyB = "b".repeat(56)
+        const nft1Hex = toHex("nft1")
+        const nft2Hex = toHex("nft2")
+        const nft3Hex = toHex("nft3")
+        const nft4Hex = toHex("nft4")
 
-        const changeAssets: Assets.Assets = {
+        const changeAssets = CoreAssets.fromRecord({
           lovelace: 200_000000n, // 200 ADA
-          [`${policyA}${toHex("nft1")}`]: 1n,
-          [`${policyA}${toHex("nft2")}`]: 1n,
-          [`${policyB}${toHex("nft3")}`]: 1n,
-          [`${policyB}${toHex("nft4")}`]: 1n
-        }
+          [`${policyA}${nft1Hex}`]: 1n,
+          [`${policyA}${nft2Hex}`]: 1n,
+          [`${policyB}${nft3Hex}`]: 1n,
+          [`${policyB}${nft4Hex}`]: 1n
+        })
 
         const options: UnfrackOptions = {
           tokens: {
@@ -836,28 +855,28 @@ describe("Unfrack UTxO Optimization", () => {
 
           // Exactly 1 output with policyA NFTs (grouped together)
           const policyAOutputs = outputs.filter(output =>
-            Object.keys(output.assets).some(key => key.includes(policyA))
+            CoreAssets.getUnits(output.assets).some(unit => unit.startsWith(policyA))
           )
           expect(policyAOutputs.length).toBe(1)
-          expect(policyAOutputs[0].assets[`${policyA}${toHex("nft1")}`]).toBe(1n)
-          expect(policyAOutputs[0].assets[`${policyA}${toHex("nft2")}`]).toBe(1n)
+          expect(CoreAssets.getByUnit(policyAOutputs[0].assets, `${policyA}${nft1Hex}`)).toBe(1n)
+          expect(CoreAssets.getByUnit(policyAOutputs[0].assets, `${policyA}${nft2Hex}`)).toBe(1n)
 
           // Exactly 1 output with policyB NFTs (grouped together)
           const policyBOutputs = outputs.filter(output =>
-            Object.keys(output.assets).some(key => key.includes(policyB))
+            CoreAssets.getUnits(output.assets).some(unit => unit.startsWith(policyB))
           )
           expect(policyBOutputs.length).toBe(1)
-          expect(policyBOutputs[0].assets[`${policyB}${toHex("nft3")}`]).toBe(1n)
-          expect(policyBOutputs[0].assets[`${policyB}${toHex("nft4")}`]).toBe(1n)
+          expect(CoreAssets.getByUnit(policyBOutputs[0].assets, `${policyB}${nft3Hex}`)).toBe(1n)
+          expect(CoreAssets.getByUnit(policyBOutputs[0].assets, `${policyB}${nft4Hex}`)).toBe(1n)
           
           // Exactly 3 ADA-only outputs from subdivision (50/25/25 split)
           const adaOnlyOutputs = outputs.filter(output =>
-            Object.keys(output.assets).length === 1 && Assets.getLovelace(output.assets) > 0n
+            output.assets.multiAsset === undefined && output.assets.lovelace > 0n
           )
           expect(adaOnlyOutputs.length).toBe(3)
           
           // Verify total lovelace is conserved
-          const totalOutputLovelace = outputs.reduce((sum, out) => sum + Assets.getLovelace(out.assets), 0n)
+          const totalOutputLovelace = outputs.reduce((sum, out) => sum + out.assets.lovelace, 0n)
           expect(totalOutputLovelace).toBe(200_000000n)
         }
       })
@@ -866,11 +885,12 @@ describe("Unfrack UTxO Optimization", () => {
     it.effect("should not subdivide ADA when below threshold even with tokens", () =>
       Effect.gen(function* () {
         const policyA = "a".repeat(56)
+        const token1Hex = toHex("token1")
 
-        const changeAssets: Assets.Assets = {
+        const changeAssets = CoreAssets.fromRecord({
           lovelace: 10_000000n, // 10 ADA - below threshold
-          [`${policyA}${toHex("token1")}`]: 100n
-        }
+          [`${policyA}${token1Hex}`]: 100n
+        })
 
         const options: UnfrackOptions = {
           tokens: {
@@ -897,16 +917,16 @@ describe("Unfrack UTxO Optimization", () => {
 
           // The single output should be the token bundle with all remaining ADA merged into it
           const tokenOutputs = outputs.filter(output =>
-            Object.keys(output.assets).some(key => key.includes(policyA))
+            CoreAssets.getUnits(output.assets).some(unit => unit.startsWith(policyA))
           )
           expect(tokenOutputs.length).toBe(1)
-          expect(tokenOutputs[0].assets[`${policyA}${toHex("token1")}`]).toBe(100n)
+          expect(CoreAssets.getByUnit(tokenOutputs[0].assets, `${policyA}${token1Hex}`)).toBe(100n)
           
           // Verify the token bundle has all the lovelace (no separate ADA-only output)
-          expect(Assets.getLovelace(tokenOutputs[0].assets)).toBe(10_000000n)
+          expect(tokenOutputs[0].assets.lovelace).toBe(10_000000n)
           
           // Verify total lovelace is conserved
-          const totalOutputLovelace = outputs.reduce((sum, out) => sum + Assets.getLovelace(out.assets), 0n)
+          const totalOutputLovelace = outputs.reduce((sum, out) => sum + out.assets.lovelace, 0n)
           expect(totalOutputLovelace).toBe(10_000000n)
         }
       })
@@ -917,20 +937,26 @@ describe("Unfrack UTxO Optimization", () => {
         const policyA = "a".repeat(56)
         const policyB = "b".repeat(56)
         const policyC = "c".repeat(56)
+        const fungible1Hex = toHex("fungible1")
+        const fungible2Hex = toHex("fungible2")
+        const nft1Hex = toHex("nft1")
+        const nft2Hex = toHex("nft2")
+        const nft3Hex = toHex("nft3")
+        const token1Hex = toHex("token1")
 
-        const changeAssets: Assets.Assets = {
+        const changeAssets = CoreAssets.fromRecord({
           lovelace: 300_000000n, // 300 ADA
           // Fungible tokens from policyA
-          [`${policyA}${toHex("fungible1")}`]: 500n,
-          [`${policyA}${toHex("fungible2")}`]: 1000n,
+          [`${policyA}${fungible1Hex}`]: 500n,
+          [`${policyA}${fungible2Hex}`]: 1000n,
           // NFTs from policyB
-          [`${policyB}${toHex("nft1")}`]: 1n,
-          [`${policyB}${toHex("nft2")}`]: 1n,
-          [`${policyB}${toHex("nft3")}`]: 1n,
+          [`${policyB}${nft1Hex}`]: 1n,
+          [`${policyB}${nft2Hex}`]: 1n,
+          [`${policyB}${nft3Hex}`]: 1n,
           // Mixed tokens from policyC
-          [`${policyC}${toHex("token1")}`]: 250n,
-          [`${policyC}${toHex("nft1")}`]: 1n
-        }
+          [`${policyC}${token1Hex}`]: 250n,
+          [`${policyC}${nft1Hex}`]: 1n
+        })
 
         const options: UnfrackOptions = {
           tokens: {
@@ -954,14 +980,14 @@ describe("Unfrack UTxO Optimization", () => {
         expect(outputs).toBeDefined()
         if (outputs !== undefined) {
           // FUNDAMENTAL: Asset Conservation Check (Delta = 0)
-          const totalOutputAssets = Assets.merge(...outputs.map(out => out.assets))
-          const delta = Assets.subtract(changeAssets, totalOutputAssets)
+          const totalOutputAssets = outputs.map(out => out.assets).reduce(CoreAssets.merge, CoreAssets.zero)
+          const delta = CoreAssets.subtract(changeAssets, totalOutputAssets)
           
           // All assets must be conserved exactly
-          expect(Assets.getLovelace(delta)).toBe(0n)
-          const deltaUnits = Assets.getUnits(delta).filter(unit => unit !== 'lovelace')
+          expect(delta.lovelace).toBe(0n)
+          const deltaUnits = CoreAssets.getUnits(delta).filter(unit => unit !== 'lovelace')
           for (const unit of deltaUnits) {
-            expect(delta[unit]).toBe(0n)
+            expect(CoreAssets.getByUnit(delta, unit)).toBe(0n)
           }
           
           // Complex scenario - verify structure:
@@ -975,30 +1001,30 @@ describe("Unfrack UTxO Optimization", () => {
 
           // Verify policyA fungibles are isolated in 1 bundle
           const policyAOutputs = outputs.filter(output =>
-            Object.keys(output.assets).some(key => key.includes(policyA))
+            CoreAssets.getUnits(output.assets).some(unit => unit.startsWith(policyA))
           )
           expect(policyAOutputs.length).toBe(1)
-          expect(policyAOutputs[0].assets[`${policyA}${toHex("fungible1")}`]).toBe(500n)
-          expect(policyAOutputs[0].assets[`${policyA}${toHex("fungible2")}`]).toBe(1000n)
+          expect(CoreAssets.getByUnit(policyAOutputs[0].assets, `${policyA}${fungible1Hex}`)).toBe(500n)
+          expect(CoreAssets.getByUnit(policyAOutputs[0].assets, `${policyA}${fungible2Hex}`)).toBe(1000n)
 
           // Verify policyB NFTs are grouped in 1 bundle
           const policyBOutputs = outputs.filter(output =>
-            Object.keys(output.assets).some(key => key.includes(policyB))
+            CoreAssets.getUnits(output.assets).some(unit => unit.startsWith(policyB))
           )
           expect(policyBOutputs.length).toBe(1)
-          expect(policyBOutputs[0].assets[`${policyB}${toHex("nft1")}`]).toBe(1n)
-          expect(policyBOutputs[0].assets[`${policyB}${toHex("nft2")}`]).toBe(1n)
-          expect(policyBOutputs[0].assets[`${policyB}${toHex("nft3")}`]).toBe(1n)
+          expect(CoreAssets.getByUnit(policyBOutputs[0].assets, `${policyB}${nft1Hex}`)).toBe(1n)
+          expect(CoreAssets.getByUnit(policyBOutputs[0].assets, `${policyB}${nft2Hex}`)).toBe(1n)
+          expect(CoreAssets.getByUnit(policyBOutputs[0].assets, `${policyB}${nft3Hex}`)).toBe(1n)
 
           // Verify policyC tokens are present
           const policyCOutputs = outputs.filter(output =>
-            Object.keys(output.assets).some(key => key.includes(policyC))
+            CoreAssets.getUnits(output.assets).some(unit => unit.startsWith(policyC))
           )
           expect(policyCOutputs.length).toBeGreaterThanOrEqual(1)
 
           // Verify exactly 4 ADA-only outputs from subdivision (40/30/20/10 split)
           const adaOnlyOutputs = outputs.filter(output =>
-            Object.keys(output.assets).length === 1 && Assets.getLovelace(output.assets) > 0n
+            output.assets.multiAsset === undefined && output.assets.lovelace > 0n
           )
           expect(adaOnlyOutputs.length).toBe(4)
         }
@@ -1013,11 +1039,11 @@ describe("Unfrack UTxO Optimization", () => {
         const tokens = Array.from({ length: 50 }, (_, i) => [
           `${policyA}${toHex(`token${i}`)}`,
           1n
-        ])
-        const changeAssets: Assets.Assets = {
+        ] as const)
+        const changeAssets = CoreAssets.fromRecord({
           lovelace: 20_000000n, // 20 ADA - will be consumed by token bundles
           ...Object.fromEntries(tokens)
-        }
+        })
 
         const options: UnfrackOptions = {
           tokens: {
@@ -1044,20 +1070,20 @@ describe("Unfrack UTxO Optimization", () => {
 
           // Verify we have exactly 5 token bundles
           const tokenOutputs = outputs.filter(output =>
-            Object.keys(output.assets).some(key => key.includes(policyA))
+            CoreAssets.getUnits(output.assets).some(unit => unit.startsWith(policyA))
           )
           expect(tokenOutputs.length).toBe(5)
           
           // Verify all 50 tokens are distributed across the 5 bundles
           const totalTokens = tokenOutputs.reduce((sum, output) => {
-            return sum + Object.entries(output.assets)
-              .filter(([key]) => key.includes(policyA))
-              .reduce((acc, [_, qty]) => acc + Number(qty), 0)
+            return sum + CoreAssets.getUnits(output.assets)
+              .filter(unit => unit.startsWith(policyA))
+              .reduce((acc, unit) => acc + Number(CoreAssets.getByUnit(output.assets, unit) ?? 0n), 0)
           }, 0)
           expect(totalTokens).toBe(50)
 
           // Verify total lovelace is conserved
-          const totalOutputLovelace = outputs.reduce((sum, out) => sum + Assets.getLovelace(out.assets), 0n)
+          const totalOutputLovelace = outputs.reduce((sum, out) => sum + out.assets.lovelace, 0n)
           expect(totalOutputLovelace).toBe(20_000000n)
         }
       })
@@ -1067,12 +1093,14 @@ describe("Unfrack UTxO Optimization", () => {
     it.skip("should return undefined when insufficient ADA for both tokens and subdivision", () =>
       Effect.gen(function* () {
         const policyA = "a".repeat(56)
+        const token1Hex = toHex("token1")
+        const token2Hex = toHex("token2")
 
-        const changeAssets: Assets.Assets = {
+        const changeAssets = CoreAssets.fromRecord({
           lovelace: 500000n, // 0.5 ADA - insufficient
-          [`${policyA}${toHex("token1")}`]: 100n,
-          [`${policyA}${toHex("token2")}`]: 200n
-        }
+          [`${policyA}${token1Hex}`]: 100n,
+          [`${policyA}${token2Hex}`]: 200n
+        })
 
         const options: UnfrackOptions = {
           tokens: {
@@ -1222,9 +1250,9 @@ describe("Unfrack UTxO Optimization", () => {
     // SKIPPED: See "SKIPPED TESTS - Common Rationale" at the top of this file
     it.skip("should return undefined when insufficient ADA for minUTxO (ADA-only subdivision)", () =>
       Effect.gen(function* () {
-        const changeAssets: Assets.Assets = {
+        const changeAssets = CoreAssets.fromRecord({
           lovelace: 1000n // Far too small for minUTxO requirements
-        }
+        })
 
         const options: UnfrackOptions = {
           ada: {
@@ -1249,13 +1277,16 @@ describe("Unfrack UTxO Optimization", () => {
     it.skip("should return undefined when insufficient ADA for token bundle minUTxO", () =>
       Effect.gen(function* () {
         const policyA = "a".repeat(56)
+        const token1Hex = toHex("token1")
+        const token2Hex = toHex("token2")
+        const token3Hex = toHex("token3")
 
-        const changeAssets: Assets.Assets = {
+        const changeAssets = CoreAssets.fromRecord({
           lovelace: 500000n, // Insufficient for token bundle minUTxO
-          [`${policyA}${toHex("token1")}`]: 100n,
-          [`${policyA}${toHex("token2")}`]: 200n,
-          [`${policyA}${toHex("token3")}`]: 300n
-        }
+          [`${policyA}${token1Hex}`]: 100n,
+          [`${policyA}${token2Hex}`]: 200n,
+          [`${policyA}${token3Hex}`]: 300n
+        })
 
         const options: UnfrackOptions = {
           tokens: {
@@ -1281,6 +1312,7 @@ describe("Unfrack UTxO Optimization", () => {
     it.skip("should return undefined when ADA subdivision would violate asset conservation", () =>
       Effect.gen(function* () {
         const policyA = "a".repeat(56)
+        const token1Hex = toHex("token1")
 
         // Scenario designed to FAIL subdivision:
         // - Small total ADA with 1 token
@@ -1290,10 +1322,10 @@ describe("Unfrack UTxO Optimization", () => {
         // - Each output would be ~0.105 ADA (way below minUTxO of ~0.9 ADA)
         // - Total minUTxO needed: ~9 ADA (0.9 × 10)
         // - Available: 1.05 ADA < 9 ADA → SKIP subdivision
-        const changeAssets: Assets.Assets = {
+        const changeAssets = CoreAssets.fromRecord({
           lovelace: 1_500000n, // 1.5 ADA total
-          [`${policyA}${toHex("token1")}`]: 100n
-        }
+          [`${policyA}${token1Hex}`]: 100n
+        })
 
         const options: UnfrackOptions = {
           tokens: {
@@ -1323,15 +1355,17 @@ describe("Unfrack UTxO Optimization", () => {
       Effect.gen(function* () {
         const policyA = "a".repeat(56)
         const policyB = "b".repeat(56)
+        const token1Hex = toHex("token1")
+        const token2Hex = toHex("token2")
 
         // Scenario: Token bundles consume most ADA, leaving ~5 ADA
         // 5 ADA > 1 ADA threshold → tries to subdivide
         // Subdivision may partially succeed or be skipped depending on minUTxO requirements
-        const changeAssets: Assets.Assets = {
+        const changeAssets = CoreAssets.fromRecord({
           lovelace: 8_000000n, // 8 ADA total
-          [`${policyA}${toHex("token1")}`]: 100n,
-          [`${policyB}${toHex("token2")}`]: 200n
-        }
+          [`${policyA}${token1Hex}`]: 100n,
+          [`${policyB}${token2Hex}`]: 200n
+        })
 
         const options: UnfrackOptions = {
           tokens: {
@@ -1353,13 +1387,13 @@ describe("Unfrack UTxO Optimization", () => {
         expect(outputs).toBeDefined()
         if (outputs !== undefined) {
           // FUNDAMENTAL: Asset Conservation
-          const totalOutputAssets = Assets.merge(...outputs.map(out => out.assets))
-          const delta = Assets.subtract(changeAssets, totalOutputAssets)
-          expect(Assets.getLovelace(delta)).toBe(0n)
+          const totalOutputAssets = outputs.map(out => out.assets).reduce(CoreAssets.merge, CoreAssets.zero)
+          const delta = CoreAssets.subtract(changeAssets, totalOutputAssets)
+          expect(delta.lovelace).toBe(0n)
           
           // Should have 2 token bundles
           const tokenOutputs = outputs.filter(output =>
-            Object.keys(output.assets).some(key => key.includes(policyA) || key.includes(policyB))
+            CoreAssets.getUnits(output.assets).some(unit => unit.startsWith(policyA) || unit.startsWith(policyB))
           )
           expect(tokenOutputs.length).toBe(2)
           
@@ -1372,16 +1406,17 @@ describe("Unfrack UTxO Optimization", () => {
     it.effect("should maintain asset conservation even when ADA subdivision partially succeeds or fails", () =>
       Effect.gen(function* () {
         const policyA = "a".repeat(56)
+        const token1Hex = toHex("token1")
 
         // Create a scenario where:
         // 1. Token bundle takes some ADA (~0.45 ADA)
         // 2. Remaining is above threshold (~4.55 ADA > 2 ADA threshold)
         // 3. Try to split into 4 outputs = ~1.14 ADA each
         // 4. Test that asset conservation is maintained regardless of subdivision success
-        const changeAssets: Assets.Assets = {
+        const changeAssets = CoreAssets.fromRecord({
           lovelace: 5_000000n, // 5 ADA total
-          [`${policyA}${toHex("token1")}`]: 50n
-        }
+          [`${policyA}${token1Hex}`]: 50n
+        })
 
         const options: UnfrackOptions = {
           tokens: {
@@ -1403,13 +1438,13 @@ describe("Unfrack UTxO Optimization", () => {
         expect(outputs).toBeDefined()
         if (outputs !== undefined) {
           // FUNDAMENTAL: Asset Conservation - must pass regardless of subdivision outcome
-          const totalOutputAssets = Assets.merge(...outputs.map(out => out.assets))
-          const delta = Assets.subtract(changeAssets, totalOutputAssets)
-          expect(Assets.getLovelace(delta)).toBe(0n)
+          const totalOutputAssets = outputs.map(out => out.assets).reduce(CoreAssets.merge, CoreAssets.zero)
+          const delta = CoreAssets.subtract(changeAssets, totalOutputAssets)
+          expect(delta.lovelace).toBe(0n)
           
           // Should have 1 token bundle
           const tokenOutputs = outputs.filter(output =>
-            Object.keys(output.assets).some(key => key.includes(policyA))
+            CoreAssets.getUnits(output.assets).some(unit => unit.startsWith(policyA))
           )
           expect(tokenOutputs.length).toBe(1)
           
@@ -1421,9 +1456,9 @@ describe("Unfrack UTxO Optimization", () => {
     it.effect("should handle edge case: exactly minUTxO amount for single output", () =>
       Effect.gen(function* () {
         // Calculate exact minUTxO for a simple ADA-only output
-        const changeAssets: Assets.Assets = {
+        const changeAssets = CoreAssets.fromRecord({
           lovelace: 1_000000n // Will calculate if this is exactly minUTxO or not
-        }
+        })
 
         const options: UnfrackOptions = {
           ada: {
@@ -1441,7 +1476,7 @@ describe("Unfrack UTxO Optimization", () => {
         // Should either create 1 output or return undefined depending on minUTxO calculation
         if (outputs !== undefined) {
           expect(outputs).toHaveLength(1)
-          expect(Assets.getLovelace(outputs[0].assets)).toBe(1_000000n)
+          expect(outputs[0].assets.lovelace).toBe(1_000000n)
         } else {
           // If undefined, it means 1 ADA < minUTxO for this address
           expect(outputs).toBeUndefined()
@@ -1451,9 +1486,9 @@ describe("Unfrack UTxO Optimization", () => {
 
     it.effect("should return undefined when ADA subdivision would create outputs below minUTxO", () =>
       Effect.gen(function* () {
-        const changeAssets: Assets.Assets = {
+        const changeAssets = CoreAssets.fromRecord({
           lovelace: 2_500000n // 2.5 ADA - may not be enough for 3 outputs
-        }
+        })
 
         const options: UnfrackOptions = {
           ada: {
@@ -1475,7 +1510,7 @@ describe("Unfrack UTxO Optimization", () => {
           // If outputs created, verify each meets minUTxO
           expect(outputs.length).toBeGreaterThan(0)
           outputs.forEach(output => {
-            expect(Assets.getLovelace(output.assets)).toBeGreaterThan(0n)
+            expect(output.assets.lovelace).toBeGreaterThan(0n)
           })
         } else {
           // Confirmed: insufficient for subdivision
@@ -1487,9 +1522,9 @@ describe("Unfrack UTxO Optimization", () => {
     // SKIPPED: See "SKIPPED TESTS - Common Rationale" at the top of this file
     it.skip("should return undefined with extremely small ADA and forced subdivision", () =>
       Effect.gen(function* () {
-        const changeAssets: Assets.Assets = {
+        const changeAssets = CoreAssets.fromRecord({
           lovelace: 100000n // 0.1 ADA - definitely too small
-        }
+        })
 
         const options: UnfrackOptions = {
           ada: {

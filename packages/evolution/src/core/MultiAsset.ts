@@ -5,7 +5,7 @@ import * as Bytes from "./Bytes.js"
 import * as CBOR from "./CBOR.js"
 import * as _Codec from "./Codec.js"
 import * as PolicyId from "./PolicyId.js"
-import * as PositiveCoin from "./PositiveCoin.js"
+
 
 /**
  * Helper function for content-based Map equality using Equal.equals.
@@ -53,20 +53,23 @@ const mapHash = <K, V>(map: Map<K, V>): number => {
 }
 
 /**
- * Schema for inner asset map (asset_name => positive_coin).
+ * Schema for inner asset map (asset_name => bigint).
+ *
+ * This is a **base type** with no constraints. Values can be positive,
+ * negative, or zero to support arithmetic operations.
+ *
+ * Constraints (positive values) are applied at boundaries like
+ * `TransactionOutput` where CDDL requires positive_coin.
  *
  * @since 2.0.0
  * @category schemas
  */
 export const AssetMap = Schema.Map({
   key: AssetName.AssetName,
-  value: PositiveCoin.PositiveCoinSchema
+  value: Schema.BigInt
+}).annotations({
+  identifier: "MultiAsset.AssetMap"
 })
-  .pipe(Schema.filter((map) => map.size > 0))
-  .annotations({
-    message: () => "Asset map cannot be empty",
-    identifier: "MultiAsset.AssetMap"
-  })
 
 /**
  * Type alias for the inner asset map.
@@ -79,9 +82,15 @@ export type AssetMap = typeof AssetMap.Type
 /**
  * Schema for MultiAsset representing native assets.
  *
+ * This is a **base type** with no constraints on size or values.
+ * It supports arithmetic operations (merge, subtract, negate) which may
+ * produce empty maps or negative quantities during intermediate calculations.
+ *
+ * Constraints (non-empty, positive values) are applied at boundaries
+ * like `TransactionOutput` where CDDL requires `multiasset<positive_coin>`.
+ *
  * ```
- * multiasset<a0> = {+ policy_id => {+ asset_name => a0}}
- * case: multiasset<positive_coin> = {+ policy_id => {+ asset_name => positive_coin}}
+ * multiasset<a0> = {* policy_id => {* asset_name => a0}}
  * ```
  *
  * @since 2.0.0
@@ -91,7 +100,7 @@ export class MultiAsset extends Schema.Class<MultiAsset>("MultiAsset")({
   map: Schema.Map({
     key: PolicyId.PolicyId,
     value: AssetMap
-  }).pipe(Schema.filter((map) => map.size > 0))
+  })
 }) {
   /**
    * Convert to JSON representation.
@@ -216,7 +225,7 @@ export const empty = (): MultiAsset => new MultiAsset({ map: new Map() })
 export const singleton = (
   policyId: PolicyId.PolicyId,
   assetName: AssetName.AssetName,
-  amount: PositiveCoin.PositiveCoin
+  amount: bigint
 ): MultiAsset => {
   const assetMap = new Map([[assetName, amount]])
   const map = new Map([[policyId, assetMap]])
@@ -233,7 +242,7 @@ export const addAsset = (
   multiAsset: MultiAsset,
   policyId: PolicyId.PolicyId,
   assetName: AssetName.AssetName,
-  amount: PositiveCoin.PositiveCoin
+  amount: bigint
 ): MultiAsset => {
   // Find existing entry by structural equality (not reference equality)
   let existingPolicyId: PolicyId.PolicyId | undefined
@@ -249,7 +258,7 @@ export const addAsset = (
   if (existingAssetMap !== undefined && existingPolicyId !== undefined) {
     // Find existing asset by structural equality
     let existingAssetName: AssetName.AssetName | undefined
-    let existingAmount: PositiveCoin.PositiveCoin | undefined
+    let existingAmount: bigint | undefined
     for (const [aname, amt] of existingAssetMap.entries()) {
       if (Equal.equals(aname, assetName)) {
         existingAssetName = aname
@@ -258,7 +267,7 @@ export const addAsset = (
       }
     }
     
-    const newAmount = existingAmount !== undefined ? PositiveCoin.add(existingAmount, amount) : amount
+    const newAmount = existingAmount !== undefined ? existingAmount + amount : amount
 
     const updatedAssetMap = new Map(existingAssetMap)
     // Use the existing key if found, otherwise use the new one
@@ -355,7 +364,7 @@ export const arbitrary: FastCheck.Arbitrary<MultiAsset> = FastCheck.uniqueArray(
       selector: (a) => Bytes.toHex(a.bytes)
     }).chain((names) =>
       // Generate exactly names.length amounts to pair with the unique names
-      FastCheck.array(PositiveCoin.arbitrary, { minLength: names.length, maxLength: names.length }).map((amounts) => {
+      FastCheck.array(FastCheck.bigInt({ min: 1n, max: 18446744073709551615n }), { minLength: names.length, maxLength: names.length }).map((amounts) => {
         const entries = names.map((n, i) => [n, amounts[i]] as const)
         return new Map(entries)
       })
@@ -364,12 +373,12 @@ export const arbitrary: FastCheck.Arbitrary<MultiAsset> = FastCheck.uniqueArray(
   return FastCheck.array(assetsForPolicy(), { minLength: policies.length, maxLength: policies.length }).map(
     (assetMaps) => {
       // Build a properly typed Map<PolicyId, AssetMap>
-      const result = new Map<PolicyId.PolicyId, Map<AssetName.AssetName, PositiveCoin.PositiveCoin>>()
+      const result = new Map<PolicyId.PolicyId, Map<AssetName.AssetName, bigint>>()
       for (let i = 0; i < policies.length; i++) {
         const policy = policies[i]!
         const assetMap = assetMaps[i]!
-        // assetMap is generated to be a Map<AssetName, PositiveCoin>
-        result.set(policy, assetMap as Map<AssetName.AssetName, PositiveCoin.PositiveCoin>)
+        // assetMap is generated to be a Map<AssetName, bigint>
+        result.set(policy, assetMap as Map<AssetName.AssetName, bigint>)
       }
 
       return new MultiAsset({ map: result })
@@ -425,13 +434,10 @@ export const FromCDDL = Schema.transformOrFail(
         for (const [policyIdBytes, assetMapCddl] of fromA.entries()) {
           const policyId = yield* ParseResult.decode(PolicyId.FromBytes)(policyIdBytes)
 
-          const assetMap = new Map<AssetName.AssetName, PositiveCoin.PositiveCoin>()
+          const assetMap = new Map<AssetName.AssetName, bigint>()
           for (const [assetNameBytes, amount] of assetMapCddl.entries()) {
             const assetName = yield* ParseResult.decode(AssetName.FromBytes)(assetNameBytes)
-            const positiveCoin = yield* ParseResult.decodeUnknown(Schema.typeSchema(PositiveCoin.PositiveCoinSchema))(
-              amount
-            )
-            assetMap.set(assetName, positiveCoin)
+            assetMap.set(assetName, amount)
           }
 
           result.set(policyId, assetMap)
@@ -556,7 +562,7 @@ export const subtract = (a: MultiAsset, b: MultiAsset): MultiAsset => {
       result.set(policyId, assetMapA)
     } else {
       // Subtract assets for this policy
-      const newAssetMap = new Map<AssetName.AssetName, PositiveCoin.PositiveCoin>()
+      const newAssetMap = new Map<AssetName.AssetName, bigint>()
 
       for (const [assetName, amountA] of assetMapA.entries()) {
         const amountB = assetMapB.get(assetName)

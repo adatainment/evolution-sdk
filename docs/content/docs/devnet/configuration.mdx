@@ -121,6 +121,7 @@ After creating a genesis configuration, calculate the resulting UTxOs to verify 
 
 ```typescript twoslash
 import { Config, Genesis } from "@evolution-sdk/devnet";
+import { Core } from "@evolution-sdk/evolution";
 declare const addressHex: string;
 
 const genesisConfig = {
@@ -135,10 +136,10 @@ const genesisUtxos = await Genesis.calculateUtxosFromConfig(genesisConfig);
 
 console.log("Genesis UTxOs:", genesisUtxos.length);
 genesisUtxos.forEach(utxo => {
-  console.log("Address:", utxo.address);
+  console.log("Address:", Core.Address.toBech32(utxo.address));
   console.log("Amount:", utxo.assets.lovelace, "lovelace");
-  console.log("TxHash:", utxo.txHash);
-  console.log("OutputIndex:", utxo.outputIndex);
+  console.log("TxHash:", Core.TransactionHash.toHex(utxo.transactionId));
+  console.log("OutputIndex:", utxo.index);
 });
 ```
 

@@ -39,20 +39,22 @@ Pointer Address = Payment Credential + Pointer (slot, txIndex, certIndex)
 | Adoption | Rare | Universal |
 | Recommended | ✗ No | • Yes |
 
-## Parsing Pointer Addresses
+## Parsing Pointer Addresses (Legacy)
 
-If you encounter a pointer address, you can parse it using the `AddressDetails` utility:
+> **Note**: `Core.Address` does not support pointer addresses as they are deprecated. Use `Core.AddressEras` for historical parsing.
+
+If you encounter a pointer address in historical data, you can parse it using `AddressEras`:
 
 ```typescript twoslash
-import { AddressDetails } from "@evolution-sdk/evolution";
+import { Core } from "@evolution-sdk/evolution";
 
-// Parse a pointer address from Bech32
-const details = AddressDetails.fromBech32("addr_test1gz...");
+// Parse a pointer address from Bech32 using AddressEras (legacy support)
+const address = Core.AddressEras.fromBech32("addr_test1gz2n8fvzgmyhnqlpnv2340v09943nr7pz5af2rwqrra8ncsm0tdz8");
 
-if (details.type === "PointerAddress" && details.address._tag === "PointerAddress") {
-  // Type narrowed to PointerAddress - now we can access pointer-specific properties
-  console.log("Payment credential:", details.address.paymentCredential);
-  console.log("Pointer:", details.address.pointer);
+if (address._tag === "PointerAddress") {
+  // Type narrowed to PointerAddress - access pointer-specific properties
+  console.log("Payment credential:", address.paymentCredential);
+  console.log("Pointer:", address.pointer);
 }
 ```
 

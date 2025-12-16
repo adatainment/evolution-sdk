@@ -5,11 +5,11 @@ description: Working with Cardano addresses in Evolution SDK
 
 # Address Overview
 
-Cardano addresses identify where funds can be sent and who controls them. The Evolution SDK provides a **simplified Address API** that works with payment credentials and optional staking credentials, abstracting away the complexity of different address types.
+Cardano addresses identify where funds can be sent and who controls them. The Evolution SDK provides `Core.Address` for working with payment credentials and optional staking credentials, handling the complexity of different address formats.
 
-## The Simplified Address Model
+## The Core Address Model
 
-Instead of dealing with multiple address types (BaseAddress, EnterpriseAddress, etc.), Evolution SDK uses a unified `Address` structure:
+Instead of dealing with multiple address types (BaseAddress, EnterpriseAddress, etc.), Evolution SDK uses a unified `Core.Address` structure:
 
 ```typescript
 Address = Payment Credential + Optional Staking Credential
@@ -104,7 +104,7 @@ const paymentOnlyAddress = new Core.Address.Address({
 const bech32String = Core.Address.toBech32(stakingAddress)
 ```
 
-[Learn about credentials and address internals →](/docs/addresses/core-concepts)
+[Learn about the Core.Address module →](/docs/addresses/address)
 
 ## When to Use Each Pattern
 
@@ -169,7 +169,7 @@ const address = new Core.Address.Address({
     Spend UTXOs            Delegate & earn rewards
 ```
 
-### Without Staking (Simplified Pattern)
+### Without Staking (Basic Pattern)
 
 ```
 ┌──────────────────────────┐
@@ -197,9 +197,9 @@ Addresses use different Bech32 prefixes based on network:
 
 ## Understanding Address Eras
 
-While the simplified `Address` API covers most use cases, Cardano's ledger specification defines several specific address types. These are called **Address Eras**:
+While `Core.Address` covers most use cases, Cardano's ledger specification defines several specific address types. These are called **Address Eras**:
 
-| Era Type | Simplified Equivalent | When to Learn More |
+| Era Type | Core.Address Equivalent | When to Learn More |
 |----------|----------------------|-------------------|
 | **Base** | Address with staking credential | Standard addresses |
 | **Enterprise** | Address without staking credential | Exchange/contract addresses |
@@ -253,7 +253,7 @@ Verify address format and network:
 ## Next Steps
 
 **Core Concepts:**
-- [Credentials & Address Internals](/docs/addresses/core-concepts) - Deep dive into how addresses work
+- [Core.Address](/docs/addresses/address) - How to parse, validate, and convert addresses
 - [Address Types](/docs/addresses/address-types) - Comprehensive coverage of all address types
 
 **Advanced Patterns:**

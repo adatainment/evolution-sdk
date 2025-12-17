@@ -1,10 +1,10 @@
 import type { Record } from "effect"
 import { Schema } from "effect"
 
-import * as Bytes from "../../../core/Bytes.js"
 import * as CoreAddress from "../../../core/Address.js"
 import * as AssetName from "../../../core/AssetName.js"
 import type * as CoreAssets from "../../../core/Assets/index.js"
+import * as Bytes from "../../../core/Bytes.js"
 import * as PlutusData from "../../../core/Data.js"
 import type * as DatumOption from "../../../core/DatumOption.js"
 import * as PolicyId from "../../../core/PolicyId.js"

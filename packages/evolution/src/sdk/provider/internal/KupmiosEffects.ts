@@ -1,9 +1,9 @@
 import { FetchHttpClient } from "@effect/platform"
 import { Array as _Array, Effect, pipe, Schedule, Schema } from "effect"
 
-import * as Bytes from "../../../core/Bytes.js"
 import * as CoreAddress from "../../../core/Address.js"
 import * as CoreAssets from "../../../core/Assets/index.js"
+import * as Bytes from "../../../core/Bytes.js"
 import * as PlutusData from "../../../core/Data.js"
 import * as DatumOption from "../../../core/DatumOption.js"
 import * as ScriptRef from "../../../core/ScriptRef.js"

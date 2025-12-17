@@ -1,6 +1,6 @@
 ---
 title: sdk/builders/TransactionBuilder.ts
-nav_order: 170
+nav_order: 171
 parent: Modules
 ---
 
@@ -755,7 +755,7 @@ Index is determined later during witness assembly based on input ordering.
 ```ts
 export interface RedeemerData {
   readonly tag: "spend" | "mint" | "cert" | "reward"
-  readonly data: string // PlutusData CBOR hex
+  readonly data: PlutusData.Data
   readonly exUnits?: {
     // Optional: from script evaluation
     readonly mem: bigint

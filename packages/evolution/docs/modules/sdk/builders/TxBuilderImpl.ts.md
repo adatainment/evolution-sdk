@@ -1,6 +1,6 @@
 ---
 title: sdk/builders/TxBuilderImpl.ts
-nav_order: 172
+nav_order: 173
 parent: Modules
 ---
 
@@ -62,7 +62,7 @@ export declare const assembleTransaction: (
   inputs: ReadonlyArray<TransactionInput.TransactionInput>,
   outputs: ReadonlyArray<TxOut.TransactionOutput>,
   fee: bigint
-) => Effect.Effect<Transaction.Transaction, TransactionBuilderError, TxContext>
+) => Effect.Effect<Transaction.Transaction, TransactionBuilderError, TxContext | TxBuilderConfigTag>
 ```
 
 Added in v2.0.0
@@ -182,7 +182,7 @@ export declare const calculateFeeIteratively: (
     string,
     {
       readonly tag: "spend" | "mint" | "cert" | "reward"
-      readonly data: string
+      readonly data: PlutusData.Data
       readonly exUnits?: { readonly mem: bigint; readonly steps: bigint }
     }
   >,

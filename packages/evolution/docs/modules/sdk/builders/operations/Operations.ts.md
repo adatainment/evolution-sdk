@@ -1,6 +1,6 @@
 ---
 title: sdk/builders/operations/Operations.ts
-nav_order: 155
+nav_order: 156
 parent: Modules
 ---
 
@@ -27,7 +27,7 @@ parent: Modules
 ```ts
 export interface CollectFromParams {
   readonly inputs: ReadonlyArray<UTxO.UTxO> // Mandatory: UTxOs to consume as inputs
-  readonly redeemer?: string
+  readonly redeemer?: Data.Data // Optional: Redeemer for script-locked UTxOs
 }
 ```
 
@@ -38,7 +38,7 @@ export interface CollectFromParams {
 ```ts
 export interface MintTokensParams {
   readonly assets: CoreAssets.Assets // Mandatory: Tokens to mint (excluding lovelace)
-  readonly redeemer?: string // Optional: Redeemer for minting script
+  readonly redeemer?: Data.Data // Optional: Redeemer for minting script
 }
 ```
 

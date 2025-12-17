@@ -5,8 +5,8 @@
 
 import { Effect, Schema } from "effect"
 
-import * as Bytes from "../../../core/Bytes.js"
 import * as CoreAddress from "../../../core/Address.js"
+import * as Bytes from "../../../core/Bytes.js"
 import type * as CoreUTxO from "../../../core/UTxO.js"
 import type * as Credential from "../../Credential.js"
 import type { EvalRedeemer } from "../../EvalRedeemer.js"

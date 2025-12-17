@@ -4,10 +4,6 @@ import * as CBOR from "./CBOR.js"
 import * as Data from "./Data.js"
 import * as Redeemer from "./Redeemer.js"
 
-// ============================================================================
-// Helpers
-// ============================================================================
-
 /**
  * Helper for array equality using element-by-element comparison.
  */
@@ -30,15 +26,12 @@ const arrayHash = <A>(arr: ReadonlyArray<A>): number => {
   return hash
 }
 
-// ============================================================================
-// Format Type
-// ============================================================================
 
 /**
  * Encoding format for redeemers collection.
  *
  * Conway CDDL supports two formats:
- * ```cddl
+ * ```
  * ; Flat Array support is included for backwards compatibility and
  * ; will be removed in the next era. It is recommended for tools to
  * ; adopt using a Map instead of Array going forward.
@@ -55,9 +48,6 @@ const arrayHash = <A>(arr: ReadonlyArray<A>): number => {
  */
 export type Format = "array" | "map"
 
-// ============================================================================
-// Model
-// ============================================================================
 
 /**
  * Redeemers collection based on Conway CDDL specification.
@@ -94,14 +84,11 @@ export class Redeemers extends Schema.TaggedClass<Redeemers>()("Redeemers", {
   }
 }
 
-// ============================================================================
-// Array Format CDDL Schemas (Legacy)
-// ============================================================================
 
 /**
  * CDDL schema for Redeemers in array format.
  *
- * CDDL: redeemers = [ + redeemer ]
+ * `redeemers = [ + redeemer ]`
  *
  * @since 2.0.0
  * @category schemas
@@ -124,12 +111,9 @@ export const FromArrayCDDL = Schema.transformOrFail(ArrayCDDLSchema, Schema.type
     })
 })
 
-// ============================================================================
-// Map Format CDDL Schemas (Conway recommended)
-// ============================================================================
 
 /**
- * Map key schema: [tag, index]
+ * Map key schema: `[tag, index]`
  *
  * @since 2.0.0
  * @category schemas
@@ -137,7 +121,7 @@ export const FromArrayCDDL = Schema.transformOrFail(ArrayCDDLSchema, Schema.type
 const MapKeyCDDLSchema = Schema.Tuple(CBOR.Integer, CBOR.Integer)
 
 /**
- * Map value schema: [data, ex_units]
+ * Map value schema: `[data, ex_units]`
  *
  * @since 2.0.0
  * @category schemas
@@ -147,7 +131,7 @@ const MapValueCDDLSchema = Schema.Tuple(Data.CDDLSchema, Schema.Tuple(CBOR.Integ
 /**
  * CDDL schema for Redeemers in map format.
  *
- * CDDL: { + [tag, index] => [data, ex_units] }
+ * `{ + [tag, index] => [data, ex_units] }`
  *
  * @since 2.0.0
  * @category schemas
@@ -192,9 +176,6 @@ export const FromMapCDDL = Schema.transformOrFail(MapCDDLSchema, Schema.typeSche
     })
 })
 
-// ============================================================================
-// Default CDDL Schema (Array format for backwards compatibility)
-// ============================================================================
 
 /**
  * Default CDDL schema for Redeemers (array format).
@@ -212,9 +193,6 @@ export const CDDLSchema = ArrayCDDLSchema
  */
 export const FromCDDL = FromArrayCDDL
 
-// ============================================================================
-// CBOR Transformation Schemas
-// ============================================================================
 
 /**
  * CBOR bytes transformation schema for Redeemers (array format).
@@ -268,10 +246,6 @@ export const FromCBORHexMap = (options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPT
     description: "Transforms CBOR hex string to Redeemers using map format"
   })
 
-// ============================================================================
-// Arbitrary
-// ============================================================================
-
 /**
  * FastCheck arbitrary for Redeemers.
  *
@@ -281,10 +255,6 @@ export const FromCBORHexMap = (options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPT
 export const arbitrary = FastCheck.array(Redeemer.arbitrary, { maxLength: 5 }).map(
   (values) => new Redeemers({ values })
 )
-
-// ============================================================================
-// Root Functions
-// ============================================================================
 
 /**
  * Parse Redeemers from CBOR bytes (array format).

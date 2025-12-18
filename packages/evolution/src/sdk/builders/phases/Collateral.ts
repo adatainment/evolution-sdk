@@ -144,7 +144,7 @@ export const executeCollateral = (): Effect.Effect<
     // ═══════════════════════════════════════════════════════════
     // STEP 1: Early Exit - Skip if no scripts
     // ═══════════════════════════════════════════════════════════
-    if (state.redeemers.size === 0) {
+    if (state.redeemers.size === 0 && state.deferredRedeemers.size === 0) {
       yield* Effect.logDebug("[Collateral] No redeemers found, skipping collateral selection")
       // No scripts - continue to ChangeCreation without collateral
       return { next: "changeCreation" as const }

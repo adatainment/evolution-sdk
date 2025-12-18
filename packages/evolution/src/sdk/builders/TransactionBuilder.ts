@@ -58,6 +58,7 @@ import { executeEvaluation } from "./phases/Evaluation.js"
 import { executeFallback } from "./phases/Fallback.js"
 import { executeFeeCalculation } from "./phases/FeeCalculation.js"
 import { executeSelection } from "./phases/Selection.js"
+import type { DeferredRedeemer } from "./RedeemerBuilder.js"
 import type { SignBuilder } from "./SignBuilder.js"
 import { makeSignBuilder } from "./SignBuilderImpl.js"
 import type { TransactionResultBase } from "./TransactionResult.js"
@@ -110,6 +111,7 @@ const initialTxBuilderState: TxBuilderState = {
   totalOutputAssets: CoreAssets.zero,
   totalInputAssets: CoreAssets.zero,
   redeemers: new Map(),
+  deferredRedeemers: new Map(),
   referenceInputs: []
 }
 
@@ -338,7 +340,11 @@ const assembleAndValidateTransaction = Effect.gen(function* () {
   const transaction = yield* assembleTransaction(inputs, allOutputs, buildCtx.calculatedFee)
 
   // SAFETY CHECK: Validate transaction size against protocol limit
-  const fakeWitnessSet = yield* buildFakeWitnessSet(selectedUtxos)
+  // Include collateral UTxOs in witness estimation - they require VKey witnesses too!
+  const allUtxosForWitnesses = finalState.collateral 
+    ? [...selectedUtxos, ...finalState.collateral.inputs]
+    : selectedUtxos
+  const fakeWitnessSet = yield* buildFakeWitnessSet(allUtxosForWitnesses)
 
   const txWithFakeWitnesses = new Transaction.Transaction({
     body: transaction.body,
@@ -1162,7 +1168,8 @@ export interface TxBuilderState {
   readonly scripts: Map<string, CoreScript.Script> // Scripts attached to the transaction
   readonly totalOutputAssets: CoreAssets.Assets // Asset totals for balancing
   readonly totalInputAssets: CoreAssets.Assets // Asset totals for balancing
-  readonly redeemers: Map<string, RedeemerData> // Redeemer data for script inputs
+  readonly redeemers: Map<string, RedeemerData> // Resolved redeemer data (static mode)
+  readonly deferredRedeemers: Map<string, DeferredRedeemerData> // Deferred redeemers (self/batch mode)
   readonly referenceInputs: ReadonlyArray<CoreUTxO.UTxO> // Reference inputs (UTxOs with reference scripts)
   readonly mint?: Mint.Mint // Assets being minted/burned (positive = mint, negative = burn)
   readonly collateral?: {
@@ -1185,6 +1192,22 @@ export interface RedeemerData {
   readonly data: PlutusData.Data
   readonly exUnits?: {
     // Optional: from script evaluation
+    readonly mem: bigint
+    readonly steps: bigint
+  }
+}
+
+/**
+ * Deferred redeemer data for RedeemerBuilder patterns.
+ * Contains callback that will be resolved after coin selection completes.
+ *
+ * @since 2.0.0
+ * @category state
+ */
+export interface DeferredRedeemerData {
+  readonly tag: "spend" | "mint" | "cert" | "reward"
+  readonly deferred: DeferredRedeemer
+  readonly exUnits?: {
     readonly mem: bigint
     readonly steps: bigint
   }

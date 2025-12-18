@@ -12,6 +12,7 @@ import * as Assets from "../../../core/Assets/index.js"
 import * as Mint from "../../../core/Mint.js"
 import * as NonZeroInt64 from "../../../core/NonZeroInt64.js"
 import * as PolicyId from "../../../core/PolicyId.js"
+import * as RedeemerBuilder from "../RedeemerBuilder.js"
 import { TransactionBuilderError, TxContext } from "../TransactionBuilder.js"
 import type { MintTokensParams } from "./Operations.js"
 
@@ -24,6 +25,11 @@ import type { MintTokensParams } from "./Operations.js"
  * 2. Converts SDK Assets to Core.Mint structure
  * 3. Merges with existing mint state
  * 4. Tracks redeemer information for script-based minting policies (by PolicyId)
+ * 
+ * **RedeemerBuilder Support:**
+ * - Static: Direct Data value stored immediately
+ * - Self: Callback stored for per-policy resolution after coin selection
+ * - Batch: Callback + input set stored for multi-policy resolution
  * 
  * @since 2.0.0
  * @category programs
@@ -91,24 +97,39 @@ export const createMintProgram = (params: MintTokensParams) =>
 
       // Track redeemer by PolicyId if provided
       let newRedeemers = state.redeemers
+      let newDeferredRedeemers = state.deferredRedeemers
       
       if (params.redeemer && policyIds.size > 0) {
-        newRedeemers = new Map(state.redeemers)
+        const deferred = RedeemerBuilder.toDeferredRedeemer(params.redeemer)
         
-        // Associate redeemer with each policy in this mint operation
-        for (const policyIdHex of policyIds) {
-          newRedeemers.set(policyIdHex, {
-            tag: "mint",
-            data: params.redeemer,
-            exUnits: undefined
-          })
+        if (deferred._tag === "static") {
+          // Static mode: store resolved data immediately
+          newRedeemers = new Map(state.redeemers)
+          for (const policyIdHex of policyIds) {
+            newRedeemers.set(policyIdHex, {
+              tag: "mint",
+              data: deferred.data,
+              exUnits: undefined
+            })
+          }
+        } else {
+          // Self or Batch mode: store deferred for resolution after coin selection
+          newDeferredRedeemers = new Map(state.deferredRedeemers)
+          for (const policyIdHex of policyIds) {
+            newDeferredRedeemers.set(policyIdHex, {
+              tag: "mint",
+              deferred,
+              exUnits: undefined
+            })
+          }
         }
       }
 
       return {
         ...state,
         mint: mergedMint,
-        redeemers: newRedeemers
+        redeemers: newRedeemers,
+        deferredRedeemers: newDeferredRedeemers
       }
     })
   })

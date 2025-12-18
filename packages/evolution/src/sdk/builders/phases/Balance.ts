@@ -114,8 +114,10 @@ export const executeBalance = (): Effect.Effect<
       yield* Effect.logDebug("[Balance] Transaction balanced!")
       
       // Check if transaction has scripts that need evaluation
-      // Only route to evaluation if there are redeemers WITHOUT exUnits
-      if (EvaluationStateManager.hasUnevaluatedRedeemers(state.redeemers)) {
+      // Route to evaluation if there are:
+      // 1. Resolved redeemers WITHOUT exUnits, OR
+      // 2. Any deferred redeemers (need resolution before evaluation)
+      if (EvaluationStateManager.hasUnevaluatedRedeemers(state.redeemers) || state.deferredRedeemers.size > 0) {
         yield* Effect.logDebug("[Balance] Unevaluated redeemers detected - routing to Evaluation phase")
         return { next: "evaluation" as const }
       }

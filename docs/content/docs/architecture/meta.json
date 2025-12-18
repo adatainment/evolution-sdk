@@ -4,6 +4,7 @@
     "index",
     "transaction-flow",
     "coin-selection",
+    "redeemer-indexing",
     "script-evaluation",
     "unfrack-optimization",
     "devnet",

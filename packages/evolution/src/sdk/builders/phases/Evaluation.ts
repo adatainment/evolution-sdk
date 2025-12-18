@@ -17,10 +17,13 @@ import * as Transaction from "../../../core/Transaction.js"
 import * as CoreUTxO from "../../../core/UTxO.js"
 import type * as ProtocolParametersModule from "../../ProtocolParameters.js"
 import * as EvaluationStateManager from "../EvaluationStateManager.js"
+import type { IndexedInput } from "../RedeemerBuilder.js"
 import {
   BuildOptionsTag,
+  type DeferredRedeemerData,
   type EvaluationContext,
   PhaseContextTag,
+  type RedeemerData,
   TransactionBuilderError,
   TxBuilderConfigTag,
   TxContext
@@ -59,6 +62,112 @@ const costModelsToCBOR = (
           cause: error
         })
     })
+  })
+
+/**
+ * Resolve deferred redeemers using the final sorted input list.
+ * 
+ * This function is called after coin selection completes, converting
+ * SelfRedeemerFn and BatchRedeemerBuilder into resolved RedeemerData.
+ * 
+ */
+const resolveDeferredRedeemers = (
+  deferredRedeemers: Map<string, DeferredRedeemerData>,
+  sortedUtxos: ReadonlyArray<CoreUTxO.UTxO>,
+  inputIndexMapping: Map<number, string>
+): Effect.Effect<Map<string, RedeemerData>, TransactionBuilderError> =>
+  Effect.gen(function* () {
+    const resolved = new Map<string, RedeemerData>()
+
+    // Build reverse mapping: UTxO ref -> index
+    const refToIndex = new Map<string, number>()
+    for (const [index, ref] of inputIndexMapping.entries()) {
+      refToIndex.set(ref, index)
+    }
+
+    // Build UTxO lookup: ref -> UTxO
+    const refToUtxo = new Map<string, CoreUTxO.UTxO>()
+    for (const utxo of sortedUtxos) {
+      refToUtxo.set(CoreUTxO.toOutRefString(utxo), utxo)
+    }
+
+    // Process each deferred redeemer
+    for (const [key, deferredData] of deferredRedeemers.entries()) {
+      const { deferred, exUnits, tag } = deferredData
+
+      if (deferred._tag === "static") {
+        // Static mode - should not be in deferredRedeemers, but handle anyway
+        resolved.set(key, {
+          tag,
+          data: deferred.data,
+          exUnits
+        })
+      } else if (deferred._tag === "self") {
+        // Self mode - invoke callback with this input's IndexedInput
+        const index = refToIndex.get(key)
+        const utxo = refToUtxo.get(key)
+
+        if (index === undefined || !utxo) {
+          yield* Effect.logWarning(`[Evaluation] Could not resolve self redeemer for ${key} - UTxO not in transaction`)
+          continue
+        }
+
+        const indexedInput: IndexedInput = { index, utxo }
+
+        const data = yield* Effect.try({
+          try: () => deferred.fn(indexedInput),
+          catch: (error) =>
+            new TransactionBuilderError({
+              message: `Self redeemer function failed for ${key}`,
+              cause: error
+            })
+        })
+
+        resolved.set(key, { tag, data, exUnits })
+        yield* Effect.logDebug(`[Evaluation] Resolved self redeemer for ${key} at index ${index}`)
+      } else if (deferred._tag === "batch") {
+        // Batch mode - invoke callback with all specified inputs
+        const batchInputs: Array<IndexedInput> = []
+
+        for (const utxo of deferred.inputs) {
+          const ref = CoreUTxO.toOutRefString(utxo)
+          const index = refToIndex.get(ref)
+
+          if (index === undefined) {
+            yield* Effect.logWarning(
+              `[Evaluation] Batch input ${ref} not found in transaction - skipping`
+            )
+            continue
+          }
+
+          batchInputs.push({ index, utxo })
+        }
+
+        if (batchInputs.length === 0) {
+          yield* Effect.logWarning(`[Evaluation] Batch redeemer for ${key} has no resolved inputs`)
+          continue
+        }
+
+        // Sort by index for consistent ordering
+        batchInputs.sort((a, b) => a.index - b.index)
+
+        const data = yield* Effect.try({
+          try: () => deferred.fn(batchInputs),
+          catch: (error) =>
+            new TransactionBuilderError({
+              message: `Batch redeemer function failed for ${key}`,
+              cause: error
+            })
+        })
+
+        resolved.set(key, { tag, data, exUnits })
+        yield* Effect.logDebug(
+          `[Evaluation] Resolved batch redeemer for ${key} with ${batchInputs.length} inputs`
+        )
+      }
+    }
+
+    return resolved
   })
 
 /**
@@ -144,20 +253,26 @@ export const executeEvaluation = (): Effect.Effect<
       )
     )
 
-    // Step 3: Check if there are redeemers to evaluate
-    if (state.redeemers.size === 0) {
+    // Step 3: Check if there are redeemers to evaluate (resolved or deferred)
+    const hasResolvedRedeemers = state.redeemers.size > 0
+    const hasDeferredRedeemers = state.deferredRedeemers.size > 0
+    
+    if (!hasResolvedRedeemers && !hasDeferredRedeemers) {
       yield* Effect.logDebug("[Evaluation] No redeemers found - skipping evaluation")
       return { next: "feeCalculation" as const }
     }
 
     // Step 3.5: Check if redeemers already have exUnits (already evaluated)
     // If all redeemers have non-zero exUnits, skip re-evaluation to prevent infinite loops
-    if (EvaluationStateManager.allRedeemersEvaluated(state.redeemers)) {
+    // Note: We only check resolved redeemers - deferred ones need resolution first
+    if (hasResolvedRedeemers && !hasDeferredRedeemers && EvaluationStateManager.allRedeemersEvaluated(state.redeemers)) {
       yield* Effect.logDebug("[Evaluation] All redeemers already evaluated - skipping re-evaluation")
       return { next: "feeCalculation" as const }
     }
 
-    yield* Effect.logDebug(`[Evaluation] Evaluating ${state.redeemers.size} redeemer(s)`)
+    yield* Effect.logDebug(
+      `[Evaluation] Processing ${state.redeemers.size} resolved + ${state.deferredRedeemers.size} deferred redeemer(s)`
+    )
 
     // Step 4: Build transaction for evaluation AND get input index mapping
     // We need to assemble the current transaction state into a Transaction object
@@ -189,11 +304,40 @@ export const executeEvaluation = (): Effect.Effect<
       yield* Effect.logDebug(`[Evaluation] Input ${i} maps to UTxO: ${key}`)
     }
 
+    // Step 4.5: Resolve deferred redeemers now that we have final input indices
+    if (hasDeferredRedeemers) {
+      yield* Effect.logDebug(`[Evaluation] Resolving ${state.deferredRedeemers.size} deferred redeemer(s)`)
+      
+      const resolvedDeferred = yield* resolveDeferredRedeemers(
+        state.deferredRedeemers,
+        sortedUtxos,
+        inputIndexMapping
+      )
+      
+      // Merge resolved deferred redeemers into state.redeemers
+      yield* Ref.update(ctx, (s) => {
+        const mergedRedeemers = new Map(s.redeemers)
+        for (const [key, data] of resolvedDeferred.entries()) {
+          mergedRedeemers.set(key, data)
+        }
+        return {
+          ...s,
+          redeemers: mergedRedeemers,
+          deferredRedeemers: new Map() // Clear deferred after resolution
+        }
+      })
+      
+      yield* Effect.logDebug(`[Evaluation] Resolved ${resolvedDeferred.size} deferred redeemer(s)`)
+    }
+
+    // Re-read state after deferred resolution
+    const updatedState = yield* Ref.get(ctx)
+
     // Build mint index mapping: index → policyIdHex
     // Mint redeemers are indexed by sorted policy ID order
     const mintIndexMapping = new Map<number, string>()
-    if (state.mint && state.mint.map.size > 0) {
-      const sortedPolicyIds = Array.from(state.mint.map.keys())
+    if (updatedState.mint && updatedState.mint.map.size > 0) {
+      const sortedPolicyIds = Array.from(updatedState.mint.map.keys())
         .map((pid) => PolicyId.toHex(pid))
         .sort()
       
@@ -204,7 +348,7 @@ export const executeEvaluation = (): Effect.Effect<
     }
     
     const inputs = yield* buildTransactionInputs(sortedUtxos)
-    const allOutputs = [...state.outputs, ...buildCtx.changeOutputs]
+    const allOutputs = [...updatedState.outputs, ...buildCtx.changeOutputs]
     const transaction = yield* assembleTransaction(inputs, allOutputs, buildCtx.calculatedFee)
 
     // Step 5: Serialize transaction to CBOR hex
@@ -253,8 +397,8 @@ export const executeEvaluation = (): Effect.Effect<
     // Pass the selected UTxOs AND reference inputs so Ogmios can resolve script hashes
     // Reference inputs are needed when scripts reference on-chain validators or datums
     const additionalUtxos = [
-      ...Array.from(state.selectedUtxos.values()),
-      ...state.referenceInputs
+      ...Array.from(updatedState.selectedUtxos.values()),
+      ...updatedState.referenceInputs
     ]
     
     const evalResults = yield* evaluator.evaluate(
@@ -274,14 +418,14 @@ export const executeEvaluation = (): Effect.Effect<
     yield* Effect.logDebug(`[Evaluation] Received ${evalResults.length} evaluation result(s)`)
 
     // Validation: If we have redeemers but received zero results, something went wrong
-    if (state.redeemers.size > 0 && evalResults.length === 0) {
+    if (updatedState.redeemers.size > 0 && evalResults.length === 0) {
       yield* Effect.logError(
-        `[Evaluation] Expected evaluation results for ${state.redeemers.size} redeemer(s) but received 0 results. ` +
+        `[Evaluation] Expected evaluation results for ${updatedState.redeemers.size} redeemer(s) but received 0 results. ` +
         `This may indicate a provider schema parsing issue or network error.`
       )
       return yield* Effect.fail(
         new TransactionBuilderError({
-          message: `Evaluation returned zero results despite having ${state.redeemers.size} redeemer(s) to evaluate`,
+          message: `Evaluation returned zero results despite having ${updatedState.redeemers.size} redeemer(s) to evaluate`,
           cause: new Error("Provider may have returned malformed response")
         })
       )
@@ -292,7 +436,9 @@ export const executeEvaluation = (): Effect.Effect<
     // Our state stores redeemers keyed by UTxO reference (txHash#outputIndex)
     // We built inputIndexMapping earlier to map from transaction position → UTxO reference
 
-    // Match evaluation results to redeemers in state
+    // Build updated redeemers map with ExUnits from evaluation
+    const evaluatedRedeemers = new Map(updatedState.redeemers)
+    
     for (const evalRedeemer of evalResults) {
       if (evalRedeemer.redeemer_tag === "spend") {
         // For spend redeemers, map input index to UTxO reference
@@ -304,18 +450,16 @@ export const executeEvaluation = (): Effect.Effect<
           continue
         }
 
-        const redeemer = state.redeemers.get(utxoRef)
+        const redeemer = evaluatedRedeemers.get(utxoRef)
         if (redeemer) {
           // Update redeemer with ExUnits from evaluation
-          const updatedRedeemer = {
+          evaluatedRedeemers.set(utxoRef, {
             ...redeemer,
             exUnits: {
               mem: BigInt(evalRedeemer.ex_units.mem),
               steps: BigInt(evalRedeemer.ex_units.steps)
             }
-          }
-
-          state.redeemers.set(utxoRef, updatedRedeemer)
+          })
 
           yield* Effect.logDebug(
             `[Evaluation] Updated redeemer at ${utxoRef} (spend:${evalRedeemer.redeemer_index}): ` +
@@ -336,18 +480,16 @@ export const executeEvaluation = (): Effect.Effect<
           continue
         }
 
-        const redeemer = state.redeemers.get(policyIdHex)
+        const redeemer = evaluatedRedeemers.get(policyIdHex)
         if (redeemer) {
           // Update redeemer with ExUnits from evaluation
-          const updatedRedeemer = {
+          evaluatedRedeemers.set(policyIdHex, {
             ...redeemer,
             exUnits: {
               mem: BigInt(evalRedeemer.ex_units.mem),
               steps: BigInt(evalRedeemer.ex_units.steps)
             }
-          }
-
-          state.redeemers.set(policyIdHex, updatedRedeemer)
+          })
 
           yield* Effect.logDebug(
             `[Evaluation] Updated redeemer for policy ${policyIdHex} (mint:${evalRedeemer.redeemer_index}): ` +
@@ -366,6 +508,12 @@ export const executeEvaluation = (): Effect.Effect<
         )
       }
     }
+
+    // Update state with evaluated redeemers
+    yield* Ref.update(ctx, (s) => ({
+      ...s,
+      redeemers: evaluatedRedeemers
+    }))
 
     yield* Effect.logDebug("[Evaluation] UPLC evaluation complete - routing to FeeCalculation")
 

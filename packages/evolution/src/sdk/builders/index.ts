@@ -1,5 +1,6 @@
 export * from "./CoinSelection.js"
 export * from "./operations/index.js"
+export * from "./RedeemerBuilder.js"
 export * from "./SignBuilder.js"
 export * from "./SignBuilderImpl.js"
 export * from "./SubmitBuilder.js"

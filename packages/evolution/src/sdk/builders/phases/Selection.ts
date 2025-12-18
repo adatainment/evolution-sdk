@@ -261,10 +261,10 @@ export const executeSelection = (): Effect.Effect<PhaseResult, TransactionBuilde
     // Step 6: Update context and check for scripts
     yield* Ref.update(buildCtxRef, (ctx) => ({ ...ctx, attempt: ctx.attempt + 1, shortfall: 0n }))
 
-    // Check if this is a script transaction (has redeemers)
+    // Check if this is a script transaction (has redeemers or deferred redeemers)
     // If so, route to Collateral BEFORE ChangeCreation
     const finalState = yield* Ref.get(ctx)
-    if (finalState.redeemers.size > 0) {
+    if (finalState.redeemers.size > 0 || finalState.deferredRedeemers.size > 0) {
       yield* Effect.logDebug("[Selection] Script transaction detected - routing to Collateral phase")
       return { next: "collateral" as const }
     }

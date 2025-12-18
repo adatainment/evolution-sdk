@@ -242,24 +242,15 @@ export const makeDatumOption = (datum: Datum.Datum): Effect.Effect<DatumOption.D
 export const makeTxOutput = (params: {
   address: CoreAddress.Address
   assets: CoreAssets.Assets
-  datum?: Datum.Datum
-  scriptRef?: any // TODO: Add ScriptRef type
+  datum?: DatumOption.DatumOption
+  scriptRef?: TxOut.TransactionOutput["scriptRef"]
 }): Effect.Effect<TxOut.TransactionOutput, TransactionBuilderError> =>
   Effect.gen(function* () {
-    // Address is already a Core Address type
-    const address = params.address
-
-    // Convert datum if provided
-    let datumOption: DatumOption.DatumOption | undefined
-    if (params.datum) {
-      datumOption = yield* makeDatumOption(params.datum)
-    }
-
-    // Create Core TransactionOutput
+    // Create Core TransactionOutput directly with core types
     const output = new TxOut.TransactionOutput({
-      address,
+      address: params.address,
       assets: params.assets,
-      datumOption,
+      datumOption: params.datum,
       scriptRef: params.scriptRef
     })
 
@@ -277,7 +268,7 @@ export const makeTxOutput = (params: {
 /**
  * Convert parameters to core TransactionOutput.
  * This is an internal conversion function used during transaction assembly.
- * Now uses Core Assets directly.
+ * Now uses Core types directly.
  *
  * @since 2.0.0
  * @category helpers
@@ -286,24 +277,15 @@ export const makeTxOutput = (params: {
 export const txOutputToTransactionOutput = (params: {
   address: CoreAddress.Address
   assets: CoreAssets.Assets
-  datum?: Datum.Datum
-  scriptRef?: any // TODO: Add ScriptRef type
+  datum?: DatumOption.DatumOption
+  scriptRef?: TxOut.TransactionOutput["scriptRef"]
 }): Effect.Effect<TxOut.TransactionOutput, TransactionBuilderError> =>
   Effect.gen(function* () {
-    // Address is already a Core Address type
-    const address = params.address
-
-    // Convert datum if provided
-    let datumOption: DatumOption.DatumOption | undefined
-    if (params.datum) {
-      datumOption = yield* makeDatumOption(params.datum)
-    }
-
-    // Create TransactionOutput (unified format with assets)
+    // Create TransactionOutput directly with core types
     const output = new TxOut.TransactionOutput({
-      address,
+      address: params.address,
       assets: params.assets,
-      datumOption,
+      datumOption: params.datum,
       scriptRef: params.scriptRef
     })
 
@@ -612,13 +594,17 @@ export const assembleTransaction = (
     }
 
     // Extract plutus data (datums) from selected UTxOs
+    // NOTE: Only datum hashes need to be resolved in the witness set's plutusData field.
+    // Inline datums (Babbage era feature) are already embedded in the UTxO output
+    // and should NOT be included in the witness set - doing so causes "extraneous datums" error.
     const plutusDataArray: Array<PlutusData.Data> = []
     for (const utxo of state.selectedUtxos) {
-      if (utxo.datumOption?._tag === "InlineDatum") {
-        // Inline datum contains PlutusData directly
-        plutusDataArray.push(utxo.datumOption.data)
-        yield* Effect.logDebug(`[Assembly] Extracted inline datum from UTxO`)
+      if (utxo.datumOption?._tag === "DatumHash") {
+        // For datum hash, we need to resolve and include the actual datum
+        // TODO: Implement datum resolution from provider or state
+        yield* Effect.logDebug(`[Assembly] Found datum hash UTxO (resolution not yet implemented)`)
       }
+      // Inline datums (InlineDatum) are NOT added to plutusData - they're already in the UTxO
     }
 
     // Compute scriptDataHash if there are Plutus scripts (redeemers present)
@@ -1013,12 +999,17 @@ export const calculateFeeIteratively = (
   }
 ): Effect.Effect<bigint, TransactionBuilderError, TxContext> =>
   Effect.gen(function* () {
-    // Get state to access mint field
+    // Get state to access mint field and collateral
     const stateRef = yield* TxContext
     const state = yield* Ref.get(stateRef)
     
+    // Include collateral UTxOs in witness estimation - they require VKey witnesses too!
+    const allUtxosForWitnesses = state.collateral 
+      ? [...inputUtxos, ...state.collateral.inputs]
+      : inputUtxos
+    
     // Build fake witness set once for accurate size estimation
-    const fakeWitnessSet = yield* buildFakeWitnessSet(inputUtxos)
+    const fakeWitnessSet = yield* buildFakeWitnessSet(allUtxosForWitnesses)
 
     // Outputs are already Core TransactionOutputs
     const transactionOutputs = outputs as Array<TxOut.TransactionOutput>
@@ -1290,8 +1281,8 @@ export const calculateLeftoverAssets = (params: {
 export const calculateMinimumUtxoLovelace = (params: {
   address: CoreAddress.Address
   assets: CoreAssets.Assets
-  datum?: Datum.Datum
-  scriptRef?: any
+  datum?: DatumOption.DatumOption
+  scriptRef?: TxOut.TransactionOutput["scriptRef"]
   coinsPerUtxoByte: bigint
 }): Effect.Effect<bigint, TransactionBuilderError> =>
   Effect.gen(function* () {

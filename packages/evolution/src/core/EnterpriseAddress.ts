@@ -14,7 +14,7 @@ import * as ScriptHash from "./ScriptHash.js"
  */
 export class EnterpriseAddress extends Schema.TaggedClass<EnterpriseAddress>("EnterpriseAddress")("EnterpriseAddress", {
   networkId: NetworkId.NetworkId,
-  paymentCredential: Credential.CredentialSchema
+  paymentCredential: Credential.Credential
 }) {
   toJSON() {
     return {
@@ -70,7 +70,7 @@ export const FromBytes = Schema.transformOrFail(Schema.typeSchema(Bytes29.BytesF
 
       // Script payment
       const isPaymentKey = (addressType & 0b0001) === 0
-      const paymentCredential: Credential.CredentialSchema = isPaymentKey
+      const paymentCredential: Credential.Credential = isPaymentKey
         ? new KeyHash.KeyHash({
             hash: fromA.slice(1, 29)
           })

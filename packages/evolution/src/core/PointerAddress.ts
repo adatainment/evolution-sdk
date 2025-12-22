@@ -15,7 +15,7 @@ import * as ScriptHash from "./ScriptHash.js"
  */
 export class PointerAddress extends Schema.TaggedClass<PointerAddress>("PointerAddress")("PointerAddress", {
   networkId: NetworkId.NetworkId,
-  paymentCredential: Credential.CredentialSchema,
+  paymentCredential: Credential.Credential,
   pointer: Pointer.Pointer
 }) {
   toJSON() {
@@ -172,7 +172,7 @@ export const FromBytes = Schema.transformOrFail(Schema.Uint8ArrayFromSelf, Schem
 
       // payment credential kind
       const isPaymentKey = (addressType & 0b0001) === 0
-      const paymentCredential: Credential.CredentialSchema = isPaymentKey
+      const paymentCredential: Credential.Credential = isPaymentKey
         ? new KeyHash.KeyHash({ hash: fromA.slice(1, 29) })
         : new ScriptHash.ScriptHash({ hash: fromA.slice(1, 29) })
 

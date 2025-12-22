@@ -22,8 +22,10 @@ import {
   BuildOptionsTag,
   type DeferredRedeemerData,
   type EvaluationContext,
+  EvaluationError,
   PhaseContextTag,
   type RedeemerData,
+  type ScriptFailure,
   TransactionBuilderError,
   TxBuilderConfigTag,
   TxContext
@@ -63,6 +65,139 @@ const costModelsToCBOR = (
         })
     })
   })
+
+/**
+ * Ogmios error response structure for script failures.
+ */
+interface OgmiosValidatorError {
+  validator: { index: number; purpose: string }
+  error: {
+    code: number
+    message: string
+    data: {
+      validationError: string
+      traces: Array<string>
+    }
+  }
+}
+
+/**
+ * Parse Ogmios script evaluation error response and enrich with labels.
+ * 
+ * Extracts structured failure information from the Ogmios JSON-RPC error response
+ * and maps redeemer indices back to user-provided labels from the builder state.
+ */
+const parseOgmiosError = (
+  error: unknown,
+  redeemers: Map<string, RedeemerData>,
+  inputIndexMapping: Map<number, string>,
+  withdrawalIndexMapping: Map<number, string>,
+  mintIndexMapping: Map<number, string>,
+  certIndexMapping: Map<number, string>
+): Array<ScriptFailure> => {
+  const failures: Array<ScriptFailure> = []
+
+  // Navigate through error chain to find the response body
+  const findErrorData = (e: unknown): Array<OgmiosValidatorError> | undefined => {
+    if (!e || typeof e !== "object") return undefined
+    
+    // Check for ResponseError with parsed body
+    const obj = e as Record<string, unknown>
+    
+    // Direct data property (from ProviderError cause chain)
+    if (obj.cause && typeof obj.cause === "object") {
+      const cause = obj.cause as Record<string, unknown>
+      
+      // ResponseError with response.body
+      if (cause.response && typeof cause.response === "object") {
+        const resp = cause.response as Record<string, unknown>
+        if (resp.body && typeof resp.body === "object") {
+          const body = resp.body as Record<string, unknown>
+          if (body.error && typeof body.error === "object") {
+            const err = body.error as Record<string, unknown>
+            if (Array.isArray(err.data)) {
+              return err.data as Array<OgmiosValidatorError>
+            }
+          }
+        }
+      }
+      
+      // Try description field which contains the JSON string
+      if (typeof cause.description === "string") {
+        try {
+          const match = cause.description.match(/\{.*\}/s)
+          if (match) {
+            const parsed = JSON.parse(match[0])
+            if (parsed.error?.data && Array.isArray(parsed.error.data)) {
+              return parsed.error.data as Array<OgmiosValidatorError>
+            }
+          }
+        } catch {
+          // JSON parse failed, continue looking
+        }
+      }
+      
+      // Recurse into cause
+      return findErrorData(cause)
+    }
+    
+    return undefined
+  }
+
+  const errorData = findErrorData(error)
+  
+  if (!errorData) {
+    return failures
+  }
+
+  // Process each validator error
+  for (const validatorError of errorData) {
+    const { error: err, validator } = validatorError
+    const { index, purpose } = validator
+    const { traces, validationError } = err.data
+
+    // Look up the redeemer key based on purpose and index
+    let redeemerKey: string | undefined
+    let label: string | undefined
+    let utxoRef: string | undefined
+    let credential: string | undefined
+    let policyId: string | undefined
+
+    if (purpose === "spend") {
+      redeemerKey = inputIndexMapping.get(index)
+      utxoRef = redeemerKey
+    } else if (purpose === "withdraw" || purpose === "reward") {
+      redeemerKey = withdrawalIndexMapping.get(index)
+      credential = redeemerKey?.replace("reward:", "")
+    } else if (purpose === "mint") {
+      redeemerKey = mintIndexMapping.get(index)
+      policyId = redeemerKey
+    } else if (purpose === "publish" || purpose === "cert") {
+      redeemerKey = certIndexMapping.get(index)
+      credential = redeemerKey?.replace("cert:", "")
+    }
+
+    // Look up label from redeemer state
+    if (redeemerKey) {
+      const redeemer = redeemers.get(redeemerKey)
+      label = redeemer?.label
+    }
+
+    failures.push({
+      purpose,
+      index,
+      label,
+      redeemerKey,
+      utxoRef,
+      credential,
+      policyId,
+      validationError,
+      traces: traces ?? []
+    })
+  }
+
+  return failures
+}
 
 /**
  * Resolve deferred redeemers using the final sorted input list.
@@ -346,6 +481,39 @@ export const executeEvaluation = (): Effect.Effect<
         yield* Effect.logDebug(`[Evaluation] Mint ${i} maps to policy: ${sortedPolicyIds[i]}`)
       }
     }
+
+    // Build certificate index mapping: index → "cert:{credentialHex}"
+    // Certificate redeemers are indexed by their position in the certificates array
+    const certIndexMapping = new Map<number, string>()
+    for (let i = 0; i < updatedState.certificates.length; i++) {
+      const cert = updatedState.certificates[i]!
+      if ("stakeCredential" in cert && cert.stakeCredential) {
+        const credHex = Bytes.toHex(cert.stakeCredential.hash)
+        const key = `cert:${credHex}`
+        certIndexMapping.set(i, key)
+        yield* Effect.logDebug(`[Evaluation] Cert ${i} maps to credential: ${key}`)
+      }
+    }
+
+    // Build withdrawal index mapping: index → "reward:{credentialHex}"
+    // Withdrawals are sorted by credential hash for canonical ordering
+    const withdrawalIndexMapping = new Map<number, string>()
+    if (updatedState.withdrawals.size > 0) {
+      const sortedWithdrawals = Array.from(updatedState.withdrawals.entries())
+        .sort((a, b) => {
+          const aHex = Bytes.toHex(a[0].stakeCredential.hash)
+          const bHex = Bytes.toHex(b[0].stakeCredential.hash)
+          return aHex.localeCompare(bHex)
+        })
+      
+      for (let i = 0; i < sortedWithdrawals.length; i++) {
+        const [rewardAccount] = sortedWithdrawals[i]!
+        const credHex = Bytes.toHex(rewardAccount.stakeCredential.hash)
+        const key = `reward:${credHex}`
+        withdrawalIndexMapping.set(i, key)
+        yield* Effect.logDebug(`[Evaluation] Withdrawal ${i} maps to credential: ${key}`)
+      }
+    }
     
     const inputs = yield* buildTransactionInputs(sortedUtxos)
     const allOutputs = [...updatedState.outputs, ...buildCtx.changeOutputs]
@@ -407,11 +575,29 @@ export const executeEvaluation = (): Effect.Effect<
       evaluationContext
     ).pipe(
       Effect.mapError(
-        (evalError) =>
-          new TransactionBuilderError({
+        (evalError) => {
+          // Parse Ogmios error and enrich with labels
+          const failures = parseOgmiosError(
+            evalError,
+            updatedState.redeemers,
+            inputIndexMapping,
+            withdrawalIndexMapping,
+            mintIndexMapping,
+            certIndexMapping
+          )
+
+          // Create enhanced evaluation error
+          const enhancedError = new EvaluationError({
             message: "Script evaluation failed",
-            cause: evalError
+            cause: evalError,
+            failures
           })
+
+          return new TransactionBuilderError({
+            message: "Script evaluation failed",
+            cause: enhancedError
+          })
+        }
       )
     )
 
@@ -500,11 +686,70 @@ export const executeEvaluation = (): Effect.Effect<
             `[Evaluation] No redeemer found in state for policy ${policyIdHex}`
           )
         }
+      } else if (evalRedeemer.redeemer_tag === "publish") {
+        // For certificate redeemers (Conway calls them "publish"), map index to credential key
+        const certKey = certIndexMapping.get(evalRedeemer.redeemer_index)
+        if (!certKey) {
+          yield* Effect.logWarning(
+            `[Evaluation] Could not map cert index ${evalRedeemer.redeemer_index} to credential`
+          )
+          continue
+        }
+
+        const redeemer = evaluatedRedeemers.get(certKey)
+        if (redeemer) {
+          // Update redeemer with ExUnits from evaluation
+          evaluatedRedeemers.set(certKey, {
+            ...redeemer,
+            exUnits: {
+              mem: BigInt(evalRedeemer.ex_units.mem),
+              steps: BigInt(evalRedeemer.ex_units.steps)
+            }
+          })
+
+          yield* Effect.logDebug(
+            `[Evaluation] Updated redeemer for cert ${certKey} (publish:${evalRedeemer.redeemer_index}): ` +
+              `mem=${evalRedeemer.ex_units.mem}, steps=${evalRedeemer.ex_units.steps}`
+          )
+        } else {
+          yield* Effect.logWarning(
+            `[Evaluation] No redeemer found in state for cert ${certKey}`
+          )
+        }
+      } else if (evalRedeemer.redeemer_tag === "withdraw") {
+        // For withdrawal redeemers, map index to credential key
+        const rewardKey = withdrawalIndexMapping.get(evalRedeemer.redeemer_index)
+        if (!rewardKey) {
+          yield* Effect.logWarning(
+            `[Evaluation] Could not map withdrawal index ${evalRedeemer.redeemer_index} to credential`
+          )
+          continue
+        }
+
+        const redeemer = evaluatedRedeemers.get(rewardKey)
+        if (redeemer) {
+          // Update redeemer with ExUnits from evaluation
+          evaluatedRedeemers.set(rewardKey, {
+            ...redeemer,
+            exUnits: {
+              mem: BigInt(evalRedeemer.ex_units.mem),
+              steps: BigInt(evalRedeemer.ex_units.steps)
+            }
+          })
+
+          yield* Effect.logDebug(
+            `[Evaluation] Updated redeemer for withdrawal ${rewardKey} (reward:${evalRedeemer.redeemer_index}): ` +
+              `mem=${evalRedeemer.ex_units.mem}, steps=${evalRedeemer.ex_units.steps}`
+          )
+        } else {
+          yield* Effect.logWarning(
+            `[Evaluation] No redeemer found in state for withdrawal ${rewardKey}`
+          )
+        }
       } else {
-        // For cert/reward redeemers, we'd need different logic
-        // TODO: Implement matching for cert and reward redeemer types
+        // Unknown redeemer type
         yield* Effect.logWarning(
-          `[Evaluation] Redeemer type ${evalRedeemer.redeemer_tag} not yet supported for matching`
+          `[Evaluation] Unknown redeemer type ${evalRedeemer.redeemer_tag} not yet supported for matching`
         )
       }
     }

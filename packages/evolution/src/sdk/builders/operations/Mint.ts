@@ -109,7 +109,8 @@ export const createMintProgram = (params: MintTokensParams) =>
             newRedeemers.set(policyIdHex, {
               tag: "mint",
               data: deferred.data,
-              exUnits: undefined
+              exUnits: undefined,
+              label: params.label
             })
           }
         } else {
@@ -119,7 +120,8 @@ export const createMintProgram = (params: MintTokensParams) =>
             newDeferredRedeemers.set(policyIdHex, {
               tag: "mint",
               deferred,
-              exUnits: undefined
+              exUnits: undefined,
+              label: params.label
             })
           }
         }

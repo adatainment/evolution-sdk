@@ -34,7 +34,7 @@ export const CommitteeColdCredential = Credential
  * @since 2.0.0
  * @category transformations
  */
-export const FromBytes = Schema.transformOrFail(Schema.Uint8ArrayFromSelf, Schema.typeSchema(Credential.CredentialSchema), {
+export const FromBytes = Schema.transformOrFail(Schema.Uint8ArrayFromSelf, Schema.typeSchema(Credential.Credential), {
   strict: true,
   encode: (toI, _, ast) =>
     Effect.gen(function* () {
@@ -110,7 +110,7 @@ export const FromHex = Schema.compose(Schema.Uint8ArrayFromHex, FromBytes).annot
  * @since 2.0.0
  * @category transformations
  */
-export const FromBech32 = Schema.transformOrFail(Schema.String, Schema.typeSchema(Credential.CredentialSchema), {
+export const FromBech32 = Schema.transformOrFail(Schema.String, Schema.typeSchema(Credential.Credential), {
   strict: true,
   encode: (_, __, ___, toA) =>
     Effect.gen(function* () {

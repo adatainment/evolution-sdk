@@ -7,6 +7,7 @@ import type * as CoreAddress from "../../core/Address.js"
 import * as CoreAssets from "../../core/Assets/index.js"
 import * as Bytes from "../../core/Bytes.js"
 import * as Bytes32 from "../../core/Bytes32.js"
+import type * as Certificate from "../../core/Certificate.js"
 import * as CostModel from "../../core/CostModel.js"
 import * as PlutusData from "../../core/Data.js"
 import * as DatumOption from "../../core/DatumOption.js"
@@ -17,6 +18,7 @@ import type * as PlutusV2 from "../../core/PlutusV2.js"
 import type * as PlutusV3 from "../../core/PlutusV3.js"
 import * as PolicyId from "../../core/PolicyId.js"
 import * as Redeemer from "../../core/Redeemer.js"
+import type * as RewardAccount from "../../core/RewardAccount.js"
 import * as ScriptDataHash from "../../core/ScriptDataHash.js"
 import * as Transaction from "../../core/Transaction.js"
 import * as TransactionBody from "../../core/TransactionBody.js"
@@ -26,6 +28,7 @@ import * as TransactionWitnessSet from "../../core/TransactionWitnessSet.js"
 import * as TxOut from "../../core/TxOut.js"
 import * as CoreUTxO from "../../core/UTxO.js"
 import * as VKey from "../../core/VKey.js"
+import * as Withdrawals from "../../core/Withdrawals.js"
 import { hashScriptData } from "../../utils/Hash.js"
 // SDK imports (for conversion utilities)
 import * as Address from "../Address.js"
@@ -551,6 +554,9 @@ export const assembleTransaction = (
     }
 
     // Build redeemers with correct indices
+    // For cert/reward redeemers, we need to find their index in the certificates/withdrawals arrays
+    // Keys are stored as `cert:{hex}` and `reward:{hex}` in state.redeemers
+    
     for (const [key, redeemerData] of state.redeemers) {
       yield* Effect.logDebug(`[Assembly] Processing redeemer for key: ${key}, tag: ${redeemerData.tag}`)
 
@@ -563,8 +569,49 @@ export const assembleTransaction = (
           yield* Effect.logWarning(`[Assembly] Could not find mint index for policy: ${key}`)
           continue
         }
+      } else if (redeemerData.tag === "cert") {
+        // For cert redeemers, find matching certificate by credential hash
+        // Key format: `cert:{credentialHex}`
+        const credentialHex = key.slice(5) // Remove "cert:" prefix
+        for (let i = 0; i < state.certificates.length; i++) {
+          const cert = state.certificates[i]!
+          if ("stakeCredential" in cert && cert.stakeCredential) {
+            const certCredHex = Bytes.toHex((cert.stakeCredential as { hash: Uint8Array }).hash)
+            if (certCredHex === credentialHex) {
+              redeemerIndex = i
+              break
+            }
+          }
+        }
+        if (redeemerIndex === undefined) {
+          yield* Effect.logWarning(`[Assembly] Could not find cert index for key: ${key}`)
+          continue
+        }
+      } else if (redeemerData.tag === "reward") {
+        // For reward redeemers, find matching withdrawal by credential hash (sorted order)
+        // Key format: `reward:{credentialHex}`
+        const credentialHex = key.slice(7) // Remove "reward:" prefix
+        // Withdrawals must be in sorted order for redeemer indices
+        const sortedWithdrawals = globalThis.Array.from(state.withdrawals.entries())
+          .sort((a, b) => {
+            const aHex = Bytes.toHex(a[0].stakeCredential.hash)
+            const bHex = Bytes.toHex(b[0].stakeCredential.hash)
+            return aHex.localeCompare(bHex)
+          })
+        for (let i = 0; i < sortedWithdrawals.length; i++) {
+          const [rewardAccount] = sortedWithdrawals[i]!
+          const rewardCredHex = Bytes.toHex(rewardAccount.stakeCredential.hash)
+          if (rewardCredHex === credentialHex) {
+            redeemerIndex = i
+            break
+          }
+        }
+        if (redeemerIndex === undefined) {
+          yield* Effect.logWarning(`[Assembly] Could not find withdrawal index for key: ${key}`)
+          continue
+        }
       } else {
-        // For spend/cert/reward redeemers, look up in input index map
+        // For spend redeemers, look up in input index map
         redeemerIndex = inputIndexMap.get(key)
         if (redeemerIndex === undefined) {
           yield* Effect.logWarning(`[Assembly] Could not find input index for redeemer key: ${key}`)
@@ -668,6 +715,16 @@ export const assembleTransaction = (
     yield* Effect.logDebug(`  - Plutus data: ${plutusDataArray.length}`)
 
     // Create TransactionBody with calculated fee and scriptDataHash
+    // Build certificates array (NonEmptyArray or undefined)
+    const certificates =
+      state.certificates.length > 0 ? (state.certificates as [Certificate.Certificate, ...Array<Certificate.Certificate>]) : undefined
+
+    // Build withdrawals (Withdrawals object or undefined)
+    const withdrawals =
+      state.withdrawals.size > 0
+        ? new Withdrawals.Withdrawals({ withdrawals: state.withdrawals as Map<RewardAccount.RewardAccount, bigint> })
+        : undefined
+
     const body = new TransactionBody.TransactionBody({
       inputs: inputs as Array<TransactionInput.TransactionInput>,
       outputs: transactionOutputs,
@@ -677,7 +734,9 @@ export const assembleTransaction = (
       totalCollateral, // Total collateral amount from Collateral phase
       referenceInputs, // Reference inputs for reading on-chain data (undefined if none)
       mint: state.mint && state.mint.map.size > 0 ? state.mint : undefined, // Mint field from minting operations
-      scriptDataHash // Hash of redeemers + datums + cost models (required for Plutus scripts)
+      scriptDataHash, // Hash of redeemers + datums + cost models (required for Plutus scripts)
+      certificates, // Certificates for staking operations
+      withdrawals // Withdrawals for claiming staking rewards
     })
 
     // Create witness set with scripts and redeemers
@@ -935,6 +994,40 @@ export const buildFakeWitnessSet = (
       vkeyWitnesses.push(witness)
     }
 
+    // Add fake witnesses for certificates that require key signatures
+    // Certificates like RegCert, UnregCert, StakeDelegation etc. require the stake key to sign
+    for (const cert of state.certificates) {
+      let credentialHash: Uint8Array | undefined
+      
+      // Extract credential from certificate types that require signing
+      if ("stakeCredential" in cert && cert.stakeCredential._tag === "KeyHash") {
+        credentialHash = cert.stakeCredential.hash
+      }
+
+      if (credentialHash) {
+        const hashHex = Bytes.toHex(credentialHash)
+        if (!keyHashesSet.has(hashHex)) {
+          keyHashesSet.add(hashHex)
+          const witness = yield* buildFakeVKeyWitness(credentialHash)
+          vkeyWitnesses.push(witness)
+        }
+      }
+    }
+
+    // Add fake witnesses for withdrawals that require key signatures
+    for (const [rewardAccount, _amount] of state.withdrawals) {
+      // RewardAccount has stakeCredential property
+      const credential = rewardAccount.stakeCredential
+      if (credential._tag === "KeyHash") {
+        const hashHex = Bytes.toHex(credential.hash)
+        if (!keyHashesSet.has(hashHex)) {
+          keyHashesSet.add(hashHex)
+          const witness = yield* buildFakeVKeyWitness(credential.hash)
+          vkeyWitnesses.push(witness)
+        }
+      }
+    }
+
     // Build fake redeemers from state.redeemers for accurate size estimation
     // Redeemers contribute to transaction size and must be included in fee calculation
     const fakeRedeemers: Array<Redeemer.Redeemer> = []
@@ -1051,6 +1144,16 @@ export const calculateFeeIteratively = (
     let iterations = 0
     const maxIterations = 10 // Increase to ensure convergence
 
+    // Build certificates array for size estimation (NonEmptyArray or undefined)
+    const certificates = state.certificates.length > 0 
+      ? (state.certificates as [Certificate.Certificate, ...Array<Certificate.Certificate>])
+      : undefined
+
+    // Build withdrawals for size estimation
+    const withdrawals = state.withdrawals.size > 0 
+      ? new Withdrawals.Withdrawals({ withdrawals: state.withdrawals })
+      : undefined
+
     while (iterations < maxIterations) {
       // Build transaction with current fee estimate
       const body = new TransactionBody.TransactionBody({
@@ -1061,7 +1164,9 @@ export const calculateFeeIteratively = (
         scriptDataHash: placeholderScriptDataHash, // Include scriptDataHash for accurate size
         collateralInputs, // Include collateral for accurate size
         collateralReturn, // Include collateral return for accurate size
-        totalCollateral // Include total collateral for accurate size
+        totalCollateral, // Include total collateral for accurate size
+        certificates, // Include certificates for accurate size calculation
+        withdrawals // Include withdrawals for accurate size calculation
       })
 
       const transaction = new Transaction.Transaction({

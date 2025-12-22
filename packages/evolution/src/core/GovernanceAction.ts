@@ -572,9 +572,9 @@ export const NoConfidenceActionFromCDDL = Schema.transformOrFail(
  */
 export class UpdateCommitteeAction extends Schema.TaggedClass<UpdateCommitteeAction>()("UpdateCommitteeAction", {
   govActionId: Schema.NullOr(GovActionId), // gov_action_id / nil
-  membersToRemove: Schema.Array(CommiteeColdCredential.CommitteeColdCredential.CredentialSchema), // set<committee_cold_credential>
+  membersToRemove: Schema.Array(CommiteeColdCredential.CommitteeColdCredential.Credential), // set<committee_cold_credential>
   membersToAdd: Schema.Map({
-    key: CommiteeColdCredential.CommitteeColdCredential.CredentialSchema, // committee_cold_credential
+    key: CommiteeColdCredential.CommitteeColdCredential.Credential, // committee_cold_credential
     value: EpochNo.EpochNoSchema // epoch_no
   }),
   threshold: UnitInterval.UnitInterval
@@ -692,7 +692,7 @@ export const UpdateCommitteeActionFromCDDL = Schema.transformOrFail(
         const govActionId = govActionIdCDDL ? yield* ParseResult.decode(GovActionIdFromCDDL)(govActionIdCDDL) : null
         const threshold = yield* ParseResult.decode(UnitInterval.FromCDDL)(thresholdCDDL)
         // Decode set into an array of credentials (accept tag 258 or plain array)
-        const membersToRemove: Array<typeof CommiteeColdCredential.CommitteeColdCredential.CredentialSchema.Type> = []
+        const membersToRemove: Array<typeof CommiteeColdCredential.CommitteeColdCredential.Credential.Type> = []
         const removeArr = CBOR.isTag(membersToRemoveCDDL)
           ? membersToRemoveCDDL.tag === 258
             ? (membersToRemoveCDDL.value as ReadonlyArray<any>)
@@ -705,7 +705,7 @@ export const UpdateCommitteeActionFromCDDL = Schema.transformOrFail(
           membersToRemove.push(coldCred)
         }
         const membersToAdd = new Map<
-          typeof CommiteeColdCredential.CommitteeColdCredential.CredentialSchema.Type,
+          typeof CommiteeColdCredential.CommitteeColdCredential.Credential.Type,
           EpochNo.EpochNo
         >()
         for (const [coldCredCDDL, epochNoCDDL] of membersToAddCDDL) {
@@ -1000,7 +1000,7 @@ export const noConfidenceArbitrary: FastCheck.Arbitrary<NoConfidenceAction> = Fa
   nil: null
 }).map((govActionId) => new NoConfidenceAction({ govActionId }))
 
-const uniqueCredArray: FastCheck.Arbitrary<ReadonlyArray<Credential.CredentialSchema>> = FastCheck.uniqueArray(
+const uniqueCredArray: FastCheck.Arbitrary<ReadonlyArray<Credential.Credential>> = FastCheck.uniqueArray(
   Credential.arbitrary,
   {
     maxLength: 5,
@@ -1008,14 +1008,14 @@ const uniqueCredArray: FastCheck.Arbitrary<ReadonlyArray<Credential.CredentialSc
   }
 )
 
-const membersToAddMapArbitrary: FastCheck.Arbitrary<Map<Credential.CredentialSchema, EpochNo.EpochNo>> =
+const membersToAddMapArbitrary: FastCheck.Arbitrary<Map<Credential.Credential, EpochNo.EpochNo>> =
   uniqueCredArray.chain((colds) =>
     FastCheck.array(EpochNo.arbitrary, {
       minLength: colds.length,
       maxLength: colds.length
     }).map((epochsRaw) => {
       const epochs = epochsRaw
-      const m = new Map<Credential.CredentialSchema, EpochNo.EpochNo>()
+      const m = new Map<Credential.Credential, EpochNo.EpochNo>()
       for (let i = 0; i < colds.length; i++) m.set(colds[i], epochs[i])
       return m
     })
@@ -1096,9 +1096,9 @@ export const match = <R>(
     NoConfidenceAction: (govActionId: GovActionId | null) => R
     UpdateCommitteeAction: (
       govActionId: GovActionId | null,
-      membersToRemove: ReadonlyArray<typeof CommiteeColdCredential.CommitteeColdCredential.CredentialSchema.Type>,
+      membersToRemove: ReadonlyArray<typeof CommiteeColdCredential.CommitteeColdCredential.Credential.Type>,
       membersToAdd: ReadonlyMap<
-        typeof CommiteeColdCredential.CommitteeColdCredential.CredentialSchema.Type,
+        typeof CommiteeColdCredential.CommitteeColdCredential.Credential.Type,
         EpochNo.EpochNo
       >,
       threshold: UnitInterval.UnitInterval

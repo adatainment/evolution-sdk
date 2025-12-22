@@ -13,7 +13,7 @@ import * as Relay from "./Relay.js"
 import * as UnitInterval from "./UnitInterval.js"
 
 export class StakeRegistration extends Schema.TaggedClass<StakeRegistration>("StakeRegistration")("StakeRegistration", {
-  stakeCredential: Credential.CredentialSchema
+  stakeCredential: Credential.Credential
 }) {
   toJSON() {
     return {
@@ -42,7 +42,7 @@ export class StakeRegistration extends Schema.TaggedClass<StakeRegistration>("St
 export class StakeDeregistration extends Schema.TaggedClass<StakeDeregistration>("StakeDeregistration")(
   "StakeDeregistration",
   {
-    stakeCredential: Credential.CredentialSchema
+    stakeCredential: Credential.Credential
   }
 ) {
   toJSON() {
@@ -70,7 +70,7 @@ export class StakeDeregistration extends Schema.TaggedClass<StakeDeregistration>
 }
 
 export class StakeDelegation extends Schema.TaggedClass<StakeDelegation>("StakeDelegation")("StakeDelegation", {
-  stakeCredential: Credential.CredentialSchema,
+  stakeCredential: Credential.Credential,
   poolKeyHash: PoolKeyHash.PoolKeyHash
 }) {
   toJSON() {
@@ -171,7 +171,7 @@ export class PoolRetirement extends Schema.TaggedClass<PoolRetirement>("PoolReti
 }
 
 export class RegCert extends Schema.TaggedClass<RegCert>("RegCert")("RegCert", {
-  stakeCredential: Credential.CredentialSchema,
+  stakeCredential: Credential.Credential,
   coin: Coin.Coin
 }) {
   toJSON() {
@@ -207,7 +207,7 @@ export class RegCert extends Schema.TaggedClass<RegCert>("RegCert")("RegCert", {
 }
 
 export class UnregCert extends Schema.TaggedClass<UnregCert>("UnregCert")("UnregCert", {
-  stakeCredential: Credential.CredentialSchema,
+  stakeCredential: Credential.Credential,
   coin: Coin.Coin
 }) {
   toJSON() {
@@ -243,7 +243,7 @@ export class UnregCert extends Schema.TaggedClass<UnregCert>("UnregCert")("Unreg
 }
 
 export class VoteDelegCert extends Schema.TaggedClass<VoteDelegCert>("VoteDelegCert")("VoteDelegCert", {
-  stakeCredential: Credential.CredentialSchema,
+  stakeCredential: Credential.Credential,
   drep: DRep.DRep
 }) {
   toJSON() {
@@ -281,7 +281,7 @@ export class VoteDelegCert extends Schema.TaggedClass<VoteDelegCert>("VoteDelegC
 export class StakeVoteDelegCert extends Schema.TaggedClass<StakeVoteDelegCert>("StakeVoteDelegCert")(
   "StakeVoteDelegCert",
   {
-    stakeCredential: Credential.CredentialSchema,
+    stakeCredential: Credential.Credential,
     poolKeyHash: PoolKeyHash.PoolKeyHash,
     drep: DRep.DRep
   }
@@ -323,7 +323,7 @@ export class StakeVoteDelegCert extends Schema.TaggedClass<StakeVoteDelegCert>("
 }
 
 export class StakeRegDelegCert extends Schema.TaggedClass<StakeRegDelegCert>("StakeRegDelegCert")("StakeRegDelegCert", {
-  stakeCredential: Credential.CredentialSchema,
+  stakeCredential: Credential.Credential,
   poolKeyHash: PoolKeyHash.PoolKeyHash,
   coin: Coin.Coin
 }) {
@@ -364,7 +364,7 @@ export class StakeRegDelegCert extends Schema.TaggedClass<StakeRegDelegCert>("St
 }
 
 export class VoteRegDelegCert extends Schema.TaggedClass<VoteRegDelegCert>("VoteRegDelegCert")("VoteRegDelegCert", {
-  stakeCredential: Credential.CredentialSchema,
+  stakeCredential: Credential.Credential,
   drep: DRep.DRep,
   coin: Coin.Coin
 }) {
@@ -407,7 +407,7 @@ export class VoteRegDelegCert extends Schema.TaggedClass<VoteRegDelegCert>("Vote
 export class StakeVoteRegDelegCert extends Schema.TaggedClass<StakeVoteRegDelegCert>("StakeVoteRegDelegCert")(
   "StakeVoteRegDelegCert",
   {
-    stakeCredential: Credential.CredentialSchema,
+    stakeCredential: Credential.Credential,
     poolKeyHash: PoolKeyHash.PoolKeyHash,
     drep: DRep.DRep,
     coin: Coin.Coin
@@ -456,8 +456,8 @@ export class StakeVoteRegDelegCert extends Schema.TaggedClass<StakeVoteRegDelegC
 export class AuthCommitteeHotCert extends Schema.TaggedClass<AuthCommitteeHotCert>("AuthCommitteeHotCert")(
   "AuthCommitteeHotCert",
   {
-    committeeColdCredential: Credential.CredentialSchema,
-    committeeHotCredential: Credential.CredentialSchema
+    committeeColdCredential: Credential.Credential,
+    committeeHotCredential: Credential.Credential
   }
 ) {
   toJSON() {
@@ -497,7 +497,7 @@ export class AuthCommitteeHotCert extends Schema.TaggedClass<AuthCommitteeHotCer
 export class ResignCommitteeColdCert extends Schema.TaggedClass<ResignCommitteeColdCert>("ResignCommitteeColdCert")(
   "ResignCommitteeColdCert",
   {
-    committeeColdCredential: Credential.CredentialSchema,
+    committeeColdCredential: Credential.Credential,
     anchor: Schema.NullishOr(Anchor.Anchor)
   }
 ) {
@@ -536,7 +536,7 @@ export class ResignCommitteeColdCert extends Schema.TaggedClass<ResignCommitteeC
 }
 
 export class RegDrepCert extends Schema.TaggedClass<RegDrepCert>("RegDrepCert")("RegDrepCert", {
-  drepCredential: Credential.CredentialSchema,
+  drepCredential: Credential.Credential,
   coin: Coin.Coin,
   anchor: Schema.NullishOr(Anchor.Anchor)
 }) {
@@ -577,7 +577,7 @@ export class RegDrepCert extends Schema.TaggedClass<RegDrepCert>("RegDrepCert")(
 }
 
 export class UnregDrepCert extends Schema.TaggedClass<UnregDrepCert>("UnregDrepCert")("UnregDrepCert", {
-  drepCredential: Credential.CredentialSchema,
+  drepCredential: Credential.Credential,
   coin: Coin.Coin
 }) {
   toJSON() {
@@ -613,7 +613,7 @@ export class UnregDrepCert extends Schema.TaggedClass<UnregDrepCert>("UnregDrepC
 }
 
 export class UpdateDrepCert extends Schema.TaggedClass<UpdateDrepCert>("UpdateDrepCert")("UpdateDrepCert", {
-  drepCredential: Credential.CredentialSchema,
+  drepCredential: Credential.Credential,
   anchor: Schema.NullishOr(Anchor.Anchor)
 }) {
   toJSON() {

@@ -12,7 +12,7 @@ import * as ScriptHash from "./ScriptHash.js"
  * @since 2.0.0
  * @category schemas
  */
-export const CredentialSchema = Schema.Union(KeyHash.KeyHash, ScriptHash.ScriptHash)
+export const Credential = Schema.Union(KeyHash.KeyHash, ScriptHash.ScriptHash)
 
 /**
  * Type representing a credential that can be either a key hash or script hash
@@ -21,11 +21,11 @@ export const CredentialSchema = Schema.Union(KeyHash.KeyHash, ScriptHash.ScriptH
  * @since 2.0.0
  * @category model
  */
-export type CredentialSchema = typeof CredentialSchema.Type
-export type Credential = typeof CredentialSchema.Encoded
+export type Credential = typeof Credential.Type
+export type CredentialEncoded = typeof Credential.Encoded
 
-export const makeKeyHash = (hash: Uint8Array): CredentialSchema => new KeyHash.KeyHash({ hash })
-export const makeScriptHash = (hash: Uint8Array): CredentialSchema => new ScriptHash.ScriptHash({ hash })
+export const makeKeyHash = (hash: Uint8Array): Credential => new KeyHash.KeyHash({ hash })
+export const makeScriptHash = (hash: Uint8Array): Credential => new ScriptHash.ScriptHash({ hash })
 
 /**
  * Check if the given value is a valid Credential
@@ -33,7 +33,7 @@ export const makeScriptHash = (hash: Uint8Array): CredentialSchema => new Script
  * @since 2.0.0
  * @category predicates
  */
-export const is = Schema.is(CredentialSchema)
+export const is = Schema.is(Credential)
 
 export const CDDLSchema = Schema.Tuple(
   Schema.Literal(0n, 1n),
@@ -47,7 +47,7 @@ export const CDDLSchema = Schema.Tuple(
  * @since 2.0.0
  * @category schemas
  */
-export const FromCDDL = Schema.transformOrFail(CDDLSchema, Schema.typeSchema(CredentialSchema), {
+export const FromCDDL = Schema.transformOrFail(CDDLSchema, Schema.typeSchema(Credential), {
   strict: true,
   encode: (toI) =>
     Eff.gen(function* () {
@@ -106,7 +106,7 @@ export const arbitrary = FastCheck.oneof(KeyHash.arbitrary, ScriptHash.arbitrary
  * @since 2.0.0
  * @category parsing
  */
-export const fromCBORBytes = (bytes: Uint8Array, options?: CBOR.CodecOptions): CredentialSchema =>
+export const fromCBORBytes = (bytes: Uint8Array, options?: CBOR.CodecOptions): Credential =>
   Schema.decodeSync(FromCBORBytes(options))(bytes)
 
 /**
@@ -115,7 +115,7 @@ export const fromCBORBytes = (bytes: Uint8Array, options?: CBOR.CodecOptions): C
  * @since 2.0.0
  * @category parsing
  */
-export const fromCBORHex = (hex: string, options?: CBOR.CodecOptions): CredentialSchema =>
+export const fromCBORHex = (hex: string, options?: CBOR.CodecOptions): Credential =>
   Schema.decodeSync(FromCBORHex(options))(hex)
 
 // ============================================================================
@@ -128,7 +128,7 @@ export const fromCBORHex = (hex: string, options?: CBOR.CodecOptions): Credentia
  * @since 2.0.0
  * @category encoding
  */
-export const toCBORBytes = (credential: CredentialSchema, options?: CBOR.CodecOptions): Uint8Array =>
+export const toCBORBytes = (credential: Credential, options?: CBOR.CodecOptions): Uint8Array =>
   Schema.encodeSync(FromCBORBytes(options))(credential)
 
 /**
@@ -137,5 +137,5 @@ export const toCBORBytes = (credential: CredentialSchema, options?: CBOR.CodecOp
  * @since 2.0.0
  * @category encoding
  */
-export const toCBORHex = (credential: CredentialSchema, options?: CBOR.CodecOptions): string =>
+export const toCBORHex = (credential: Credential, options?: CBOR.CodecOptions): string =>
   Schema.encodeSync(FromCBORHex(options))(credential)

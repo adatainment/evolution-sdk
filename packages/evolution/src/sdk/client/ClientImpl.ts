@@ -254,7 +254,9 @@ const computeRequiredKeyHashesSync = (params: {
             ? cert.stakeCredential
             : cert._tag === "StakeVoteDelegCert" ||
                 cert._tag === "StakeRegDelegCert" ||
-                cert._tag === "StakeVoteRegDelegCert"
+                cert._tag === "StakeVoteRegDelegCert" ||
+                cert._tag === "VoteDelegCert" ||
+                cert._tag === "VoteRegDelegCert"
               ? cert.stakeCredential
               : undefined
       if (cred && cred._tag === "KeyHash") {

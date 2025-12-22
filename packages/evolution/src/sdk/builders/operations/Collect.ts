@@ -78,7 +78,8 @@ export const createCollectFromProgram = (params: CollectFromParams) =>
             newRedeemers.set(inputKey, {
               tag: "spend",
               data: deferred.data,
-              exUnits: undefined
+              exUnits: undefined,
+              label: params.label
             })
           })
         } else {
@@ -89,7 +90,8 @@ export const createCollectFromProgram = (params: CollectFromParams) =>
             newDeferredRedeemers.set(inputKey, {
               tag: "spend",
               deferred,
-              exUnits: undefined
+              exUnits: undefined,
+              label: params.label
             })
           })
         }

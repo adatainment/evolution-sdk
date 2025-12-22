@@ -30,10 +30,12 @@ import type { Either } from "effect/Either"
 
 import type * as CoreAddress from "../../core/Address.js"
 import * as CoreAssets from "../../core/Assets/index.js"
+import type * as Certificate from "../../core/Certificate.js"
 import type * as Coin from "../../core/Coin.js"
 import type * as PlutusData from "../../core/Data.js"
 import type * as Mint from "../../core/Mint.js"
 import type * as Network from "../../core/Network.js"
+import type * as RewardAccount from "../../core/RewardAccount.js"
 import type * as CoreScript from "../../core/Script.js"
 import * as Time from "../../core/Time/index.js"
 import * as Transaction from "../../core/Transaction.js"
@@ -48,9 +50,10 @@ import type { CoinSelectionAlgorithm, CoinSelectionFunction } from "./CoinSelect
 import { attachScriptToState } from "./operations/Attach.js"
 import { createCollectFromProgram } from "./operations/Collect.js"
 import { createMintProgram } from "./operations/Mint.js"
-import type { CollectFromParams, MintTokensParams, PayToAddressParams, ReadFromParams } from "./operations/Operations.js"
+import type { AuthCommitteeHotParams, CollectFromParams, DelegateToParams, DeregisterDRepParams, DeregisterStakeParams, MintTokensParams, PayToAddressParams, ReadFromParams, RegisterAndDelegateToParams, RegisterDRepParams, RegisterPoolParams, RegisterStakeParams, ResignCommitteeColdParams, RetirePoolParams,UpdateDRepParams, WithdrawParams } from "./operations/Operations.js"
 import { createPayToAddressProgram } from "./operations/Pay.js"
 import { createReadFromProgram } from "./operations/ReadFrom.js"
+import { createDelegateToProgram, createDeregisterStakeProgram, createRegisterAndDelegateToProgram, createRegisterStakeProgram, createWithdrawProgram } from "./operations/Stake.js"
 import { executeBalance } from "./phases/Balance.js"
 import { executeChangeCreation } from "./phases/ChangeCreation.js"
 import { executeCollateral } from "./phases/Collateral.js"
@@ -112,7 +115,9 @@ const initialTxBuilderState: TxBuilderState = {
   totalInputAssets: CoreAssets.zero,
   redeemers: new Map(),
   deferredRedeemers: new Map(),
-  referenceInputs: []
+  referenceInputs: [],
+  certificates: [],
+  withdrawals: new Map()
 }
 
 /**
@@ -498,6 +503,7 @@ const buildPartialEffectCore = (
     return {} as Transaction.Transaction
   }).pipe(
     Effect.provideServiceEffect(TxContext, Ref.make(initialTxBuilderState)),
+    Effect.provideService(TxBuilderConfigTag, config),
     Effect.mapError(
       (error) =>
         new TransactionBuilderError({
@@ -579,18 +585,72 @@ export interface Evaluator {
 }
 
 /**
- * Error type for failures in script evaluation.
+ * Represents a single script failure from Ogmios evaluation.
  *
- * **NOTE: NOT YET IMPLEMENTED** - Reserved for future script evaluation error handling.
+ * Contains all available information about which script failed and why,
+ * including optional labels from the user's operation definitions.
  *
  * @since 2.0.0
  * @category errors
- * @experimental
+ */
+export interface ScriptFailure {
+  /** Redeemer purpose: "spend", "mint", "withdraw", "publish" */
+  readonly purpose: string
+  /** Index within the purpose category */
+  readonly index: number
+  /** User-provided label for debugging (from operation params) */
+  readonly label?: string
+  /** Key used internally to track this redeemer (e.g., "txHash#index" for spend) */
+  readonly redeemerKey?: string
+  /** Script hash if available */
+  readonly scriptHash?: string
+  /** UTxO reference for spend redeemers */
+  readonly utxoRef?: string
+  /** Credential hash for withdraw/cert redeemers */
+  readonly credential?: string
+  /** Policy ID for mint redeemers */
+  readonly policyId?: string
+  /** Validation error message from the script */
+  readonly validationError: string
+  /** Execution traces emitted by the script */
+  readonly traces: ReadonlyArray<string>
+}
+
+/**
+ * Error type for failures in script evaluation.
+ *
+ * Enhanced with structured failure information including user-provided labels.
+ *
+ * @since 2.0.0
+ * @category errors
  */
 export class EvaluationError extends Data.TaggedError("EvaluationError")<{
   readonly cause: unknown
   readonly message?: string
-}> {}
+  /** Parsed script failures with labels */
+  readonly failures?: ReadonlyArray<ScriptFailure>
+}> {
+  /**
+   * Format failures into a human-readable string.
+   */
+  formatFailures(): string {
+    if (!this.failures || this.failures.length === 0) {
+      return this.message ?? "Script evaluation failed"
+    }
+
+    const lines = ["Script evaluation failed:"]
+    for (const f of this.failures) {
+      const labelPart = f.label ? ` [${f.label}]` : ""
+      const refPart = f.utxoRef ? ` UTxO: ${f.utxoRef}` : f.credential ? ` Credential: ${f.credential}` : f.policyId ? ` Policy: ${f.policyId}` : ""
+      lines.push(`  ${f.purpose}:${f.index}${labelPart}${refPart}`)
+      lines.push(`    Error: ${f.validationError}`)
+      if (f.traces.length > 0) {
+        lines.push(`    Traces: ${f.traces.join(", ")}`)
+      }
+    }
+    return lines.join("\n")
+  }
+}
 
 // ============================================================================
 // Factory Functions
@@ -1171,6 +1231,8 @@ export interface TxBuilderState {
   readonly redeemers: Map<string, RedeemerData> // Resolved redeemer data (static mode)
   readonly deferredRedeemers: Map<string, DeferredRedeemerData> // Deferred redeemers (self/batch mode)
   readonly referenceInputs: ReadonlyArray<CoreUTxO.UTxO> // Reference inputs (UTxOs with reference scripts)
+  readonly certificates: ReadonlyArray<Certificate.Certificate> // Certificates for staking operations
+  readonly withdrawals: Map<RewardAccount.RewardAccount, bigint> // Withdrawal amounts by reward account
   readonly mint?: Mint.Mint // Assets being minted/burned (positive = mint, negative = burn)
   readonly collateral?: {
     // Collateral data for script transactions
@@ -1195,6 +1257,8 @@ export interface RedeemerData {
     readonly mem: bigint
     readonly steps: bigint
   }
+  /** Optional label for debugging - identifies this redeemer in error messages */
+  readonly label?: string
 }
 
 /**
@@ -1211,6 +1275,8 @@ export interface DeferredRedeemerData {
     readonly mem: bigint
     readonly steps: bigint
   }
+  /** Optional label for debugging - identifies this redeemer in error messages */
+  readonly label?: string
 }
 
 /**
@@ -1330,16 +1396,17 @@ export class BuildOptionsTag extends Context.Tag("BuildOptions")<BuildOptionsTag
  *
  * Type signature:
  * ```typescript
- * type ProgramStep = Effect.Effect<void, TransactionBuilderError, TxContext>
+ * type ProgramStep = Effect.Effect<void, TransactionBuilderError, TxContext | TxBuilderConfigTag>
  * ```
  *
  * Requirements from context:
  * - TxContext: Mutable state Ref (selected UTxOs, outputs, scripts, assets)
+ * - TxBuilderConfigTag: Builder configuration (provider, network, etc.)
  *
  * @since 2.0.0
  * @category types
  */
-export type ProgramStep = Effect.Effect<void, TransactionBuilderError, TxContext>
+export type ProgramStep = Effect.Effect<void, TransactionBuilderError, TxContext | TxBuilderConfigTag>
 
 // ============================================================================
 // Transaction Builder Interface - Hybrid Effect/Promise API
@@ -1530,6 +1597,199 @@ export interface TransactionBuilderBase {
    * @category builder-methods
    */
   readonly readFrom: (params: ReadFromParams) => this
+
+  /**
+   * Register a stake credential on-chain.
+   *
+   * Creates a stake registration certificate, enabling the credential to delegate
+   * to pools and receive rewards. Requires paying a stake key deposit (currently 2 ADA).
+   *
+   * Queues a deferred operation that will be executed when build() is called.
+   * Returns the same builder for method chaining.
+   *
+   * @since 2.0.0
+   * @category staking-methods
+   */
+  readonly registerStake: (params: RegisterStakeParams) => this
+
+  /**
+   * Deregister a stake credential from the chain.
+   *
+   * Removes the stake credential registration and reclaims the deposit.
+   * All rewards must be withdrawn before deregistering.
+   *
+   * For script-controlled credentials, provide a redeemer. The redeemer can use:
+   * - **Static**: Direct Data value
+   * - **Self**: Callback receiving the indexed certificate
+   *
+   * Queues a deferred operation that will be executed when build() is called.
+   * Returns the same builder for method chaining.
+   *
+   * @since 2.0.0
+   * @category staking-methods
+   */
+  readonly deregisterStake: (params: DeregisterStakeParams) => this
+
+  /**
+   * Delegate stake and/or voting power to a pool or DRep.
+   *
+   * Supports three delegation modes:
+   * - **Stake only**: Provide `poolKeyHash` to delegate to a stake pool
+   * - **Vote only**: Provide `drep` to delegate governance voting power (Conway)
+   * - **Both**: Provide both for combined stake + vote delegation
+   *
+   * For script-controlled credentials, provide a redeemer.
+   *
+   * Queues a deferred operation that will be executed when build() is called.
+   * Returns the same builder for method chaining.
+   *
+   * @since 2.0.0
+   * @category staking-methods
+   */
+  readonly delegateTo: (params: DelegateToParams) => this
+
+  /**
+   * Withdraw staking rewards from a stake credential.
+   *
+   * Withdraws accumulated rewards to the transaction's change address.
+   * Use `amount: 0n` to trigger a stake validator without withdrawing rewards
+   * (useful for the coordinator pattern).
+   *
+   * For script-controlled credentials, provide a redeemer. The redeemer can use:
+   * - **Static**: Direct Data value
+   * - **Self**: Callback receiving the indexed withdrawal
+   *
+   * Queues a deferred operation that will be executed when build() is called.
+   * Returns the same builder for method chaining.
+   *
+   * @since 2.0.0
+   * @category staking-methods
+   */
+  readonly withdraw: (params: WithdrawParams) => this
+
+  /**
+   * Register a stake credential and delegate in a single certificate.
+   *
+   * Combines registration and delegation into one certificate, reducing
+   * transaction size and fees. Available in Conway era onwards.
+   *
+   * Supports three delegation modes:
+   * - **Stake only**: Provide `poolKeyHash` to register and delegate to pool
+   * - **Vote only**: Provide `drep` to register and delegate voting power
+   * - **Both**: Provide both for combined registration + delegation
+   *
+   * For script-controlled credentials, provide a redeemer.
+   *
+   * Queues a deferred operation that will be executed when build() is called.
+   * Returns the same builder for method chaining.
+   *
+   * @since 2.0.0
+   * @category staking-methods
+   */
+  readonly registerAndDelegateTo: (params: RegisterAndDelegateToParams) => this
+
+  /**
+   * Register as a Delegated Representative (DRep).
+   *
+   * Registers a credential as a DRep for governance voting. Requires paying
+   * a DRep deposit. Optionally provide an anchor with metadata URL and hash.
+   *
+   * Queues a deferred operation that will be executed when build() is called.
+   * Returns the same builder for method chaining.
+   *
+   * @since 2.0.0
+   * @category governance-methods
+   */
+  readonly registerDRep: (params: RegisterDRepParams) => this
+
+  /**
+   * Update DRep metadata anchor.
+   *
+   * Updates the anchor (metadata URL + hash) for a registered DRep.
+   * For script-controlled DRep credentials, provide a redeemer.
+   *
+   * Queues a deferred operation that will be executed when build() is called.
+   * Returns the same builder for method chaining.
+   *
+   * @since 2.0.0
+   * @category governance-methods
+   */
+  readonly updateDRep: (params: UpdateDRepParams) => this
+
+  /**
+   * Deregister as a DRep.
+   *
+   * Removes DRep registration and reclaims the deposit.
+   * For script-controlled DRep credentials, provide a redeemer.
+   *
+   * Queues a deferred operation that will be executed when build() is called.
+   * Returns the same builder for method chaining.
+   *
+   * @since 2.0.0
+   * @category governance-methods
+   */
+  readonly deregisterDRep: (params: DeregisterDRepParams) => this
+
+  /**
+   * Authorize a committee hot credential.
+   *
+   * Authorizes a hot credential to act on behalf of a cold committee credential.
+   * The cold credential is kept offline for security; the hot credential signs
+   * governance actions.
+   *
+   * For script-controlled cold credentials, provide a redeemer.
+   *
+   * Queues a deferred operation that will be executed when build() is called.
+   * Returns the same builder for method chaining.
+   *
+   * @since 2.0.0
+   * @category governance-methods
+   */
+  readonly authCommitteeHot: (params: AuthCommitteeHotParams) => this
+
+  /**
+   * Resign from the constitutional committee.
+   *
+   * Submits a resignation from committee membership. Optionally provide
+   * an anchor with resignation rationale.
+   *
+   * For script-controlled cold credentials, provide a redeemer.
+   *
+   * Queues a deferred operation that will be executed when build() is called.
+   * Returns the same builder for method chaining.
+   *
+   * @since 2.0.0
+   * @category governance-methods
+   */
+  readonly resignCommitteeCold: (params: ResignCommitteeColdParams) => this
+
+  /**
+   * Register or update a stake pool.
+   *
+   * Registers a new stake pool or updates existing pool parameters.
+   * Pool parameters include operator key, VRF key, costs, margin, reward account, etc.
+   *
+   * Queues a deferred operation that will be executed when build() is called.
+   * Returns the same builder for method chaining.
+   *
+   * @since 2.0.0
+   * @category pool-methods
+   */
+  readonly registerPool: (params: RegisterPoolParams) => this
+
+  /**
+   * Retire a stake pool.
+   *
+   * Announces pool retirement effective at the specified epoch.
+   * The pool will continue operating until the retirement epoch.
+   *
+   * Queues a deferred operation that will be executed when build() is called.
+   * Returns the same builder for method chaining.
+   *
+   * @since 2.0.0
+   * @category pool-methods
+   */
+  readonly retirePool: (params: RetirePoolParams) => this
 }
 
 /**
@@ -1746,6 +2006,54 @@ export function makeTxBuilder(config: TxBuilderConfig) {
       const program = attachScriptToState(params.script)
       programs.push(program)
       return txBuilder // Return same instance for chaining
+    },
+
+    // Staking/Certificate methods
+    registerStake: (params: RegisterStakeParams) => {
+      const program = createRegisterStakeProgram(params)
+      programs.push(program)
+      return txBuilder
+    },
+    deregisterStake: (params: DeregisterStakeParams) => {
+      const program = createDeregisterStakeProgram(params)
+      programs.push(program)
+      return txBuilder
+    },
+    delegateTo: (params: DelegateToParams) => {
+      const program = createDelegateToProgram(params)
+      programs.push(program)
+      return txBuilder
+    },
+    withdraw: (params: WithdrawParams) => {
+      const program = createWithdrawProgram(params, config)
+      programs.push(program)
+      return txBuilder
+    },
+    registerAndDelegateTo: (params: RegisterAndDelegateToParams) => {
+      const program = createRegisterAndDelegateToProgram(params)
+      programs.push(program)
+      return txBuilder
+    },
+    registerDRep: (_params: RegisterDRepParams) => {
+      throw new Error("registerDRep not yet implemented")
+    },
+    updateDRep: (_params: UpdateDRepParams) => {
+      throw new Error("updateDRep not yet implemented")
+    },
+    deregisterDRep: (_params: DeregisterDRepParams) => {
+      throw new Error("deregisterDRep not yet implemented")
+    },
+    authCommitteeHot: (_params: AuthCommitteeHotParams) => {
+      throw new Error("authCommitteeHot not yet implemented")
+    },
+    resignCommitteeCold: (_params: ResignCommitteeColdParams) => {
+      throw new Error("resignCommitteeCold not yet implemented")
+    },
+    registerPool: (_params: RegisterPoolParams) => {
+      throw new Error("registerPool not yet implemented")
+    },
+    retirePool: (_params: RetirePoolParams) => {
+      throw new Error("retirePool not yet implemented")
     },
 
     // ============================================================================

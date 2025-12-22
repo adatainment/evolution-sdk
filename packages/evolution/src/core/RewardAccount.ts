@@ -15,7 +15,7 @@ import * as ScriptHash from "./ScriptHash.js"
  */
 export class RewardAccount extends Schema.TaggedClass<RewardAccount>("RewardAccount")("RewardAccount", {
   networkId: NetworkId.NetworkId,
-  stakeCredential: Credential.CredentialSchema
+  stakeCredential: Credential.Credential
 }) {
   /**
    * @since 2.0.0
@@ -83,7 +83,7 @@ export const FromBytes = Schema.transformOrFail(Schema.typeSchema(Bytes29.BytesF
       const addressType = header >> 4
 
       const isStakeKey = (addressType & 0b0001) === 0
-      const stakeCredential: Credential.CredentialSchema = isStakeKey
+      const stakeCredential: Credential.Credential = isStakeKey
         ? new KeyHash.KeyHash({
             hash: fromA.slice(1, 29)
           })

@@ -18,8 +18,8 @@ import * as ScriptHash from "./ScriptHash.js"
  */
 export class Address extends Schema.Class<Address>("AddressStructure")({
   networkId: NetworkId.NetworkId,
-  paymentCredential: Credential.CredentialSchema,
-  stakingCredential: Schema.optional(Credential.CredentialSchema)
+  paymentCredential: Credential.Credential,
+  stakingCredential: Schema.optional(Credential.Credential)
 }) {
   toJSON() {
     return {
@@ -105,12 +105,12 @@ export const FromBytes = Schema.transformOrFail(
         if (fromA.length === 57) {
           // BaseAddress (with staking credential)
           const isPaymentKey = (addressTypeBits & 0b0001) === 0
-          const paymentCredential: Credential.CredentialSchema = isPaymentKey
+          const paymentCredential: Credential.Credential = isPaymentKey
             ? new KeyHash.KeyHash({ hash: fromA.slice(1, 29) })
             : new ScriptHash.ScriptHash({ hash: fromA.slice(1, 29) })
 
           const isStakeKey = (addressTypeBits & 0b0010) === 0
-          const stakingCredential: Credential.CredentialSchema = isStakeKey
+          const stakingCredential: Credential.Credential = isStakeKey
             ? new KeyHash.KeyHash({ hash: fromA.slice(29, 57) })
             : new ScriptHash.ScriptHash({ hash: fromA.slice(29, 57) })
 
@@ -122,7 +122,7 @@ export const FromBytes = Schema.transformOrFail(
         } else if (fromA.length === 29) {
           // EnterpriseAddress (no staking credential)
           const isPaymentKey = (addressTypeBits & 0b0001) === 0
-          const paymentCredential: Credential.CredentialSchema = isPaymentKey
+          const paymentCredential: Credential.Credential = isPaymentKey
             ? new KeyHash.KeyHash({ hash: fromA.slice(1, 29) })
             : new ScriptHash.ScriptHash({ hash: fromA.slice(1, 29) })
 
@@ -250,8 +250,8 @@ export interface AddressDetails {
     readonly bech32: string
     readonly hex: string
   }
-  readonly paymentCredential: Credential.CredentialSchema
-  readonly stakingCredential?: Credential.CredentialSchema
+  readonly paymentCredential: Credential.Credential
+  readonly stakingCredential?: Credential.Credential
 }
 
 /**
@@ -320,7 +320,7 @@ export const getAddressDetails = (address: string): AddressDetails | undefined =
  * @since 1.0.0
  * @category Utils
  */
-export const getPaymentCredential = (address: string): Credential.CredentialSchema | undefined => {
+export const getPaymentCredential = (address: string): Credential.Credential | undefined => {
   const details = getAddressDetails(address)
   return details?.paymentCredential
 }
@@ -332,7 +332,7 @@ export const getPaymentCredential = (address: string): Credential.CredentialSche
  * @since 1.0.0
  * @category Utils
  */
-export const getStakingCredential = (address: string): Credential.CredentialSchema | undefined => {
+export const getStakingCredential = (address: string): Credential.Credential | undefined => {
   const details = getAddressDetails(address)
   return details?.stakingCredential
 }

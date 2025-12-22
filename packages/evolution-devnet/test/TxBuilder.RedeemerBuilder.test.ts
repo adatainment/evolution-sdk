@@ -19,7 +19,6 @@ import * as PlutusV3 from "@evolution-sdk/evolution/core/PlutusV3"
 import * as PolicyId from "@evolution-sdk/evolution/core/PolicyId"
 import * as ScriptHash from "@evolution-sdk/evolution/core/ScriptHash"
 import * as Text from "@evolution-sdk/evolution/core/Text"
-import type { IndexedInput } from "@evolution-sdk/evolution/sdk/builders/RedeemerBuilder"
 import { createClient } from "@evolution-sdk/evolution/sdk/client/ClientImpl"
 import { Schema } from "effect"
 
@@ -28,9 +27,7 @@ import plutusJson from "../../evolution/test/spec/plutus.json"
 const CoreAssets = Core.Assets
 
 const getMintMultiValidator = () => {
-  const validator = plutusJson.validators.find(
-    (v) => v.title === "mint_multi_validator.mint_multi_validator.spend"
-  )
+  const validator = plutusJson.validators.find((v) => v.title === "mint_multi_validator.mint_multi_validator.spend")
 
   if (!validator) {
     throw new Error("mint_multi_validator not found in plutus.json")
@@ -53,20 +50,14 @@ describe("TxBuilder RedeemerBuilder", () => {
     "test test test test test test test test test test test test test test test test test test test test test test test sauce"
 
   /** SpendRedeemer: Constr(0, [value: Int]) where value = datum.counter + input_index */
-  const makeSpendRedeemer = (value: bigint): Data.Data =>
-    Data.constr(0n, [Data.int(value)])
+  const makeSpendRedeemer = (value: bigint): Data.Data => Data.constr(0n, [Data.int(value)])
 
   /** MintRedeemer: Constr(0, [entries: List<(Int, Int)>]) */
   const makeMintRedeemer = (entries: Array<[bigint, bigint]>): Data.Data =>
-    Data.constr(0n, [
-      Data.list(entries.map(([idx, val]) =>
-        Data.list([Data.int(idx), Data.int(val)])
-      ))
-    ])
+    Data.constr(0n, [Data.list(entries.map(([idx, val]) => Data.list([Data.int(idx), Data.int(val)])))])
 
   /** CounterDatum: Constr(0, [counter: Int]) */
-  const makeCounterDatum = (counter: bigint): Data.Data =>
-    Data.constr(0n, [Data.int(counter)])
+  const makeCounterDatum = (counter: bigint): Data.Data => Data.constr(0n, [Data.int(counter)])
 
   /** Parse counter value from UTxO inline datum */
   const parseCounterDatum = (utxo: Core.UTxO.UTxO): bigint => {
@@ -238,7 +229,7 @@ describe("TxBuilder RedeemerBuilder", () => {
       .attachScript({ script: mintMultiScript })
       .collectFrom({
         inputs: scriptUtxos,
-        redeemer: ({ index, utxo }: IndexedInput): Data.Data => {
+        redeemer: ({ index, utxo }: { index: number; utxo: Core.UTxO.UTxO }): Data.Data => {
           const datumCounter = parseCounterDatum(utxo)
           return makeSpendRedeemer(datumCounter + BigInt(index))
         }
@@ -246,7 +237,7 @@ describe("TxBuilder RedeemerBuilder", () => {
       .mintAssets({
         assets: CoreAssets.fromRecord({ [unit]: -300n }),
         redeemer: {
-          all: (inputs: ReadonlyArray<IndexedInput>): Data.Data => {
+          all: (inputs: ReadonlyArray<{ index: number; utxo: Core.UTxO.UTxO }>): Data.Data => {
             const entries: Array<[bigint, bigint]> = inputs.map((input) => {
               const datumCounter = parseCounterDatum(input.utxo)
               return [BigInt(input.index), datumCounter + BigInt(input.index)]

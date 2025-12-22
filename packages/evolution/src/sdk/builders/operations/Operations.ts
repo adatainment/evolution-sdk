@@ -1,6 +1,12 @@
 import type * as CoreAddress from "../../../core/Address.js"
+import type * as Anchor from "../../../core/Anchor.js"
 import type * as CoreAssets from "../../../core/Assets/index.js"
+import type * as Credential from "../../../core/Credential.js"
 import type * as CoreDatumOption from "../../../core/DatumOption.js"
+import type * as DRep from "../../../core/DRep.js"
+import type * as EpochNo from "../../../core/EpochNo.js"
+import type * as PoolKeyHash from "../../../core/PoolKeyHash.js"
+import type * as PoolParams from "../../../core/PoolParams.js"
 import type * as CoreScriptRef from "../../../core/ScriptRef.js"
 import type * as UTxO from "../../../core/UTxO.js"
 import type * as RedeemerBuilder from "../RedeemerBuilder.js"
@@ -31,6 +37,8 @@ export interface CollectFromParams {
   readonly inputs: ReadonlyArray<UTxO.UTxO>
   /** Optional redeemer for script-locked UTxOs (static, self, or batch mode) */
   readonly redeemer?: RedeemerBuilder.RedeemerArg
+  /** Optional label for debugging script failures - identifies this operation in error messages */
+  readonly label?: string
 }
 
 export interface ReadFromParams {
@@ -52,4 +60,242 @@ export interface MintTokensParams {
   readonly assets: CoreAssets.Assets
   /** Optional redeemer for Plutus minting policies (static, self, or batch mode) */
   readonly redeemer?: RedeemerBuilder.RedeemerArg
+  /** Optional label for debugging script failures - identifies this operation in error messages */
+  readonly label?: string
+}
+
+// ============================================================================
+// Phase 1: Basic Staking Operations
+// ============================================================================
+
+/**
+ * Parameters for registering a stake credential.
+ *
+ * Registers a stake credential on-chain, enabling delegation and rewards.
+ * Requires paying a deposit (currently 2 ADA on mainnet).
+ *
+ * @since 2.0.0
+ * @category staking
+ */
+export interface RegisterStakeParams {
+  /** The stake credential to register (key hash or script hash) */
+  readonly stakeCredential: Credential.Credential
+  /** Redeemer for script-controlled stake credentials */
+  readonly redeemer?: RedeemerBuilder.RedeemerArg
+  /** Optional label for debugging script failures - identifies this operation in error messages */
+  readonly label?: string
+}
+
+/**
+ * Parameters for deregistering a stake credential.
+ *
+ * Removes a stake credential from the chain and reclaims the deposit.
+ * Must withdraw all rewards before deregistering.
+ *
+ * @since 2.0.0
+ * @category staking
+ */
+export interface DeregisterStakeParams {
+  /** The stake credential to deregister */
+  readonly stakeCredential: Credential.Credential
+  /** Redeemer for script-controlled stake credentials */
+  readonly redeemer?: RedeemerBuilder.RedeemerArg
+  /** Optional label for debugging script failures - identifies this operation in error messages */
+  readonly label?: string
+}
+
+/**
+ * Parameters for delegating stake and/or voting power.
+ *
+ * Supports three delegation modes:
+ * - **Stake only**: Provide `poolKeyHash` to delegate to a stake pool
+ * - **Vote only**: Provide `drep` to delegate voting power (Conway)
+ * - **Both**: Provide both for combined stake + vote delegation
+ *
+ * @since 2.0.0
+ * @category staking
+ */
+export interface DelegateToParams {
+  /** The stake credential delegating */
+  readonly stakeCredential: Credential.Credential
+  /** Pool to delegate stake to (optional) */
+  readonly poolKeyHash?: PoolKeyHash.PoolKeyHash
+  /** DRep to delegate voting power to (optional, Conway) */
+  readonly drep?: DRep.DRep
+  /** Redeemer for script-controlled stake credentials */
+  readonly redeemer?: RedeemerBuilder.RedeemerArg
+  /** Optional label for debugging script failures - identifies this operation in error messages */
+  readonly label?: string
+}
+
+/**
+ * Parameters for withdrawing staking rewards.
+ *
+ * Withdraws accumulated rewards from a stake credential.
+ * Use amount: 0n to trigger a stake validator without withdrawing rewards
+ * (useful for the coordinator pattern).
+ *
+ * @since 2.0.0
+ * @category staking
+ */
+export interface WithdrawParams {
+  /** The stake credential to withdraw from */
+  readonly stakeCredential: Credential.Credential
+  /** Amount of lovelace to withdraw */
+  readonly amount: bigint
+  /** Redeemer for script-controlled stake credentials */
+  readonly redeemer?: RedeemerBuilder.RedeemerArg
+  /** Optional label for debugging script failures - identifies this operation in error messages */
+  readonly label?: string
+}
+
+// ============================================================================
+// Phase 3: Combined Register + Delegate (Conway)
+// ============================================================================
+
+/**
+ * Parameters for registering AND delegating in a single certificate.
+ *
+ * Combines registration and delegation into one certificate, saving fees.
+ * Available in Conway era onwards.
+ *
+ * @since 2.0.0
+ * @category staking
+ */
+export interface RegisterAndDelegateToParams {
+  /** The stake credential to register and delegate */
+  readonly stakeCredential: Credential.Credential
+  /** Pool to delegate stake to (optional) */
+  readonly poolKeyHash?: PoolKeyHash.PoolKeyHash
+  /** DRep to delegate voting power to (optional) */
+  readonly drep?: DRep.DRep
+  /** Redeemer for script-controlled stake credentials */
+  readonly redeemer?: RedeemerBuilder.RedeemerArg
+  /** Optional label for debugging script failures - identifies this operation in error messages */
+  readonly label?: string
+}
+
+// ============================================================================
+// Phase 4: DRep Management (Conway)
+// ============================================================================
+
+/**
+ * Parameters for registering as a DRep.
+ *
+ * Registers a credential as a Delegated Representative for governance.
+ * Requires paying a deposit.
+ *
+ * @since 2.0.0
+ * @category governance
+ */
+export interface RegisterDRepParams {
+  /** The credential to register as a DRep */
+  readonly drepCredential: Credential.Credential
+  /** Optional metadata anchor (URL + hash) */
+  readonly anchor?: Anchor.Anchor
+}
+
+/**
+ * Parameters for updating DRep metadata.
+ *
+ * Updates the anchor (metadata URL + hash) for a registered DRep.
+ *
+ * @since 2.0.0
+ * @category governance
+ */
+export interface UpdateDRepParams {
+  /** The DRep credential to update */
+  readonly drepCredential: Credential.Credential
+  /** New metadata anchor (URL + hash) */
+  readonly anchor?: Anchor.Anchor
+  /** Redeemer for script-controlled DRep credentials */
+  readonly redeemer?: RedeemerBuilder.RedeemerArg
+}
+
+/**
+ * Parameters for deregistering as a DRep.
+ *
+ * Removes DRep registration and reclaims the deposit.
+ *
+ * @since 2.0.0
+ * @category governance
+ */
+export interface DeregisterDRepParams {
+  /** The DRep credential to deregister */
+  readonly drepCredential: Credential.Credential
+  /** Redeemer for script-controlled DRep credentials */
+  readonly redeemer?: RedeemerBuilder.RedeemerArg
+}
+
+// ============================================================================
+// Phase 5: Constitutional Committee (Conway)
+// ============================================================================
+
+/**
+ * Parameters for authorizing a committee hot credential.
+ *
+ * Authorizes a hot credential to act on behalf of a cold committee credential.
+ * The cold credential is kept offline for security; the hot credential signs
+ * governance actions.
+ *
+ * @since 2.0.0
+ * @category governance
+ */
+export interface AuthCommitteeHotParams {
+  /** The cold credential (offline, secure) */
+  readonly coldCredential: Credential.Credential
+  /** The hot credential to authorize (online, signing) */
+  readonly hotCredential: Credential.Credential
+  /** Redeemer for script-controlled cold credentials */
+  readonly redeemer?: RedeemerBuilder.RedeemerArg
+}
+
+/**
+ * Parameters for resigning from the constitutional committee.
+ *
+ * Submits a resignation from committee membership.
+ *
+ * @since 2.0.0
+ * @category governance
+ */
+export interface ResignCommitteeColdParams {
+  /** The cold credential resigning */
+  readonly coldCredential: Credential.Credential
+  /** Optional anchor with resignation rationale */
+  readonly anchor?: Anchor.Anchor
+  /** Redeemer for script-controlled cold credentials */
+  readonly redeemer?: RedeemerBuilder.RedeemerArg
+}
+
+// ============================================================================
+// Phase 6: Stake Pool Operations
+// ============================================================================
+
+/**
+ * Parameters for registering a stake pool.
+ *
+ * Registers a new stake pool with the specified parameters.
+ * Also used for updating existing pool parameters.
+ *
+ * @since 2.0.0
+ * @category pool
+ */
+export interface RegisterPoolParams {
+  /** Complete pool parameters including operator, VRF key, costs, etc. */
+  readonly poolParams: PoolParams.PoolParams
+}
+
+/**
+ * Parameters for retiring a stake pool.
+ *
+ * Announces pool retirement effective at the specified epoch.
+ *
+ * @since 2.0.0
+ * @category pool
+ */
+export interface RetirePoolParams {
+  /** The pool key hash of the pool to retire */
+  readonly poolKeyHash: PoolKeyHash.PoolKeyHash
+  /** Epoch at which retirement takes effect */
+  readonly epoch: EpochNo.EpochNo
 }

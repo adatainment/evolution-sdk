@@ -71,7 +71,7 @@ const mapHash = <K, V>(map: Map<K, V>): number => {
 export class ConstitutionalCommitteeVoter extends Schema.TaggedClass<ConstitutionalCommitteeVoter>()(
   "ConstitutionalCommitteeVoter",
   {
-    credential: Credential.CredentialSchema
+    credential: Credential.Credential
   }
 ) {
   toJSON() {
@@ -709,7 +709,7 @@ export const isAbstainVote = (vote: Vote): vote is Schema.Schema.Type<typeof Abs
  */
 export const matchVoter =
   <R>(patterns: {
-    ConstitutionalCommitteeVoter: (credential: Credential.CredentialSchema) => R
+    ConstitutionalCommitteeVoter: (credential: Credential.Credential) => R
     DRepVoter: (drep: DRep.DRep) => R
     StakePoolVoter: (poolKeyHash: PoolKeyHash.PoolKeyHash) => R
   }) =>

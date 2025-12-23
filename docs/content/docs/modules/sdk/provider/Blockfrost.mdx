@@ -1,6 +1,6 @@
 ---
 title: sdk/provider/Blockfrost.ts
-nav_order: 190
+nav_order: 191
 parent: Modules
 ---
 

@@ -1,6 +1,6 @@
 ---
 title: sdk/builders/TransactionBuilder.ts
-nav_order: 175
+nav_order: 176
 parent: Modules
 ---
 
@@ -630,6 +630,57 @@ export interface TransactionBuilderBase {
    */
   readonly addSigner: (params: AddSignerParams) => this
 
+  /**
+   * Attach metadata to the transaction.
+   *
+   * Metadata is stored in the auxiliary data section and identified by labels (0-255)
+   * following the CIP-10 standard. Common use cases include:
+   * - Transaction messages/comments (label 674, CIP-20)
+   * - NFT metadata (label 721, CIP-25)
+   * - Royalty information (label 777, CIP-27)
+   * - DApp-specific data
+   *
+   * Multiple metadata entries with different labels can be attached by calling this
+   * method multiple times. The same label cannot be used twice.
+   *
+   * Queues a deferred operation that will be executed when build() is called.
+   * Returns the same builder for method chaining.
+   *
+   * @example
+   * ```typescript
+   * import * as TransactionMetadatum from "@evolution-sdk/core/TransactionMetadatum"
+   *
+   * // Attach a simple message (CIP-20)
+   * const tx = await builder
+   *   .payToAddress({ address, assets: { lovelace: 2_000_000n } })
+   *   .attachMetadata({
+   *     label: 674n,
+   *     metadata: TransactionMetadatum.makeTransactionMetadatumMap(
+   *       new Map([[0n, TransactionMetadatum.makeTransactionMetadatumText("Hello, Cardano!")]])
+   *     )
+   *   })
+   *   .build()
+   *
+   * // Attach NFT metadata (CIP-25)
+   * const nftMetadata = TransactionMetadatum.makeTransactionMetadatumMap(
+   *   new Map([
+   *     [TransactionMetadatum.makeTransactionMetadatumText("name"),
+   *      TransactionMetadatum.makeTransactionMetadatumText("My NFT #42")],
+   *     [TransactionMetadatum.makeTransactionMetadatumText("image"),
+   *      TransactionMetadatum.makeTransactionMetadatumText("ipfs://Qm...")],
+   *   ])
+   * )
+   * const tx = await builder
+   *   .mintAssets({ assets: { [policyId + assetName]: 1n } })
+   *   .attachMetadata({ label: 721n, metadata: nftMetadata })
+   *   .build()
+   * ```
+   *
+   * @since 2.0.0
+   * @category metadata-methods
+   */
+  readonly attachMetadata: (params: AttachMetadataParams) => this
+
   // ============================================================================
   // Transaction Chaining Methods
   // ============================================================================
@@ -1205,6 +1256,7 @@ export interface TxBuilderState {
     readonly to?: Time.UnixTime // ttl
   }
   readonly requiredSigners: ReadonlyArray<KeyHash.KeyHash> // Extra signers required (for script validation)
+  readonly auxiliaryData?: AuxiliaryData.AuxiliaryData // Auxiliary data (metadata, scripts, etc.)
 }
 ```
 

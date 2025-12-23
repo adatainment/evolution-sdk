@@ -24,6 +24,7 @@ parent: Modules
 - [model](#model)
   - [Uint8 (type alias)](#uint8-type-alias)
 - [schemas](#schemas)
+  - [NonNegativeInteger](#nonnegativeinteger)
   - [Uint8Schema](#uint8schema)
 - [utils](#utils)
   - [INT16_MAX](#int16_max)
@@ -193,6 +194,18 @@ export type Uint8 = typeof Uint8Schema.Type
 Added in v2.0.0
 
 # schemas
+
+## NonNegativeInteger
+
+Schema for non-negative integers (unbounded).
+
+**Signature**
+
+```ts
+export declare const NonNegativeInteger: Schema.refine<bigint, typeof Schema.BigInt>
+```
+
+Added in v2.0.0
 
 ## Uint8Schema
 

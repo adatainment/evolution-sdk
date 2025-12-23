@@ -1,7 +1,8 @@
-import { Data, Equal, FastCheck, Hash, Schema } from "effect"
+import { Data, FastCheck, Schema } from "effect"
 
 import * as CBOR from "./CBOR.js"
 import * as Function from "./Function.js"
+import * as Numeric from "./Numeric.js"
 
 /**
  * Error class for transaction metadatum related operations.
@@ -20,88 +21,127 @@ export class TransactionMetadatumError extends Data.TaggedError("TransactionMeta
  * @since 2.0.0
  * @category model
  */
-export type TransactionMetadatumVariantsEncoded =
-  | { readonly _tag: "TextMetadatum"; readonly value: string }
-  | { readonly _tag: "IntMetadatum"; readonly value: string }
-  | { readonly _tag: "BytesMetadatum"; readonly value: string }
-  | {
-      readonly _tag: "MetadatumMap"
-      readonly value: ReadonlyArray<readonly [TransactionMetadatumVariantsEncoded, TransactionMetadatumVariantsEncoded]>
-    }
-  | { readonly _tag: "ArrayMetadatum"; readonly value: ReadonlyArray<TransactionMetadatumVariantsEncoded> }
+export type TransactionMetadatumEncoded =
+  // String (text stays as string)
+  | string
+  // Int (stays as bigint in CBOR)
+  | bigint
+  // Bytes (Uint8ArrayFromHex encodes to hex string)
+  | string
+  // Map (encoded as array of [key, value] pairs)
+  | ReadonlyArray<readonly [TransactionMetadatumEncoded, TransactionMetadatumEncoded]>
+  // Array
+  | ReadonlyArray<TransactionMetadatumEncoded>
 
 /**
- * Runtime type for transaction metadata (bigint at runtime)
+ * Transaction metadata type definition (runtime type).
+ *
+ * Transaction metadata supports text strings, integers, byte arrays, arrays, and maps.
+ * Following CIP-10 standard metadata registry.
  *
  * @since 2.0.0
  * @category model
  */
-export type TransactionMetadatumVariants = TextMetadatum | IntMetadatum | BytesMetadatum | MetadatumMap | ArrayMetadatum
+export type TransactionMetadatum =
+  // Text string
+  | string
+  // Integer (runtime as bigint)
+  | bigint
+  // Bytes (runtime as Uint8Array)
+  | Uint8Array
+  // Map (using standard Map)
+  | globalThis.Map<TransactionMetadatum, TransactionMetadatum>
+  // Array
+  | ReadonlyArray<TransactionMetadatum>
 
 /**
- * Schema for text-based transaction metadata.
+ * TransactionMetadatumMap type alias
  *
  * @since 2.0.0
- * @category schemas
+ * @category model
  */
-export class TextMetadatum extends Schema.TaggedClass<TextMetadatum>("TextMetadatum")("TextMetadatum", {
-  value: Schema.String
-}) {}
+export type Map = globalThis.Map<TransactionMetadatum, TransactionMetadatum>
 
 /**
- * Schema for integer-based transaction metadata.
- * Encoded as string, runtime as bigint
+ * TransactionMetadatumList type alias
  *
  * @since 2.0.0
- * @category schemas
+ * @category model
  */
-export class IntMetadatum extends Schema.TaggedClass<IntMetadatum>("IntMetadatum")("IntMetadatum", {
-  value: Schema.BigInt
-}) {}
+export type List = ReadonlyArray<TransactionMetadatum>
 
 /**
- * Schema for bytes-based transaction metadata.
+ * Schema for TransactionMetadatum map type
  *
- * @since 2.0.0
  * @category schemas
- */
-export class BytesMetadatum extends Schema.TaggedClass<BytesMetadatum>("BytesMetadatum")("BytesMetadatum", {
-  value: Schema.Uint8ArrayFromHex
-}) {}
-
-/**
- * Schema for map-based transaction metadata.
- *
  * @since 2.0.0
- * @category schemas
  */
-export class MetadatumMap extends Schema.TaggedClass<MetadatumMap>("MetadatumMap")("MetadatumMap", {
-  value: Schema.Map({
-    key: Schema.suspend(
-      (): Schema.Schema<TransactionMetadatumVariants, TransactionMetadatumVariantsEncoded> =>
-        TransactionMetadatumVariants
-    ),
-    value: Schema.suspend(
-      (): Schema.Schema<TransactionMetadatumVariants, TransactionMetadatumVariantsEncoded> =>
-        TransactionMetadatumVariants
-    )
+export const MapSchema: Schema.Schema<Map, TransactionMetadatumEncoded> = Schema.Map({
+  key: Schema.suspend(() => TransactionMetadatumSchema).annotations({
+    identifier: "TransactionMetadatum.Map.Key",
+    title: "Map Key",
+    description: "The key of the metadata map, must be a TransactionMetadatum type"
+  }),
+  value: Schema.suspend(() => TransactionMetadatumSchema).annotations({
+    identifier: "TransactionMetadatum.Map.Value",
+    title: "Map Value",
+    description: "The value of the metadata map, must be a TransactionMetadatum type"
   })
-}) {}
+}).annotations({
+  identifier: "TransactionMetadatum.Map",
+  title: "Metadata Map",
+  description: "A map of TransactionMetadatum key-value pairs"
+}) as any
 
 /**
- * Schema for array-based transaction metadata.
+ * Schema for TransactionMetadatum list type
  *
- * @since 2.0.0
  * @category schemas
+ * @since 2.0.0
  */
-export class ArrayMetadatum extends Schema.TaggedClass<ArrayMetadatum>("ArrayMetadatum")("ArrayMetadatum", {
-  value: Schema.Array(
-    Schema.suspend(
-      (): Schema.Schema<TransactionMetadatumVariants, TransactionMetadatumVariantsEncoded> =>
-        TransactionMetadatumVariants
-    )
-  )
-}) {}
+export const ListSchema: Schema.Schema<List, TransactionMetadatumEncoded> = Schema.Array(
+  Schema.suspend(() => TransactionMetadatumSchema)
+).annotations({
+  identifier: "TransactionMetadatum.List",
+  title: "Metadata List",
+  description: "An array of TransactionMetadatum values"
+}) as any
+
+/**
+ * Schema for TransactionMetadatum string type
+ *
+ * @category schemas
+ * @since 2.0.0
+ */
+export const TextSchema = Schema.String.annotations({
+  identifier: "TransactionMetadatum.Text",
+  title: "Metadata Text",
+  description: "A text string value in transaction metadata"
+})
+
+/**
+ * Schema for TransactionMetadatum integer type
+ *
+ * @category schemas
+ * @since 2.0.0
+ */
+export const IntSchema = Numeric.Int64.annotations({
+  identifier: "TransactionMetadatum.Int",
+  title: "Metadata Integer",
+  description: "An integer value in transaction metadata (64-bit signed)"
+})
+
+/**
+ * Schema for TransactionMetadatum bytes type
+ *
+ * @category schemas
+ * @since 2.0.0
+ */
+export const BytesSchema = Schema.Uint8ArrayFromHex.annotations({
+  identifier: "TransactionMetadatum.Bytes",
+  title: "Metadata Bytes",
+  description: "A byte array value in transaction metadata"
+})
 
 /**
  * Union schema for all types of transaction metadata.
@@ -109,185 +149,20 @@ export class ArrayMetadatum extends Schema.TaggedClass<ArrayMetadatum>("ArrayMet
  * @since 2.0.0
  * @category schemas
  */
-export const TransactionMetadatumVariants: Schema.Schema<
-  TransactionMetadatumVariants,
-  TransactionMetadatumVariantsEncoded
-> = Schema.Union(TextMetadatum, IntMetadatum, BytesMetadatum, ArrayMetadatum, MetadatumMap).annotations({
-  identifier: "TransactionMetadatum",
-  description: "A transaction metadata value supporting text, integers, bytes, arrays, and maps"
-})
-
-// Add Equal/Hash implementations to variant classes
-// @ts-expect-error - Adding Equal symbol to prototype
-TextMetadatum.prototype[Equal.symbol] = function (that: unknown): boolean {
-  return that instanceof TextMetadatum && this.value === that.value
-}
-// @ts-expect-error - Adding Hash symbol to prototype
-TextMetadatum.prototype[Hash.symbol] = function (): number {
-  return Hash.string(this.value)
-}
-
-// @ts-expect-error - Adding Equal symbol to prototype
-IntMetadatum.prototype[Equal.symbol] = function (that: unknown): boolean {
-  return that instanceof IntMetadatum && this.value === that.value
-}
-// @ts-expect-error - Adding Hash symbol to prototype
-IntMetadatum.prototype[Hash.symbol] = function (): number {
-  return Hash.number(Number(this.value))
-}
-
-// @ts-expect-error - Adding Equal symbol to prototype
-BytesMetadatum.prototype[Equal.symbol] = function (that: unknown): boolean {
-  if (!(that instanceof BytesMetadatum)) return false
-  if (this.value.length !== that.value.length) return false
-  for (let i = 0; i < this.value.length; i++) {
-    if (this.value[i] !== that.value[i]) return false
-  }
-  return true
-}
-// @ts-expect-error - Adding Hash symbol to prototype
-BytesMetadatum.prototype[Hash.symbol] = function (): number {
-  let h = Hash.string("BytesMetadatum")
-  for (let i = 0; i < this.value.length; i++) {
-    h = Hash.combine(h)(Hash.number(this.value[i]))
-  }
-  return h
-}
-
-// @ts-expect-error - Adding Equal symbol to prototype
-ArrayMetadatum.prototype[Equal.symbol] = function (that: unknown): boolean {
-  if (!(that instanceof ArrayMetadatum)) return false
-  if (this.value.length !== that.value.length) return false
-  for (let i = 0; i < this.value.length; i++) {
-    if (!Equal.equals(this.value[i], that.value[i])) return false
-  }
-  return true
-}
-// @ts-expect-error - Adding Hash symbol to prototype
-ArrayMetadatum.prototype[Hash.symbol] = function (): number {
-  let h = Hash.string("ArrayMetadatum")
-  for (const item of this.value) {
-    h = Hash.combine(h)(Hash.hash(item))
-  }
-  return h
-}
-
-// @ts-expect-error - Adding Equal symbol to prototype
-MetadatumMap.prototype[Equal.symbol] = function (that: unknown): boolean {
-  if (!(that instanceof MetadatumMap)) return false
-  if (this.value.size !== that.value.size) return false
-  for (const [key, val] of this.value.entries()) {
-    let found = false
-    for (const [bKey, bVal] of that.value.entries()) {
-      if (Equal.equals(key, bKey)) {
-        if (!Equal.equals(val, bVal)) return false
-        found = true
-        break
-      }
-    }
-    if (!found) return false
-  }
-  return true
-}
-// @ts-expect-error - Adding Hash symbol to prototype
-MetadatumMap.prototype[Hash.symbol] = function (): number {
-  let h = Hash.string("MetadatumMap")
-  const entries = Array.from(this.value.entries())
-  entries.sort((a, b) => Hash.hash(a[0]) - Hash.hash(b[0]))
-  for (const [key, val] of entries) {
-    h = Hash.combine(h)(Hash.hash(key))
-    h = Hash.combine(h)(Hash.hash(val))
-  }
-  return h
-}
-
-export class TransactionMetadatum extends Schema.Class<TransactionMetadatum>("TransactionMetadatum")({
-  variants: TransactionMetadatumVariants
-}) {}
-
-/**
- * Type representing the CDDL-compatible format for transaction metadata.
- *
- * @since 2.0.0
- * @category model
- */
-export type CDDLSchema = bigint | string | Uint8Array | ReadonlyArray<CDDLSchema> | ReadonlyMap<CDDLSchema, CDDLSchema>
-
-/**
- * Schema for CDDL-compatible transaction metadata format.
- *
- * @since 2.0.0
- * @category schemas
- */
-export const CDDLSchema: Schema.Schema<CDDLSchema> = Schema.Union(
-  Schema.String,
-  Schema.BigIntFromSelf,
-  Schema.Uint8ArrayFromSelf,
-  Schema.Array(Schema.suspend((): Schema.Schema<CDDLSchema> => CDDLSchema)),
-  Schema.ReadonlyMapFromSelf({
-    key: Schema.suspend((): Schema.Schema<CDDLSchema> => CDDLSchema),
-    value: Schema.suspend((): Schema.Schema<CDDLSchema> => CDDLSchema)
-  })
+export const TransactionMetadatumSchema: Schema.Schema<TransactionMetadatum, TransactionMetadatumEncoded> = Schema.Union(
+  TextSchema,
+  IntSchema,
+  BytesSchema,
+  ListSchema,
+  MapSchema
 ).annotations({
-  identifier: "TransactionMetadatum.CDDLSchema",
-  description: "CDDL-compatible format for transaction metadata"
-})
+  identifier: "TransactionMetadatum",
+  description: "Transaction metadata supporting text, integers, bytes, arrays, and maps"
+}) as any
 
-type encode = (
-  toI: TextMetadatum | IntMetadatum | BytesMetadatum | MetadatumMap | ArrayMetadatum,
-  toA: TextMetadatum | IntMetadatum | BytesMetadatum | MetadatumMap | ArrayMetadatum
-) => CDDLSchema
-const encode: encode = (toI, toA) => {
-  switch (toI._tag) {
-    case "TextMetadatum":
-      return toI.value
-    case "IntMetadatum":
-      return toI.value
-    case "BytesMetadatum":
-      return toI.value
-    case "ArrayMetadatum":
-      return toI.value.map((item) => encode(item, toA))
-    case "MetadatumMap": {
-      const map = new Map<CDDLSchema, CDDLSchema>()
-      for (const [key, value] of toI.value.entries()) {
-        map.set(encode(key, toA), encode(value, toA))
-      }
-      return map
-    }
-  }
-}
-
-type decode = (
-  fromA: CDDLSchema,
-  fromI: CDDLSchema
-) => TextMetadatum | IntMetadatum | BytesMetadatum | MetadatumMap | ArrayMetadatum
-const decode: decode = (fromA, fromI) => {
-  if (typeof fromA === "string") {
-    return new TextMetadatum({ value: fromA })
-  } else if (typeof fromA === "bigint") {
-    return new IntMetadatum({ value: fromA })
-  } else if (fromA instanceof Uint8Array) {
-    return new BytesMetadatum({ value: fromA })
-  } else if (Array.isArray(fromA)) {
-    return new ArrayMetadatum({ value: fromA.map((item) => decode(item, fromI)) })
-  } else if (fromA instanceof Map) {
-    const map = new Map()
-    for (const [key, value] of fromA.entries()) {
-      map.set(decode(key, fromI), decode(value, fromI))
-    }
-    return new MetadatumMap({ value: map })
-  }
-  throw new TransactionMetadatumError({ message: "Invalid CDDL format" })
-}
-
-export const FromCDDL = Schema.transform(CDDLSchema, Schema.typeSchema(TransactionMetadatumVariants), {
-  strict: true,
-  encode,
-  decode
-}).annotations({
-  identifier: "TransactionMetadatum.FromCDDL",
-  description: "Transforms CDDL schema to TransactionMetadatum"
-})
+// ============================================================================
+// CBOR Functions
+// ============================================================================
 
 /**
  * Schema transformer for TransactionMetadatum from CBOR bytes.
@@ -296,7 +171,7 @@ export const FromCDDL = Schema.transform(CDDLSchema, Schema.typeSchema(Transacti
  * @category schemas
  */
 export const FromCBORBytes = (options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTIONS) =>
-  Schema.compose(CBOR.FromBytes(options), FromCDDL).annotations({
+  CBOR.FromBytes(options).pipe(Schema.compose(TransactionMetadatumSchema)).annotations({
     identifier: "TransactionMetadatum.FromCBORBytes",
     description: "Transforms CBOR bytes to TransactionMetadatum"
   })
@@ -308,7 +183,7 @@ export const FromCBORBytes = (options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTI
  * @category schemas
  */
 export const FromCBORHex = (options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTIONS) =>
-  Schema.compose(CBOR.FromHex(options), FromCBORBytes(options)).annotations({
+  CBOR.FromHex(options).pipe(Schema.compose(FromCBORBytes(options))).annotations({
     identifier: "TransactionMetadatum.FromCBORHex",
     description: "Transforms CBOR hex string to TransactionMetadatum"
   })
@@ -323,33 +198,45 @@ export const FromCBORHex = (options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTION
  * @since 2.0.0
  * @category utilities
  */
-export const equals = (a: TransactionMetadatumVariants, b: TransactionMetadatumVariants): boolean => {
-  if (a._tag !== b._tag) return false
-
-  switch (a._tag) {
-    case "TextMetadatum":
-      return a.value === (b as TextMetadatum).value
-    case "IntMetadatum":
-      return a.value === (b as IntMetadatum).value
-    case "BytesMetadatum":
-      return (
-        a.value.length === (b as BytesMetadatum).value.length &&
-        a.value.every((byte, i) => byte === (b as BytesMetadatum).value[i])
-      )
-    case "ArrayMetadatum": {
-      const bArray = b as ArrayMetadatum
-      return a.value.length === bArray.value.length && a.value.every((item, i) => equals(item, bArray.value[i]))
-    }
-    case "MetadatumMap": {
-      const bMap = b as MetadatumMap
-      if (a.value.size !== bMap.value.size) return false
-      for (const [key, value] of a.value.entries()) {
-        const bValue = Array.from(bMap.value.entries()).find(([bKey]) => equals(key, bKey))?.[1]
-        if (!bValue || !equals(value, bValue)) return false
-      }
-      return true
-    }
+export const equals = (a: TransactionMetadatum, b: TransactionMetadatum): boolean => {
+  // String comparison
+  if (typeof a === "string" && typeof b === "string") {
+    return a === b
   }
+  
+  // BigInt comparison
+  if (typeof a === "bigint" && typeof b === "bigint") {
+    return a === b
+  }
+  
+  // Uint8Array comparison
+  if (a instanceof Uint8Array && b instanceof Uint8Array) {
+    return a.length === b.length && a.every((byte, i) => byte === b[i])
+  }
+  
+  // Array comparison
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((item, i) => equals(item, b[i]))
+  }
+  
+  // Map comparison
+  if (a instanceof globalThis.Map && b instanceof globalThis.Map) {
+    if (a.size !== b.size) return false
+    for (const [key, value] of a.entries()) {
+      let found = false
+      for (const [bKey, bVal] of b.entries()) {
+        if (equals(key, bKey)) {
+          if (!equals(value, bVal)) return false
+          found = true
+          break
+        }
+      }
+      if (!found) return false
+    }
+    return true
+  }
+  
+  return false
 }
 
 /**
@@ -362,33 +249,27 @@ const I64_MIN = -(1n << 63n)
 const I64_MAX = (1n << 63n) - 1n
 const int64Arbitrary = FastCheck.bigInt({ min: I64_MIN, max: I64_MAX })
 
-export const arbitrary: FastCheck.Arbitrary<TransactionMetadatumVariants> = FastCheck.oneof(
-  FastCheck.string().map((value) => new TextMetadatum({ value })),
-  int64Arbitrary.map((value) => new IntMetadatum({ value })),
-  FastCheck.uint8Array({ minLength: 1, maxLength: 10 }).map((value) => new BytesMetadatum({ value })),
+export const arbitrary: FastCheck.Arbitrary<TransactionMetadatum> = FastCheck.oneof(
+  FastCheck.string(),
+  int64Arbitrary,
+  FastCheck.uint8Array({ minLength: 1, maxLength: 64 }),
   FastCheck.array(
     FastCheck.oneof(
-      FastCheck.string().map((value) => new TextMetadatum({ value })),
-      int64Arbitrary.map((value) => new IntMetadatum({ value }))
+      FastCheck.string(),
+      int64Arbitrary
     ),
-    { maxLength: 3 }
-  ).map((value) => new ArrayMetadatum({ value })),
+    { maxLength: 5 }
+  ),
   FastCheck.uniqueArray(
     FastCheck.tuple(
-      FastCheck.string().map((value) => new TextMetadatum({ value })),
-      int64Arbitrary.map((value) => new IntMetadatum({ value }))
+      FastCheck.string(),
+      int64Arbitrary
     ),
     {
-      maxLength: 3,
-      selector: ([key]) => key.value // Ensure unique keys by their string value
+      maxLength: 5,
+      selector: ([key]) => key // Ensure unique keys
     }
-  ).map((entries) => {
-    const map = new Map()
-    for (const [key, value] of entries) {
-      map.set(key, value)
-    }
-    return new MetadatumMap({ value: map })
-  })
+  ).map((entries) => new globalThis.Map(entries))
 )
 
 // ============================================================================
@@ -402,7 +283,7 @@ export const arbitrary: FastCheck.Arbitrary<TransactionMetadatumVariants> = Fast
  * @category parsing
  */
 export const fromCBORBytes = Function.makeCBORDecodeSync(
-  FromCDDL,
+  TransactionMetadatumSchema,
   TransactionMetadatumError,
   "TransactionMetadatum.fromCBORBytes"
 )
@@ -414,7 +295,7 @@ export const fromCBORBytes = Function.makeCBORDecodeSync(
  * @category parsing
  */
 export const fromCBORHex = Function.makeCBORDecodeHexSync(
-  FromCDDL,
+  TransactionMetadatumSchema,
   TransactionMetadatumError,
   "TransactionMetadatum.fromCBORHex"
 )
@@ -430,7 +311,7 @@ export const fromCBORHex = Function.makeCBORDecodeHexSync(
  * @category encoding
  */
 export const toCBORBytes = Function.makeCBOREncodeSync(
-  FromCDDL,
+  TransactionMetadatumSchema,
   TransactionMetadatumError,
   "TransactionMetadatum.toCBORBytes"
 )
@@ -442,7 +323,7 @@ export const toCBORBytes = Function.makeCBOREncodeSync(
  * @category encoding
  */
 export const toCBORHex = Function.makeCBOREncodeHexSync(
-  FromCDDL,
+  TransactionMetadatumSchema,
   TransactionMetadatumError,
   "TransactionMetadatum.toCBORHex"
 )
@@ -452,45 +333,44 @@ export const toCBORHex = Function.makeCBOREncodeHexSync(
 // ============================================================================
 
 /**
- * Create a TextMetadatum from a string value.
+ * Create a text TransactionMetadatum from a string value.
  *
  * @since 2.0.0
  * @category constructors
  */
-export const text = (value: string): TextMetadatum => new TextMetadatum({ value })
+export const text = (value: string): string => value
 
 /**
- * Create an IntMetadatum from a bigint value.
+ * Create an integer TransactionMetadatum from a bigint value.
  *
  * @since 2.0.0
  * @category constructors
  */
-export const int = (value: bigint): IntMetadatum => new IntMetadatum({ value })
+export const int = (value: bigint): bigint => value
 
 /**
- * Create a BytesMetadatum from a Uint8Array value.
+ * Create a bytes TransactionMetadatum from a Uint8Array value.
  *
  * @since 2.0.0
  * @category constructors
  */
-export const bytes = (value: Uint8Array): BytesMetadatum => new BytesMetadatum({ value })
+export const bytes = (value: Uint8Array): Uint8Array => value
 
 /**
- * Create an ArrayMetadatum from an array of TransactionMetadatum values.
+ * Create an array TransactionMetadatum from an array of TransactionMetadatum values.
  *
  * @since 2.0.0
  * @category constructors
  */
-export const array = (value: Array<TransactionMetadatumVariants>): ArrayMetadatum => new ArrayMetadatum({ value })
+export const array = (value: Array<TransactionMetadatum>): List => value
 
 /**
- * Create a MetadatumMap from a Map of TransactionMetadatum key-value pairs.
+ * Create a map TransactionMetadatum from a Map of TransactionMetadatum key-value pairs.
  *
  * @since 2.0.0
  * @category constructors
  */
-export const map = (value: Map<TransactionMetadatumVariants, TransactionMetadatumVariants>): MetadatumMap =>
-  new MetadatumMap({ value })
+export const map = (value: globalThis.Map<TransactionMetadatum, TransactionMetadatum>): Map => value
 
 // ============================================================================
 // Effect Namespace - Effect-based Error Handling
@@ -509,7 +389,7 @@ export namespace Either {
    * @since 2.0.0
    * @category parsing
    */
-  export const fromCBORBytes = Function.makeCBORDecodeEither(FromCDDL, TransactionMetadatumError)
+  export const fromCBORBytes = Function.makeCBORDecodeEither(TransactionMetadatumSchema, TransactionMetadatumError)
 
   /**
    * Parse a TransactionMetadatum from CBOR hex string with Effect error handling.
@@ -517,7 +397,7 @@ export namespace Either {
    * @since 2.0.0
    * @category parsing
    */
-  export const fromCBORHex = Function.makeCBORDecodeHexEither(FromCDDL, TransactionMetadatumError)
+  export const fromCBORHex = Function.makeCBORDecodeHexEither(TransactionMetadatumSchema, TransactionMetadatumError)
 
   /**
    * Convert a TransactionMetadatum to CBOR bytes with Effect error handling.
@@ -525,7 +405,7 @@ export namespace Either {
    * @since 2.0.0
    * @category encoding
    */
-  export const toCBORBytes = Function.makeCBOREncodeEither(FromCDDL, TransactionMetadatumError)
+  export const toCBORBytes = Function.makeCBOREncodeEither(TransactionMetadatumSchema, TransactionMetadatumError)
 
   /**
    * Convert a TransactionMetadatum to CBOR hex string with Effect error handling.
@@ -533,5 +413,5 @@ export namespace Either {
    * @since 2.0.0
    * @category encoding
    */
-  export const toCBORHex = Function.makeCBOREncodeHexEither(FromCDDL, TransactionMetadatumError)
+  export const toCBORHex = Function.makeCBOREncodeHexEither(TransactionMetadatumSchema, TransactionMetadatumError)
 }

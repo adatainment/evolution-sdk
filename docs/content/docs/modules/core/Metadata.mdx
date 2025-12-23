@@ -66,7 +66,7 @@ Create Metadata from an array of label-metadatum pairs.
 
 ```ts
 export declare const fromEntries: (
-  entries: Array<[MetadataLabel, TransactionMetadatum.TransactionMetadatumVariants]>
+  entries: Array<[MetadataLabel, TransactionMetadatum.TransactionMetadatum]>
 ) => Metadata
 ```
 
@@ -94,7 +94,7 @@ Add or update a metadata entry.
 export declare const set: (
   metadata: Metadata,
   label: MetadataLabel,
-  metadatum: TransactionMetadatum.TransactionMetadatumVariants
+  metadatum: TransactionMetadatum.TransactionMetadatum
 ) => Metadata
 ```
 
@@ -111,7 +111,7 @@ Convert Metadata to CBOR bytes.
 ```ts
 export declare const toCBORBytes: (
   options?: CBOR.CodecOptions
-) => (a: Map<bigint, TransactionMetadatum.TransactionMetadatumVariants>, overrideOptions?: ParseOptions) => any
+) => (a: Map<bigint, TransactionMetadatum.TransactionMetadatum>, overrideOptions?: ParseOptions) => any
 ```
 
 Added in v2.0.0
@@ -125,7 +125,7 @@ Convert Metadata to CBOR hex string.
 ```ts
 export declare const toCBORHex: (
   options?: CBOR.CodecOptions
-) => (a: Map<bigint, TransactionMetadatum.TransactionMetadatumVariants>, overrideOptions?: ParseOptions) => string
+) => (a: Map<bigint, TransactionMetadatum.TransactionMetadatum>, overrideOptions?: ParseOptions) => string
 ```
 
 Added in v2.0.0
@@ -134,7 +134,7 @@ Added in v2.0.0
 
 ## MetadataLabel (type alias)
 
-Type representing a transaction metadatum label (uint .size 8).
+Type representing a transaction metadatum label (uint).
 
 **Signature**
 
@@ -155,7 +155,7 @@ Parse Metadata from CBOR bytes.
 ```ts
 export declare const fromCBORBytes: (
   options?: CBOR.CodecOptions
-) => (i: any, overrideOptions?: ParseOptions) => Map<bigint, TransactionMetadatum.TransactionMetadatumVariants>
+) => (i: any, overrideOptions?: ParseOptions) => Map<bigint, TransactionMetadatum.TransactionMetadatum>
 ```
 
 Added in v2.0.0
@@ -169,7 +169,7 @@ Parse Metadata from CBOR hex string.
 ```ts
 export declare const fromCBORHex: (
   options?: CBOR.CodecOptions
-) => (i: string, overrideOptions?: ParseOptions) => Map<bigint, TransactionMetadatum.TransactionMetadatumVariants>
+) => (i: string, overrideOptions?: ParseOptions) => Map<bigint, TransactionMetadatum.TransactionMetadatum>
 ```
 
 Added in v2.0.0
@@ -178,14 +178,15 @@ Added in v2.0.0
 
 ## CDDLSchema
 
-Schema for CDDL-compatible metadata format.
+CDDL schema for Metadata (CBOR-compatible representation).
+Maps bigint labels to encoded transaction metadatum values.
 
 **Signature**
 
 ```ts
 export declare const CDDLSchema: Schema.MapFromSelf<
   typeof Schema.BigIntFromSelf,
-  Schema.Schema<TransactionMetadatum.CDDLSchema, TransactionMetadatum.CDDLSchema, never>
+  Schema.suspend<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatumEncoded, never>
 >
 ```
 
@@ -209,11 +210,11 @@ export declare const FromCBORBytes: (
   Schema.transformOrFail<
     Schema.MapFromSelf<
       typeof Schema.BigIntFromSelf,
-      Schema.Schema<TransactionMetadatum.CDDLSchema, TransactionMetadatum.CDDLSchema, never>
+      Schema.suspend<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatumEncoded, never>
     >,
     Schema.SchemaClass<
-      Map<bigint, TransactionMetadatum.TransactionMetadatumVariants>,
-      Map<bigint, TransactionMetadatum.TransactionMetadatumVariants>,
+      Map<bigint, TransactionMetadatum.TransactionMetadatum>,
+      Map<bigint, TransactionMetadatum.TransactionMetadatum>,
       never
     >,
     never
@@ -233,14 +234,7 @@ Schema transformer for Metadata from CBOR hex string.
 export declare const FromCBORHex: (
   options?: CBOR.CodecOptions
 ) => Schema.transform<
-  Schema.transform<
-    Schema.Schema<Uint8Array, string, never>,
-    Schema.transformOrFail<
-      typeof Schema.Uint8ArrayFromSelf,
-      Schema.declare<CBOR.CBOR, CBOR.CBOR, readonly [], never>,
-      never
-    >
-  >,
+  Schema.Schema<Uint8Array, string, never>,
   Schema.transform<
     Schema.transformOrFail<
       typeof Schema.Uint8ArrayFromSelf,
@@ -250,11 +244,15 @@ export declare const FromCBORHex: (
     Schema.transformOrFail<
       Schema.MapFromSelf<
         typeof Schema.BigIntFromSelf,
-        Schema.Schema<TransactionMetadatum.CDDLSchema, TransactionMetadatum.CDDLSchema, never>
+        Schema.suspend<
+          TransactionMetadatum.TransactionMetadatum,
+          TransactionMetadatum.TransactionMetadatumEncoded,
+          never
+        >
       >,
       Schema.SchemaClass<
-        Map<bigint, TransactionMetadatum.TransactionMetadatumVariants>,
-        Map<bigint, TransactionMetadatum.TransactionMetadatumVariants>,
+        Map<bigint, TransactionMetadatum.TransactionMetadatum>,
+        Map<bigint, TransactionMetadatum.TransactionMetadatum>,
         never
       >,
       never
@@ -275,11 +273,11 @@ Transform schema from CDDL to Metadata.
 export declare const FromCDDL: Schema.transformOrFail<
   Schema.MapFromSelf<
     typeof Schema.BigIntFromSelf,
-    Schema.Schema<TransactionMetadatum.CDDLSchema, TransactionMetadatum.CDDLSchema, never>
+    Schema.suspend<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatumEncoded, never>
   >,
   Schema.SchemaClass<
-    Map<bigint, TransactionMetadatum.TransactionMetadatumVariants>,
-    Map<bigint, TransactionMetadatum.TransactionMetadatumVariants>,
+    Map<bigint, TransactionMetadatum.TransactionMetadatum>,
+    Map<bigint, TransactionMetadatum.TransactionMetadatum>,
     never
   >,
   never
@@ -303,20 +301,12 @@ export declare const Metadata: Schema.transform<
   Schema.Array$<
     Schema.Tuple2<
       Schema.refine<bigint, typeof Schema.BigInt>,
-      Schema.Schema<
-        TransactionMetadatum.TransactionMetadatumVariants,
-        TransactionMetadatum.TransactionMetadatumVariantsEncoded,
-        never
-      >
+      Schema.Schema<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatumEncoded, never>
     >
   >,
   Schema.MapFromSelf<
     Schema.SchemaClass<bigint, bigint, never>,
-    Schema.SchemaClass<
-      TransactionMetadatum.TransactionMetadatumVariants,
-      TransactionMetadatum.TransactionMetadatumVariants,
-      never
-    >
+    Schema.SchemaClass<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatum, never>
   >
 >
 ```
@@ -325,7 +315,8 @@ Added in v2.0.0
 
 ## MetadataLabel
 
-Schema for transaction metadatum label (uint .size 8).
+Schema for transaction metadatum label (uint - unbounded positive integer).
+Uses Numeric.NonNegativeInteger for consistency with other numeric types.
 
 **Signature**
 
@@ -344,7 +335,7 @@ FastCheck arbitrary for generating random Metadata instances.
 **Signature**
 
 ```ts
-export declare const arbitrary: FastCheck.Arbitrary<Map<bigint, TransactionMetadatum.TransactionMetadatumVariants>>
+export declare const arbitrary: FastCheck.Arbitrary<Map<bigint, TransactionMetadatum.TransactionMetadatum>>
 ```
 
 Added in v2.0.0
@@ -358,9 +349,7 @@ Get all entries in the metadata.
 **Signature**
 
 ```ts
-export declare const entries: (
-  metadata: Metadata
-) => Array<[MetadataLabel, TransactionMetadatum.TransactionMetadatumVariants]>
+export declare const entries: (metadata: Metadata) => Array<[MetadataLabel, TransactionMetadatum.TransactionMetadatum]>
 ```
 
 Added in v2.0.0
@@ -375,7 +364,7 @@ Get a metadata entry by label.
 export declare const get: (
   metadata: Metadata,
   label: MetadataLabel
-) => TransactionMetadatum.TransactionMetadatumVariants | undefined
+) => TransactionMetadatum.TransactionMetadatum | undefined
 ```
 
 Added in v2.0.0
@@ -423,7 +412,7 @@ Get all metadata values in the metadata.
 **Signature**
 
 ```ts
-export declare const values: (metadata: Metadata) => Array<TransactionMetadatum.TransactionMetadatumVariants>
+export declare const values: (metadata: Metadata) => Array<TransactionMetadatum.TransactionMetadatum>
 ```
 
 Added in v2.0.0

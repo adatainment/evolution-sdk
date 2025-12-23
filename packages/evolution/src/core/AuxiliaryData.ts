@@ -324,7 +324,7 @@ const AnyEraCDDL = Schema.Union(
   CDDLSchema,
   // ShelleyMA array form; we accept arbitrary CBOR array and validate within decode
   CBOR.ArraySchema,
-  // Shelley map form (metadata only)
+  // Shelley map form (metadata only) - use Metadata CDDL schema
   Metadata.CDDLSchema
 )
 
@@ -337,8 +337,11 @@ export const FromCDDL = Schema.transformOrFail(AnyEraCDDL, Schema.typeSchema(Aux
         case "ConwayAuxiliaryData": {
           // const struct: Record<number, any> = {}
           const map = new globalThis.Map<bigint, CBOR.CBOR>()
-          if (auxData.metadata !== undefined)
-            map.set(0n, yield* ParseResult.encodeEither(Metadata.FromCDDL)(auxData.metadata))
+          if (auxData.metadata !== undefined) {
+            // Encode metadata through the schema which handles the transformation
+            const encoded = yield* ParseResult.encodeEither(Metadata.FromCDDL)(auxData.metadata)
+            map.set(0n, encoded as any)
+          }
           if (auxData.nativeScripts !== undefined) {
             const scripts = []
             for (const s of auxData.nativeScripts) {
@@ -374,7 +377,7 @@ export const FromCDDL = Schema.transformOrFail(AnyEraCDDL, Schema.typeSchema(Aux
           // Use empty map/array when values are absent to avoid CBOR specials and match CML decoding.
           const encodedMetadata: Map<bigint, CBOR.CBOR> =
             auxData.metadata !== undefined
-              ? new Map(yield* ParseResult.encodeEither(Metadata.FromCDDL)(auxData.metadata))
+              ? (new Map(yield* ParseResult.encodeEither(Metadata.FromCDDL)(auxData.metadata)) as any)
               : new Map()
           const encodedScripts: Array<CBOR.CBOR> = (() => {
             const list = auxData.nativeScripts ?? []
@@ -390,7 +393,7 @@ export const FromCDDL = Schema.transformOrFail(AnyEraCDDL, Schema.typeSchema(Aux
           // Encode Shelley era as plain metadata map (no tag)
           {
             const m = yield* ParseResult.encodeEither(Metadata.FromCDDL)(auxData.metadata)
-            return new Map(m)
+            return new Map(m) as any
           }
         }
       }
@@ -435,7 +438,7 @@ export const FromCDDL = Schema.transformOrFail(AnyEraCDDL, Schema.typeSchema(Aux
         let nativeScripts: Array<NativeScripts.NativeScript> | undefined
 
         if (arr.length >= 1 && arr[0] !== undefined) {
-          const m = yield* ParseResult.decodeEither(Metadata.FromCDDL)(arr[0])
+          const m = yield* ParseResult.decodeEither(Metadata.FromCDDL)(arr[0] as any)
           metadata = m.size === 0 ? undefined : m
         }
         if (arr.length >= 2 && arr[1] !== undefined) {
@@ -454,7 +457,7 @@ export const FromCDDL = Schema.transformOrFail(AnyEraCDDL, Schema.typeSchema(Aux
 
       // Shelley map form: metadata only
       if (input instanceof Map) {
-        const metadata = yield* ParseResult.decodeEither(Metadata.FromCDDL)(input)
+        const metadata = yield* ParseResult.decodeEither(Metadata.FromCDDL)(input as any)
         return new ShelleyAuxiliaryData({ metadata })
       }
 

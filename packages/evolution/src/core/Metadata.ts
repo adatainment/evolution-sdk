@@ -5,7 +5,7 @@ import * as Numeric from "./Numeric.js"
 import * as TransactionMetadatum from "./TransactionMetadatum.js"
 
 /**
- * Type representing a transaction metadatum label (uint .size 8).
+ * Type representing a transaction metadatum label (uint).
  *
  * @since 2.0.0
  * @category model
@@ -13,14 +13,15 @@ import * as TransactionMetadatum from "./TransactionMetadatum.js"
 export type MetadataLabel = typeof MetadataLabel.Type
 
 /**
- * Schema for transaction metadatum label (uint .size 8).
+ * Schema for transaction metadatum label (uint - unbounded positive integer).
+ * Uses Numeric.NonNegativeInteger for consistency with other numeric types.
  *
  * @since 2.0.0
  * @category schemas
  */
-export const MetadataLabel = Numeric.Uint8Schema.annotations({
+export const MetadataLabel = Numeric.NonNegativeInteger.annotations({
   identifier: "Metadata.MetadataLabel",
-  description: "A transaction metadatum label (0-255)"
+  description: "A transaction metadatum label (non-negative integer)"
 })
 
 /**
@@ -34,7 +35,7 @@ export const MetadataLabel = Numeric.Uint8Schema.annotations({
  */
 export const Metadata = Schema.Map({
   key: MetadataLabel,
-  value: TransactionMetadatum.TransactionMetadatumVariants
+  value: TransactionMetadatum.TransactionMetadatumSchema
 }).annotations({
   identifier: "Metadata",
   description: "Transaction metadata as a map from labels to transaction metadata values"
@@ -43,14 +44,15 @@ export const Metadata = Schema.Map({
 export type Metadata = typeof Metadata.Type
 
 /**
- * Schema for CDDL-compatible metadata format.
+ * CDDL schema for Metadata (CBOR-compatible representation).
+ * Maps bigint labels to encoded transaction metadatum values.
  *
  * @since 2.0.0
  * @category schemas
  */
 export const CDDLSchema = Schema.MapFromSelf({
-  key: CBOR.Integer,
-  value: TransactionMetadatum.CDDLSchema
+  key: CBOR.Integer, // MetadataLabel as bigint
+  value: Schema.suspend(() => TransactionMetadatum.TransactionMetadatumSchema)
 })
 
 /**
@@ -61,24 +63,27 @@ export const CDDLSchema = Schema.MapFromSelf({
  */
 export const FromCDDL = Schema.transformOrFail(CDDLSchema, Schema.typeSchema(Metadata), {
   strict: true,
-  encode: (toI) =>
+  encode: (metadata) =>
     E.gen(function* () {
-      const map = new Map<bigint, TransactionMetadatum.CDDLSchema>()
-      for (const [label, metadatum] of toI.entries()) {
-        const transactionMetadatum = yield* ParseResult.encodeEither(TransactionMetadatum.FromCDDL)(metadatum)
-        map.set(label, transactionMetadatum)
+      const map = new Map<bigint, TransactionMetadatum.TransactionMetadatumEncoded>()
+      for (const [label, metadatum] of metadata.entries()) {
+        const encoded = yield* ParseResult.encodeEither(TransactionMetadatum.TransactionMetadatumSchema)(metadatum)
+        map.set(label, encoded)
       }
       return map
     }),
-  decode: (fromA) =>
+  decode: (cddl) =>
     E.gen(function* () {
-      const map = new Map<MetadataLabel, TransactionMetadatum.TransactionMetadatumVariants>()
-      for (const [label, metadatum] of fromA.entries()) {
-        const transactionMetadatum = yield* ParseResult.decodeEither(TransactionMetadatum.FromCDDL)(metadatum)
-        map.set(label, transactionMetadatum)
+      const map = new Map<MetadataLabel, TransactionMetadatum.TransactionMetadatum>()
+      for (const [label, encoded] of cddl.entries()) {
+        const metadatum = yield* ParseResult.decodeEither(TransactionMetadatum.TransactionMetadatumSchema)(encoded as any)
+        map.set(label, metadatum)
       }
-      return map
+      return map as Metadata
     })
+}).annotations({
+  identifier: "Metadata.FromCDDL",
+  description: "Transforms CBOR structure to Metadata"
 })
 
 /**
@@ -88,7 +93,10 @@ export const FromCDDL = Schema.transformOrFail(CDDLSchema, Schema.typeSchema(Met
  * @category schemas
  */
 export const FromCBORBytes = (options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTIONS) =>
-  Schema.compose(CBOR.FromBytes(options), FromCDDL).annotations({
+  Schema.compose(
+    CBOR.FromBytes(options), // Uint8Array → CBOR
+    FromCDDL // CBOR → Metadata
+  ).annotations({
     identifier: "Metadata.FromCBORBytes",
     description: "Transforms CBOR bytes to Metadata"
   })
@@ -100,7 +108,10 @@ export const FromCBORBytes = (options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTI
  * @category schemas
  */
 export const FromCBORHex = (options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTIONS) =>
-  Schema.compose(CBOR.FromHex(options), FromCBORBytes(options)).annotations({
+  Schema.compose(
+    Schema.Uint8ArrayFromHex, // string → Uint8Array
+    FromCBORBytes(options) // Uint8Array → Metadata
+  ).annotations({
     identifier: "Metadata.FromCBORHex",
     description: "Transforms CBOR hex string to Metadata"
   })
@@ -152,7 +163,7 @@ export const fromCBORHex = (options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTION
  * @category encoding
  */
 export const toCBORBytes = (options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTIONS) =>
-  Schema.encodeSync(Schema.compose(CBOR.FromBytes(options), FromCDDL))
+  Schema.encodeSync(FromCBORBytes(options))
 
 /**
  * Convert Metadata to CBOR hex string.
@@ -161,7 +172,7 @@ export const toCBORBytes = (options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTION
  * @category encoding
  */
 export const toCBORHex = (options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTIONS) =>
-  Schema.encodeSync(Schema.compose(CBOR.FromHex(options), FromCBORBytes(options)))
+  Schema.encodeSync(FromCBORHex(options))
 
 // ============================================================================
 // Factory Functions
@@ -173,7 +184,7 @@ export const toCBORHex = (options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTIONS)
  * @since 2.0.0
  * @category constructors
  */
-export const fromEntries = (entries: Array<[MetadataLabel, TransactionMetadatum.TransactionMetadatumVariants]>): Metadata =>
+export const fromEntries = (entries: Array<[MetadataLabel, TransactionMetadatum.TransactionMetadatum]>): Metadata =>
   new Map(entries)
 
 /**
@@ -193,7 +204,7 @@ export const empty = (): Metadata => new Map() as Metadata
 export const set = (
   metadata: Metadata,
   label: MetadataLabel,
-  metadatum: TransactionMetadatum.TransactionMetadatumVariants
+  metadatum: TransactionMetadatum.TransactionMetadatum
 ): Metadata => {
   const newMap = new Map(metadata)
   newMap.set(label, metadatum)
@@ -206,7 +217,7 @@ export const set = (
  * @since 2.0.0
  * @category utilities
  */
-export const get = (metadata: Metadata, label: MetadataLabel): TransactionMetadatum.TransactionMetadatumVariants | undefined =>
+export const get = (metadata: Metadata, label: MetadataLabel): TransactionMetadatum.TransactionMetadatum | undefined =>
   metadata.get(label)
 
 /**
@@ -251,7 +262,7 @@ export const labels = (metadata: Metadata): Array<MetadataLabel> => Array.from(m
  * @since 2.0.0
  * @category utilities
  */
-export const values = (metadata: Metadata): Array<TransactionMetadatum.TransactionMetadatumVariants> =>
+export const values = (metadata: Metadata): Array<TransactionMetadatum.TransactionMetadatum> =>
   Array.from(metadata.values())
 
 /**
@@ -260,5 +271,5 @@ export const values = (metadata: Metadata): Array<TransactionMetadatum.Transacti
  * @since 2.0.0
  * @category utilities
  */
-export const entries = (metadata: Metadata): Array<[MetadataLabel, TransactionMetadatum.TransactionMetadatumVariants]> =>
+export const entries = (metadata: Metadata): Array<[MetadataLabel, TransactionMetadatum.TransactionMetadatum]> =>
   Array.from(metadata.entries())

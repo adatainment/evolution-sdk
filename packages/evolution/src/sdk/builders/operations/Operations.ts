@@ -6,10 +6,12 @@ import type * as CoreDatumOption from "../../../core/DatumOption.js"
 import type * as DRep from "../../../core/DRep.js"
 import type * as EpochNo from "../../../core/EpochNo.js"
 import type * as KeyHash from "../../../core/KeyHash.js"
+import type * as Metadata from "../../../core/Metadata.js"
 import type * as PoolKeyHash from "../../../core/PoolKeyHash.js"
 import type * as PoolParams from "../../../core/PoolParams.js"
 import type * as CoreScript from "../../../core/Script.js"
 import type * as Time from "../../../core/Time/index.js"
+import type * as TransactionMetadatum from "../../../core/TransactionMetadatum.js"
 import type * as UTxO from "../../../core/UTxO.js"
 import type * as RedeemerBuilder from "../RedeemerBuilder.js"
 
@@ -338,4 +340,29 @@ export interface RetirePoolParams {
 export interface AddSignerParams {
   /** The key hash that must sign the transaction */
   readonly keyHash: KeyHash.KeyHash
+}
+
+// ============================================================================
+// Metadata
+// ============================================================================
+
+/**
+ * Parameters for attaching metadata to transaction.
+ *
+ * Metadata is attached to the auxiliary data section of the transaction.
+ * Each metadata entry is identified by a label (0-2^64-1) following CIP-10 standard.
+ *
+ * Common labels:
+ * - 674n: Message/comment metadata (CIP-20)
+ * - 721n: NFT metadata (CIP-25)
+ * - 777n: Royalty metadata (CIP-27)
+ *
+ * @since 2.0.0
+ * @category metadata
+ */
+export interface AttachMetadataParams {
+  /** Metadata label (bigint 0-2^64-1). See CIP-10 for standard labels. */
+  readonly label: Metadata.MetadataLabel
+  /** Metadata content as TransactionMetadatum */
+  readonly metadata: TransactionMetadatum.TransactionMetadatum
 }

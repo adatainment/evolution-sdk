@@ -111,7 +111,17 @@ Convert Metadata to CBOR bytes.
 ```ts
 export declare const toCBORBytes: (
   options?: CBOR.CodecOptions
-) => (a: Map<bigint, TransactionMetadatum.TransactionMetadatum>, overrideOptions?: ParseOptions) => any
+) => (
+  a: Map<
+    bigint,
+    | string
+    | bigint
+    | Uint8Array
+    | Map<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatum>
+    | readonly TransactionMetadatum.TransactionMetadatum[]
+  >,
+  overrideOptions?: ParseOptions
+) => any
 ```
 
 Added in v2.0.0
@@ -125,7 +135,17 @@ Convert Metadata to CBOR hex string.
 ```ts
 export declare const toCBORHex: (
   options?: CBOR.CodecOptions
-) => (a: Map<bigint, TransactionMetadatum.TransactionMetadatum>, overrideOptions?: ParseOptions) => string
+) => (
+  a: Map<
+    bigint,
+    | string
+    | bigint
+    | Uint8Array
+    | Map<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatum>
+    | readonly TransactionMetadatum.TransactionMetadatum[]
+  >,
+  overrideOptions?: ParseOptions
+) => string
 ```
 
 Added in v2.0.0
@@ -155,7 +175,17 @@ Parse Metadata from CBOR bytes.
 ```ts
 export declare const fromCBORBytes: (
   options?: CBOR.CodecOptions
-) => (i: any, overrideOptions?: ParseOptions) => Map<bigint, TransactionMetadatum.TransactionMetadatum>
+) => (
+  i: any,
+  overrideOptions?: ParseOptions
+) => Map<
+  bigint,
+  | string
+  | bigint
+  | Uint8Array
+  | Map<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatum>
+  | readonly TransactionMetadatum.TransactionMetadatum[]
+>
 ```
 
 Added in v2.0.0
@@ -169,7 +199,17 @@ Parse Metadata from CBOR hex string.
 ```ts
 export declare const fromCBORHex: (
   options?: CBOR.CodecOptions
-) => (i: string, overrideOptions?: ParseOptions) => Map<bigint, TransactionMetadatum.TransactionMetadatum>
+) => (
+  i: string,
+  overrideOptions?: ParseOptions
+) => Map<
+  bigint,
+  | string
+  | bigint
+  | Uint8Array
+  | Map<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatum>
+  | readonly TransactionMetadatum.TransactionMetadatum[]
+>
 ```
 
 Added in v2.0.0
@@ -179,14 +219,29 @@ Added in v2.0.0
 ## CDDLSchema
 
 CDDL schema for Metadata (CBOR-compatible representation).
-Maps bigint labels to encoded transaction metadatum values.
+Maps bigint labels to transaction metadatum values.
+
+Uses Schema.typeSchema(TransactionMetadatumSchema) because CBOR decoding
+returns runtime types (bigint, Uint8Array, Map) directly.
 
 **Signature**
 
 ```ts
 export declare const CDDLSchema: Schema.MapFromSelf<
   typeof Schema.BigIntFromSelf,
-  Schema.suspend<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatumEncoded, never>
+  Schema.suspend<
+    | string
+    | bigint
+    | Uint8Array
+    | Map<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatum>
+    | readonly TransactionMetadatum.TransactionMetadatum[],
+    | string
+    | bigint
+    | Uint8Array
+    | Map<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatum>
+    | readonly TransactionMetadatum.TransactionMetadatum[],
+    never
+  >
 >
 ```
 
@@ -210,11 +265,37 @@ export declare const FromCBORBytes: (
   Schema.transformOrFail<
     Schema.MapFromSelf<
       typeof Schema.BigIntFromSelf,
-      Schema.suspend<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatumEncoded, never>
+      Schema.suspend<
+        | string
+        | bigint
+        | Uint8Array
+        | Map<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatum>
+        | readonly TransactionMetadatum.TransactionMetadatum[],
+        | string
+        | bigint
+        | Uint8Array
+        | Map<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatum>
+        | readonly TransactionMetadatum.TransactionMetadatum[],
+        never
+      >
     >,
     Schema.SchemaClass<
-      Map<bigint, TransactionMetadatum.TransactionMetadatum>,
-      Map<bigint, TransactionMetadatum.TransactionMetadatum>,
+      Map<
+        bigint,
+        | string
+        | bigint
+        | Uint8Array
+        | Map<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatum>
+        | readonly TransactionMetadatum.TransactionMetadatum[]
+      >,
+      Map<
+        bigint,
+        | string
+        | bigint
+        | Uint8Array
+        | Map<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatum>
+        | readonly TransactionMetadatum.TransactionMetadatum[]
+      >,
       never
     >,
     never
@@ -245,14 +326,36 @@ export declare const FromCBORHex: (
       Schema.MapFromSelf<
         typeof Schema.BigIntFromSelf,
         Schema.suspend<
-          TransactionMetadatum.TransactionMetadatum,
-          TransactionMetadatum.TransactionMetadatumEncoded,
+          | string
+          | bigint
+          | Uint8Array
+          | Map<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatum>
+          | readonly TransactionMetadatum.TransactionMetadatum[],
+          | string
+          | bigint
+          | Uint8Array
+          | Map<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatum>
+          | readonly TransactionMetadatum.TransactionMetadatum[],
           never
         >
       >,
       Schema.SchemaClass<
-        Map<bigint, TransactionMetadatum.TransactionMetadatum>,
-        Map<bigint, TransactionMetadatum.TransactionMetadatum>,
+        Map<
+          bigint,
+          | string
+          | bigint
+          | Uint8Array
+          | Map<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatum>
+          | readonly TransactionMetadatum.TransactionMetadatum[]
+        >,
+        Map<
+          bigint,
+          | string
+          | bigint
+          | Uint8Array
+          | Map<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatum>
+          | readonly TransactionMetadatum.TransactionMetadatum[]
+        >,
         never
       >,
       never
@@ -273,11 +376,37 @@ Transform schema from CDDL to Metadata.
 export declare const FromCDDL: Schema.transformOrFail<
   Schema.MapFromSelf<
     typeof Schema.BigIntFromSelf,
-    Schema.suspend<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatumEncoded, never>
+    Schema.suspend<
+      | string
+      | bigint
+      | Uint8Array
+      | Map<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatum>
+      | readonly TransactionMetadatum.TransactionMetadatum[],
+      | string
+      | bigint
+      | Uint8Array
+      | Map<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatum>
+      | readonly TransactionMetadatum.TransactionMetadatum[],
+      never
+    >
   >,
   Schema.SchemaClass<
-    Map<bigint, TransactionMetadatum.TransactionMetadatum>,
-    Map<bigint, TransactionMetadatum.TransactionMetadatum>,
+    Map<
+      bigint,
+      | string
+      | bigint
+      | Uint8Array
+      | Map<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatum>
+      | readonly TransactionMetadatum.TransactionMetadatum[]
+    >,
+    Map<
+      bigint,
+      | string
+      | bigint
+      | Uint8Array
+      | Map<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatum>
+      | readonly TransactionMetadatum.TransactionMetadatum[]
+    >,
     never
   >,
   never
@@ -301,12 +430,65 @@ export declare const Metadata: Schema.transform<
   Schema.Array$<
     Schema.Tuple2<
       Schema.refine<bigint, typeof Schema.BigInt>,
-      Schema.Schema<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatumEncoded, never>
+      Schema.Union<
+        [
+          Schema.transform<
+            Schema.Array$<
+              Schema.Tuple2<
+                Schema.suspend<
+                  TransactionMetadatum.TransactionMetadatum,
+                  TransactionMetadatum.TransactionMetadatumEncoded,
+                  never
+                >,
+                Schema.suspend<
+                  TransactionMetadatum.TransactionMetadatum,
+                  TransactionMetadatum.TransactionMetadatumEncoded,
+                  never
+                >
+              >
+            >,
+            Schema.MapFromSelf<
+              Schema.SchemaClass<
+                TransactionMetadatum.TransactionMetadatum,
+                TransactionMetadatum.TransactionMetadatum,
+                never
+              >,
+              Schema.SchemaClass<
+                TransactionMetadatum.TransactionMetadatum,
+                TransactionMetadatum.TransactionMetadatum,
+                never
+              >
+            >
+          >,
+          Schema.Array$<
+            Schema.suspend<
+              TransactionMetadatum.TransactionMetadatum,
+              TransactionMetadatum.TransactionMetadatumEncoded,
+              never
+            >
+          >,
+          Schema.refine<bigint, typeof Schema.BigInt>,
+          Schema.Schema<Uint8Array, string, never>,
+          Schema.SchemaClass<string, string, never>
+        ]
+      >
     >
   >,
   Schema.MapFromSelf<
     Schema.SchemaClass<bigint, bigint, never>,
-    Schema.SchemaClass<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatum, never>
+    Schema.SchemaClass<
+      | string
+      | bigint
+      | Uint8Array
+      | Map<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatum>
+      | readonly TransactionMetadatum.TransactionMetadatum[],
+      | string
+      | bigint
+      | Uint8Array
+      | Map<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatum>
+      | readonly TransactionMetadatum.TransactionMetadatum[],
+      never
+    >
   >
 >
 ```
@@ -335,7 +517,16 @@ FastCheck arbitrary for generating random Metadata instances.
 **Signature**
 
 ```ts
-export declare const arbitrary: FastCheck.Arbitrary<Map<bigint, TransactionMetadatum.TransactionMetadatum>>
+export declare const arbitrary: FastCheck.Arbitrary<
+  Map<
+    bigint,
+    | string
+    | bigint
+    | Uint8Array
+    | Map<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatum>
+    | readonly TransactionMetadatum.TransactionMetadatum[]
+  >
+>
 ```
 
 Added in v2.0.0

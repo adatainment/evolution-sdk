@@ -13,6 +13,7 @@
 import { Effect, Ref } from "effect"
 
 import * as AuxiliaryData from "../../../core/AuxiliaryData.js"
+import type * as TransactionMetadatum from "../../../core/TransactionMetadatum.js"
 import { TransactionBuilderError, TxContext } from "../TransactionBuilder.js"
 import type { AttachMetadataParams } from "./Operations.js"
 
@@ -32,41 +33,39 @@ export const createAttachMetadataProgram = (params: AttachMetadataParams) =>
   Effect.gen(function* () {
     const ctx = yield* TxContext
 
-    yield* Ref.update(ctx, (state) => {
-      const currentAuxData = state.auxiliaryData
+    // Read current state and check for duplicate label
+    const state = yield* Ref.get(ctx)
+    const currentAuxData = state.auxiliaryData
+    const existingMetadata =
+      currentAuxData && currentAuxData instanceof AuxiliaryData.ConwayAuxiliaryData
+        ? currentAuxData.metadata
+        : undefined
 
-      // Extract existing metadata map or create new one
-      const existingMetadata =
-        currentAuxData && currentAuxData instanceof AuxiliaryData.ConwayAuxiliaryData 
-          ? currentAuxData.metadata 
-          : undefined
-
-      // Check for duplicate label
-      if (existingMetadata && existingMetadata.has(params.label)) {
-        throw new TransactionBuilderError({
+    if (existingMetadata && existingMetadata.has(params.label)) {
+      return yield* Effect.fail(
+        new TransactionBuilderError({
           message: `Metadata label ${params.label} already exists. Each metadata label can only be used once per transaction.`
         })
-      }
+      )
+    }
 
-      // Create new metadata map with the new entry
-      const newMetadata: Map<bigint, any> = new Map(existingMetadata)
-      newMetadata.set(params.label, params.metadata)
+    // Create new metadata map with the new entry
+    const newMetadata: Map<bigint, TransactionMetadatum.TransactionMetadatum> = new Map(
+      existingMetadata
+    )
+    newMetadata.set(params.label, params.metadata)
 
-      // Create or update ConwayAuxiliaryData, preserving existing scripts if from Conway era
-      const isConway = currentAuxData instanceof AuxiliaryData.ConwayAuxiliaryData
-      const updatedAuxData = new AuxiliaryData.ConwayAuxiliaryData({
-        metadata: newMetadata,
-        nativeScripts: isConway ? currentAuxData.nativeScripts : undefined,
-        plutusV1Scripts: isConway ? currentAuxData.plutusV1Scripts : undefined,
-        plutusV2Scripts: isConway ? currentAuxData.plutusV2Scripts : undefined,
-        plutusV3Scripts: isConway ? currentAuxData.plutusV3Scripts : undefined
-      })
-
-      return {
-        ...state,
-        auxiliaryData: updatedAuxData
-      }
+    // Create or update ConwayAuxiliaryData, preserving existing scripts if from Conway era
+    const isConway = currentAuxData instanceof AuxiliaryData.ConwayAuxiliaryData
+    const updatedAuxData = new AuxiliaryData.ConwayAuxiliaryData({
+      metadata: newMetadata,
+      nativeScripts: isConway ? currentAuxData.nativeScripts : undefined,
+      plutusV1Scripts: isConway ? currentAuxData.plutusV1Scripts : undefined,
+      plutusV2Scripts: isConway ? currentAuxData.plutusV2Scripts : undefined,
+      plutusV3Scripts: isConway ? currentAuxData.plutusV3Scripts : undefined
     })
+
+    yield* Ref.set(ctx, { ...state, auxiliaryData: updatedAuxData })
 
     yield* Effect.logDebug(`[AttachMetadata] Attached metadata with label ${params.label}`)
   })

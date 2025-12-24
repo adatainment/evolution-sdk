@@ -13,16 +13,13 @@ parent: Modules
 - [constructors](#constructors)
   - [array](#array)
   - [bytes](#bytes)
+  - [fromEntries](#fromentries)
   - [int](#int)
   - [map](#map)
   - [text](#text)
-- [effect](#effect)
-  - [Either (namespace)](#either-namespace)
 - [encoding](#encoding)
   - [toCBORBytes](#tocborbytes)
   - [toCBORHex](#tocborhex)
-- [errors](#errors)
-  - [TransactionMetadatumError (class)](#transactionmetadatumerror-class)
 - [model](#model)
   - [List (type alias)](#list-type-alias)
   - [Map (type alias)](#map-type-alias)
@@ -73,6 +70,18 @@ export declare const bytes: (value: Uint8Array) => Uint8Array
 
 Added in v2.0.0
 
+## fromEntries
+
+Create a map TransactionMetadatum from an array of key-value pair entries.
+
+**Signature**
+
+```ts
+export declare const fromEntries: (entries: Array<[TransactionMetadatum, TransactionMetadatum]>) => Map
+```
+
+Added in v2.0.0
+
 ## int
 
 Create an integer TransactionMetadatum from a bigint value.
@@ -109,14 +118,6 @@ export declare const text: (value: string) => string
 
 Added in v2.0.0
 
-# effect
-
-## Either (namespace)
-
-Effect-based error handling variants for functions that can fail.
-
-Added in v2.0.0
-
 # encoding
 
 ## toCBORBytes
@@ -126,7 +127,7 @@ Convert a TransactionMetadatum to CBOR bytes.
 **Signature**
 
 ```ts
-export declare const toCBORBytes: (input: TransactionMetadatum, options?: CBOR.CodecOptions) => Uint8Array
+export declare const toCBORBytes: (data: TransactionMetadatum, options?: CBOR.CodecOptions) => any
 ```
 
 Added in v2.0.0
@@ -138,21 +139,7 @@ Convert a TransactionMetadatum to CBOR hex string.
 **Signature**
 
 ```ts
-export declare const toCBORHex: (input: TransactionMetadatum, options?: CBOR.CodecOptions) => string
-```
-
-Added in v2.0.0
-
-# errors
-
-## TransactionMetadatumError (class)
-
-Error class for transaction metadatum related operations.
-
-**Signature**
-
-```ts
-export declare class TransactionMetadatumError
+export declare const toCBORHex: (data: TransactionMetadatum, options?: CBOR.CodecOptions) => string
 ```
 
 Added in v2.0.0
@@ -210,17 +197,18 @@ Added in v2.0.0
 
 ## TransactionMetadatumEncoded (type alias)
 
-Encoded type for transaction metadata (wire format with string for bigint)
+Encoded type for transaction metadata (wire format).
+Based on CBOR encoding rules.
 
 **Signature**
 
 ```ts
 export type TransactionMetadatumEncoded =
-  // String (text stays as string)
+  // Text string
   | string
-  // Int (stays as bigint in CBOR)
-  | bigint
-  // Bytes (Uint8ArrayFromHex encodes to hex string)
+  // Int (encoded as string)
+  | string
+  // Bytes (encoded as hex string)
   | string
   // Map (encoded as array of [key, value] pairs)
   | ReadonlyArray<readonly [TransactionMetadatumEncoded, TransactionMetadatumEncoded]>
@@ -239,7 +227,15 @@ Parse a TransactionMetadatum from CBOR bytes.
 **Signature**
 
 ```ts
-export declare const fromCBORBytes: (bytes: Uint8Array, options?: CBOR.CodecOptions) => TransactionMetadatum
+export declare const fromCBORBytes: (
+  bytes: Uint8Array,
+  options?: CBOR.CodecOptions
+) =>
+  | string
+  | bigint
+  | Uint8Array
+  | globalThis.Map<TransactionMetadatum, TransactionMetadatum>
+  | readonly TransactionMetadatum[]
 ```
 
 Added in v2.0.0
@@ -251,7 +247,15 @@ Parse a TransactionMetadatum from CBOR hex string.
 **Signature**
 
 ```ts
-export declare const fromCBORHex: (hex: string, options?: CBOR.CodecOptions) => TransactionMetadatum
+export declare const fromCBORHex: (
+  hex: string,
+  options?: CBOR.CodecOptions
+) =>
+  | string
+  | bigint
+  | Uint8Array
+  | globalThis.Map<TransactionMetadatum, TransactionMetadatum>
+  | readonly TransactionMetadatum[]
 ```
 
 Added in v2.0.0
@@ -274,6 +278,9 @@ Added in v2.0.0
 
 Schema transformer for TransactionMetadatum from CBOR bytes.
 
+Uses Schema.typeSchema(TransactionMetadatumSchema) because CBOR.FromBytes
+returns runtime types (bigint, Uint8Array, Map), not encoded types.
+
 **Signature**
 
 ```ts
@@ -285,7 +292,19 @@ export declare const FromCBORBytes: (
     Schema.declare<CBOR.CBOR, CBOR.CBOR, readonly [], never>,
     never
   >,
-  Schema.Schema<TransactionMetadatum, TransactionMetadatumEncoded, never>
+  Schema.SchemaClass<
+    | string
+    | bigint
+    | Uint8Array
+    | globalThis.Map<TransactionMetadatum, TransactionMetadatum>
+    | readonly TransactionMetadatum[],
+    | string
+    | bigint
+    | Uint8Array
+    | globalThis.Map<TransactionMetadatum, TransactionMetadatum>
+    | readonly TransactionMetadatum[],
+    never
+  >
 >
 ```
 
@@ -301,21 +320,26 @@ Schema transformer for TransactionMetadatum from CBOR hex string.
 export declare const FromCBORHex: (
   options?: CBOR.CodecOptions
 ) => Schema.transform<
-  Schema.transform<
-    Schema.Schema<Uint8Array, string, never>,
-    Schema.transformOrFail<
-      typeof Schema.Uint8ArrayFromSelf,
-      Schema.declare<CBOR.CBOR, CBOR.CBOR, readonly [], never>,
-      never
-    >
-  >,
+  Schema.Schema<Uint8Array, string, never>,
   Schema.transform<
     Schema.transformOrFail<
       typeof Schema.Uint8ArrayFromSelf,
       Schema.declare<CBOR.CBOR, CBOR.CBOR, readonly [], never>,
       never
     >,
-    Schema.Schema<TransactionMetadatum, TransactionMetadatumEncoded, never>
+    Schema.SchemaClass<
+      | string
+      | bigint
+      | Uint8Array
+      | globalThis.Map<TransactionMetadatum, TransactionMetadatum>
+      | readonly TransactionMetadatum[],
+      | string
+      | bigint
+      | Uint8Array
+      | globalThis.Map<TransactionMetadatum, TransactionMetadatum>
+      | readonly TransactionMetadatum[],
+      never
+    >
   >
 >
 ```
@@ -341,7 +365,7 @@ Schema for TransactionMetadatum list type
 **Signature**
 
 ```ts
-export declare const ListSchema: Schema.Schema<List, TransactionMetadatumEncoded, never>
+export declare const ListSchema: Schema.Array$<Schema.suspend<TransactionMetadatum, TransactionMetadatumEncoded, never>>
 ```
 
 Added in v2.0.0
@@ -353,7 +377,18 @@ Schema for TransactionMetadatum map type
 **Signature**
 
 ```ts
-export declare const MapSchema: Schema.Schema<Map, TransactionMetadatumEncoded, never>
+export declare const MapSchema: Schema.transform<
+  Schema.Array$<
+    Schema.Tuple2<
+      Schema.suspend<TransactionMetadatum, TransactionMetadatumEncoded, never>,
+      Schema.suspend<TransactionMetadatum, TransactionMetadatumEncoded, never>
+    >
+  >,
+  Schema.MapFromSelf<
+    Schema.SchemaClass<TransactionMetadatum, TransactionMetadatum, never>,
+    Schema.SchemaClass<TransactionMetadatum, TransactionMetadatum, never>
+  >
+>
 ```
 
 Added in v2.0.0
@@ -377,7 +412,26 @@ Union schema for all types of transaction metadata.
 **Signature**
 
 ```ts
-export declare const TransactionMetadatumSchema: Schema.Schema<TransactionMetadatum, TransactionMetadatumEncoded, never>
+export declare const TransactionMetadatumSchema: Schema.Union<
+  [
+    Schema.transform<
+      Schema.Array$<
+        Schema.Tuple2<
+          Schema.suspend<TransactionMetadatum, TransactionMetadatumEncoded, never>,
+          Schema.suspend<TransactionMetadatum, TransactionMetadatumEncoded, never>
+        >
+      >,
+      Schema.MapFromSelf<
+        Schema.SchemaClass<TransactionMetadatum, TransactionMetadatum, never>,
+        Schema.SchemaClass<TransactionMetadatum, TransactionMetadatum, never>
+      >
+    >,
+    Schema.Array$<Schema.suspend<TransactionMetadatum, TransactionMetadatumEncoded, never>>,
+    Schema.refine<bigint, typeof Schema.BigInt>,
+    Schema.Schema<Uint8Array, string, never>,
+    Schema.SchemaClass<string, string, never>
+  ]
+>
 ```
 
 Added in v2.0.0

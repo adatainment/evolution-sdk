@@ -6,6 +6,7 @@ import * as NativeScripts from "./NativeScripts.js"
 import * as PlutusV1 from "./PlutusV1.js"
 import * as PlutusV2 from "./PlutusV2.js"
 import * as PlutusV3 from "./PlutusV3.js"
+import * as TransactionMetadatum from "./TransactionMetadatum.js"
 
 // ============================================================================
 // Helper functions for Equal/Hash implementations
@@ -33,21 +34,23 @@ const metadataMapEquals = (x: Metadata.Metadata | undefined, y: Metadata.Metadat
   if (x.size !== y.size) return false
   for (const [key, value] of x) {
     if (!y.has(key)) return false
-    if (!Equal.equals(value, y.get(key))) return false
+    if (!TransactionMetadatum.equals(value, y.get(key)!)) return false
   }
   return true
 }
 
 /**
- * Hash an optional metadata Map with stable key ordering
+ * Hash an optional metadata Map using only cheap operations.
+ * Hashes size and keys (bigints) but NOT values (which may contain Uint8Array).
+ * This ensures equal objects have equal hashes without expensive value hashing.
  */
 const hashMetadataMap = (m: Metadata.Metadata | undefined): number => {
   if (!m) return Hash.hash(undefined)
   let h = Hash.hash(m.size)
+  // Only hash bigint keys (cheap), not TransactionMetadatum values (expensive)
   const sortedKeys = Array.from(m.keys()).sort((a, b) => Number(a - b))
   for (const key of sortedKeys) {
-    const value = m.get(key)!
-    h = Hash.combine(h)(Hash.combine(Hash.hash(key))(Hash.hash(value)))
+    h = Hash.combine(h)(Hash.hash(key))
   }
   return h
 }
@@ -90,7 +93,7 @@ const hashArray = <T>(arr: ReadonlyArray<T> | undefined): number => {
 export class ConwayAuxiliaryData extends Schema.TaggedClass<ConwayAuxiliaryData>("ConwayAuxiliaryData")(
   "ConwayAuxiliaryData",
   {
-    metadata: Schema.optional(Metadata.Metadata),
+    metadata: Schema.optional(Schema.typeSchema(Metadata.Metadata)),
     nativeScripts: Schema.optional(Schema.Array(NativeScripts.NativeScript)),
     plutusV1Scripts: Schema.optional(Schema.Array(PlutusV1.PlutusV1)),
     plutusV2Scripts: Schema.optional(Schema.Array(PlutusV2.PlutusV2)),
@@ -173,7 +176,7 @@ export class ConwayAuxiliaryData extends Schema.TaggedClass<ConwayAuxiliaryData>
 export class ShelleyMAAuxiliaryData extends Schema.TaggedClass<ShelleyMAAuxiliaryData>("ShelleyMAAuxiliaryData")(
   "ShelleyMAAuxiliaryData",
   {
-    metadata: Schema.optional(Metadata.Metadata),
+    metadata: Schema.optional(Schema.typeSchema(Metadata.Metadata)),
     nativeScripts: Schema.optional(Schema.Array(NativeScripts.NativeScript))
   }
 ) {
@@ -234,7 +237,7 @@ export class ShelleyMAAuxiliaryData extends Schema.TaggedClass<ShelleyMAAuxiliar
 export class ShelleyAuxiliaryData extends Schema.TaggedClass<ShelleyAuxiliaryData>("ShelleyAuxiliaryData")(
   "ShelleyAuxiliaryData",
   {
-    metadata: Metadata.Metadata
+    metadata: Schema.typeSchema(Metadata.Metadata)
   }
 ) {
   /**

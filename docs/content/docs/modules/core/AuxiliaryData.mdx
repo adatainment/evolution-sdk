@@ -491,7 +491,19 @@ export declare const FromCBORBytes: (
         Schema.Array$<Schema.suspend<CBOR.CBOR, CBOR.CBOR, never>>,
         Schema.MapFromSelf<
           typeof Schema.BigIntFromSelf,
-          Schema.suspend<TransactionMetadatum, TransactionMetadatumEncoded, never>
+          Schema.suspend<
+            | string
+            | bigint
+            | Uint8Array
+            | Map<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatum>
+            | readonly TransactionMetadatum.TransactionMetadatum[],
+            | string
+            | bigint
+            | Uint8Array
+            | Map<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatum>
+            | readonly TransactionMetadatum.TransactionMetadatum[],
+            never
+          >
         >
       ]
     >,
@@ -538,7 +550,19 @@ export declare const FromCBORHex: (
           Schema.Array$<Schema.suspend<CBOR.CBOR, CBOR.CBOR, never>>,
           Schema.MapFromSelf<
             typeof Schema.BigIntFromSelf,
-            Schema.suspend<TransactionMetadatum, TransactionMetadatumEncoded, never>
+            Schema.suspend<
+              | string
+              | bigint
+              | Uint8Array
+              | Map<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatum>
+              | readonly TransactionMetadatum.TransactionMetadatum[],
+              | string
+              | bigint
+              | Uint8Array
+              | Map<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatum>
+              | readonly TransactionMetadatum.TransactionMetadatum[],
+              never
+            >
           >
         ]
       >,
@@ -575,7 +599,19 @@ export declare const FromCDDL: Schema.transformOrFail<
       Schema.Array$<Schema.suspend<CBOR.CBOR, CBOR.CBOR, never>>,
       Schema.MapFromSelf<
         typeof Schema.BigIntFromSelf,
-        Schema.suspend<TransactionMetadatum, TransactionMetadatumEncoded, never>
+        Schema.suspend<
+          | string
+          | bigint
+          | Uint8Array
+          | Map<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatum>
+          | readonly TransactionMetadatum.TransactionMetadatum[],
+          | string
+          | bigint
+          | Uint8Array
+          | Map<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatum>
+          | readonly TransactionMetadatum.TransactionMetadatum[],
+          never
+        >
       >
     ]
   >,

@@ -11,7 +11,7 @@ import * as Config from "@evolution-sdk/devnet/Config"
 import * as Genesis from "@evolution-sdk/devnet/Genesis"
 import { Core } from "@evolution-sdk/evolution"
 import * as Address from "@evolution-sdk/evolution/core/Address"
-import type * as TransactionMetadatum from "@evolution-sdk/evolution/core/TransactionMetadatum"
+import { fromEntries } from "@evolution-sdk/evolution/core/TransactionMetadatum"
 import { createClient } from "@evolution-sdk/evolution/sdk/client/ClientImpl"
 
 describe("TxBuilder attachMetadata (Devnet Submit)", () => {
@@ -177,19 +177,19 @@ describe("TxBuilder attachMetadata (Devnet Submit)", () => {
     const client = createTestClient(0)
     const myAddress = await client.address()
 
-    // Create CIP-25 style NFT metadata
-    const nftMetadata = new Map<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatum>([
+    // CIP-25 style NFT metadata
+    const nftMetadata = fromEntries([
       ["name", "Evolution SDK Test NFT"],
       ["image", "ipfs://QmTestHash123"],
       ["description", "A test NFT minted with Evolution SDK"],
       [
         "attributes",
         [
-          new Map<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatum>([
+          fromEntries([
             ["trait_type", "Rarity"],
             ["value", "Common"]
           ]),
-          new Map<TransactionMetadatum.TransactionMetadatum, TransactionMetadatum.TransactionMetadatum>([
+          fromEntries([
             ["trait_type", "Edition"],
             ["value", 1n]
           ])

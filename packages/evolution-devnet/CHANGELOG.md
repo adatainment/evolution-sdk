@@ -1,5 +1,260 @@
 # @evolution-sdk/devnet
 
+## 1.1.8
+
+### Patch Changes
+
+- Updated dependencies [[`7905507`](https://github.com/IntersectMBO/evolution-sdk/commit/79055076ab31214dc4c7462553484e9c2bcaf22c)]:
+  - @evolution-sdk/evolution@0.3.8
+
+## 1.1.7
+
+### Patch Changes
+
+- [#109](https://github.com/IntersectMBO/evolution-sdk/pull/109) [`0730f23`](https://github.com/IntersectMBO/evolution-sdk/commit/0730f2353490ff1fa75743cccc0d05b33cff1b23) Thanks [@solidsnakedev](https://github.com/solidsnakedev)! - ### TxBuilder setValidity API
+
+  Add `setValidity()` method to TxBuilder for setting transaction validity intervals:
+
+  ```ts
+  client.newTx()
+    .setValidity({
+      from: Date.now(),           // Valid after this Unix time (optional)
+      to: Date.now() + 300_000    // Expires after this Unix time (optional)
+    })
+    .payToAddress({ ... })
+    .build()
+  ```
+
+  - Times are provided as Unix milliseconds and converted to slots during transaction assembly
+  - At least one of `from` or `to` must be specified
+  - Validates that `from < to` when both are provided
+
+  ### slotConfig support for devnets
+
+  Add `slotConfig` parameter to `createClient()` for custom slot configurations:
+
+  ```ts
+  const slotConfig = Cluster.getSlotConfig(devnetCluster)
+  const client = createClient({
+    network: 0,
+    slotConfig,  // Custom slot config for devnet
+    provider: { ... },
+    wallet: { ... }
+  })
+  ```
+
+  Priority chain for slot config resolution:
+  1. `BuildOptions.slotConfig` (per-transaction override)
+  2. `TxBuilderConfig.slotConfig` (client default)
+  3. `SLOT_CONFIG_NETWORK[network]` (hardcoded fallback)
+
+  ### Cluster.getSlotConfig helper
+
+  Add `getSlotConfig()` helper to derive slot configuration from devnet cluster genesis:
+
+  ```ts
+  const slotConfig = Cluster.getSlotConfig(cluster)
+  // Returns: { zeroTime, zeroSlot, slotLength }
+  ```
+
+- Updated dependencies [[`c59507e`](https://github.com/IntersectMBO/evolution-sdk/commit/c59507eafd942cd5bce1d3608c9c3e9c99a4cac8), [`9ddc79d`](https://github.com/IntersectMBO/evolution-sdk/commit/9ddc79dbc9b6667b3f2981dd06875878d9ad14f5), [`0730f23`](https://github.com/IntersectMBO/evolution-sdk/commit/0730f2353490ff1fa75743cccc0d05b33cff1b23)]:
+  - @evolution-sdk/evolution@0.3.7
+
+## 1.1.6
+
+### Patch Changes
+
+- [#107](https://github.com/IntersectMBO/evolution-sdk/pull/107) [`1e1aec8`](https://github.com/IntersectMBO/evolution-sdk/commit/1e1aec88dfc726ff66809f51671d80b3f469eb5c) Thanks [@solidsnakedev](https://github.com/solidsnakedev)! - ### Added: Redeemer Labels for Script Debugging
+
+  Added optional `label` property to redeemer operations (`collectFrom`, `withdraw`, `mint`, and stake operations) to help identify which script failed during evaluation.
+
+  ```typescript
+  client
+    .newTx()
+    .collectFrom({
+      inputs: [utxo],
+      redeemer: makeSpendRedeemer(999n),
+      label: "coordinator-spend-utxo" // Shows in failure output
+    })
+    .withdraw({
+      stakeCredential,
+      amount: 0n,
+      redeemer: makeWithdrawRedeemer([999n]),
+      label: "coordinator-withdrawal"
+    })
+  ```
+
+  When scripts fail, the `EvaluationError` now includes a structured `failures` array:
+
+  ```typescript
+  interface ScriptFailure {
+    purpose: "spend" | "mint" | "withdraw" | "cert"
+    index: number
+    label?: string // User-provided label
+    redeemerKey: string // e.g., "spend:0", "withdraw:0"
+    utxoRef?: string // For spend failures
+    credential?: string // For withdraw/cert failures
+    policyId?: string // For mint failures
+    validationError: string
+    traces: string[]
+  }
+  ```
+
+  ### Added: Stake Operations
+
+  Full support for Conway-era stake operations:
+  - `registerStake` - Register stake credential (RegCert)
+  - `deregisterStake` - Deregister stake credential (UnregCert)
+  - `delegateTo` - Delegate to pool and/or DRep (StakeDelegation, VoteDelegCert, StakeVoteDelegCert)
+  - `registerAndDelegateTo` - Combined registration + delegation (StakeRegDelegCert, VoteRegDelegCert, StakeVoteRegDelegCert)
+  - `withdraw` - Withdraw staking rewards (supports coordinator pattern with amount: 0n)
+
+  All operations support script-controlled credentials with RedeemerBuilder for deferred redeemer resolution.
+
+- Updated dependencies [[`1e1aec8`](https://github.com/IntersectMBO/evolution-sdk/commit/1e1aec88dfc726ff66809f51671d80b3f469eb5c)]:
+  - @evolution-sdk/evolution@0.3.6
+
+## 1.1.5
+
+### Patch Changes
+
+- [#105](https://github.com/IntersectMBO/evolution-sdk/pull/105) [`98b59fa`](https://github.com/IntersectMBO/evolution-sdk/commit/98b59fa49d5a4e454e242a9c400572677e2f986f) Thanks [@solidsnakedev](https://github.com/solidsnakedev)! - Add deferred redeemer construction for dynamic index resolution
+
+  **RedeemerBuilder module** (`RedeemerBuilder.ts`):
+  - `IndexedInput` type: `{ index: number, utxo: UTxO }` - provides the final sorted index and original UTxO after coin selection
+  - Three modes for redeemer construction:
+    - `Static`: Direct Data value when index not needed
+    - `Self`: Per-input function `(input: IndexedInput) => Data` for single UTxO index
+    - `Batch`: Multi-input function `(inputs: IndexedInput[]) => Data` for stake validator coordinator pattern
+  - Type guards: `isSelfFn`, `isBatchBuilder`, `isStaticData`
+  - Internal types: `DeferredRedeemer`, `toDeferredRedeemer`
+
+  **Evaluation phase updates**:
+  - Add `resolveDeferredRedeemers` to convert deferred redeemers after coin selection
+  - Build `refToIndex` and `refToUtxo` mappings from sorted inputs
+  - Invoke Self/Batch callbacks with resolved `IndexedInput` objects
+
+  **Operations updates**:
+  - `collectFrom` and `mintTokens` now accept `RedeemerArg` (Data | SelfRedeemerFn | BatchRedeemerBuilder)
+  - Store deferred redeemers in `state.deferredRedeemers` for later resolution
+
+  **Test coverage** (`TxBuilder.RedeemerBuilder.test.ts`):
+  - Tests for all three modes with mint_multi_validator.ak spec
+
+  **Architecture docs** (`redeemer-indexing.mdx`):
+  - Document the circular dependency problem and deferred construction solution
+  - Explain stake validator coordinator pattern with O(1) index lookup
+
+- Updated dependencies [[`98b59fa`](https://github.com/IntersectMBO/evolution-sdk/commit/98b59fa49d5a4e454e242a9c400572677e2f986f)]:
+  - @evolution-sdk/evolution@0.3.5
+
+## 1.1.4
+
+### Patch Changes
+
+- [#101](https://github.com/IntersectMBO/evolution-sdk/pull/101) [`aaf0882`](https://github.com/IntersectMBO/evolution-sdk/commit/aaf0882e280fad9769410a81419ebf1c6af48785) Thanks [@solidsnakedev](https://github.com/solidsnakedev)! - ### Core Module Enhancements
+
+  **Mint Module**
+  - Added `Mint.getByHex()` and `Mint.getAssetsByPolicyHex()` utilities for hex-based lookups
+  - Fixed `Mint.insert`, `removePolicy`, `removeAsset`, and `get` to use content-based equality (`Equal.equals`) instead of reference equality for PolicyId/AssetName lookups
+
+  **Fee Calculation**
+  - Fixed `calculateFeeIteratively` to include mint field in fee calculation via TxContext access
+  - Removed unnecessary 5000n fee buffer that caused fee overpayment
+
+  **Transaction Builder**
+  - Added `.mint()` method to TransactionBuilder for native token minting/burning
+  - `.attachScript()` now accepts `{ script: CoreScript }` parameter format
+  - Improved type safety by using Core types directly instead of SDK wrappers
+
+  ### Devnet Package
+
+  **Test Infrastructure**
+  - Added `TxBuilder.Mint.test.ts` with devnet submit tests for minting and burning
+  - Updated `TxBuilder.Scripts.test.ts` to use Core types (`PlutusV2.PlutusV2`) instead of SDK format
+  - Refactored `createCoreTestUtxo` helper to accept Core `Script` types directly
+  - Removed unused `createTestUtxo` (SDK format) helper
+  - Added `Genesis.calculateUtxosFromConfig()` for retrieving initial UTxOs from genesis config
+  - Replaced all `Buffer.from().toString("hex")` with `Text.toHex()` in tests
+
+  ### Breaking Changes
+  - `attachScript()` now requires `{ script: ... }` object format instead of passing script directly
+  - Test helpers now use Core types exclusively
+
+- [#104](https://github.com/IntersectMBO/evolution-sdk/pull/104) [`c26391a`](https://github.com/IntersectMBO/evolution-sdk/commit/c26391a3783a5dca95b2ab1b2af95c98c62e4966) Thanks [@solidsnakedev](https://github.com/solidsnakedev)! - ### PlutusV3 Minting Support
+  - Add PlutusV3 script minting with automatic script evaluation via Ogmios
+  - Add `mintAssets` builder method for Plutus script-based minting policies
+  - Add `attachScript` builder method for attaching Plutus scripts to transactions
+  - Support both minting (positive amounts) and burning (negative amounts)
+
+  ### Redeemer API Improvements
+  - **Breaking**: Change `redeemer` parameter type from `string` (CBOR hex) to `Data.Data`
+    - Affects `collectFrom()` and `mintAssets()` builder methods
+    - Provides type-safe redeemer construction without manual CBOR encoding
+    - Example: `redeemer: Data.constr(0n, [Data.int(1n)])` instead of hex strings
+
+  ### Core Module Additions
+  - Add `Redeemers` module with Conway CDDL-compliant encoding (array format)
+  - Refactor `hashScriptData` to use proper module encoders for redeemers and datums
+  - Add `Redeemers.toCBORBytes()` for script data hash computation
+
+  ### Internal Improvements
+  - Store `PlutusData.Data` directly in builder state instead of CBOR hex strings
+  - Remove redundant CBOR hex encoding/decoding in transaction assembly
+  - Add PlutusV3 minting devnet tests with real script evaluation
+
+- Updated dependencies [[`aaf0882`](https://github.com/IntersectMBO/evolution-sdk/commit/aaf0882e280fad9769410a81419ebf1c6af48785), [`65b7259`](https://github.com/IntersectMBO/evolution-sdk/commit/65b7259b8b250b87d5420bca6458a5e862ba9406), [`c26391a`](https://github.com/IntersectMBO/evolution-sdk/commit/c26391a3783a5dca95b2ab1b2af95c98c62e4966)]:
+  - @evolution-sdk/evolution@0.3.4
+
+## 1.1.3
+
+### Patch Changes
+
+- [#98](https://github.com/IntersectMBO/evolution-sdk/pull/98) [`ef563f3`](https://github.com/IntersectMBO/evolution-sdk/commit/ef563f305879e6e7411d930a87733cc4e9f34314) Thanks [@solidsnakedev](https://github.com/solidsnakedev)! - Migrate transaction builder and provider layer to use Core UTxO types throughout the SDK.
+
+  ### New Core Types
+  - **`Core.UTxO`** — Schema-validated UTxO with branded types (`TransactionHash`, `Address`, `Assets`)
+  - **`Core.Assets`** — Enhanced with `merge`, `subtract`, `negate`, `getAsset`, `setAsset`, `hasAsset` operations
+  - **`Core.Time`** — New module for slot/time conversions with `SlotConfig`, `Slot`, `UnixTime`
+  - **`Core.Address`** — Added `getAddressDetails`, `getPaymentCredential`, `getStakingCredential` utilities
+
+  ### SDK Changes
+  - Provider methods (`getUtxos`, `getUtxoByUnit`, `getUtxosWithUnit`) now return `Core.UTxO.UTxO[]`
+  - Client methods (`getWalletUtxos`, `newTx`) use Core UTxO internally
+  - Transaction builder accepts `Core.UTxO.UTxO[]` for `availableUtxos`
+  - `Genesis.calculateUtxosFromConfig` and `Genesis.queryUtxos` return Core UTxOs
+
+  ### Rationale
+
+  The SDK previously used a lightweight `{ txHash, outputIndex, address, assets }` record for UTxOs, requiring constant conversions when interfacing with the Core layer (transaction building, CBOR serialization). This caused:
+  1. **Conversion overhead** — Every transaction build required converting SDK UTxOs to Core types
+  2. **Type ambiguity** — `txHash: string` vs `TransactionHash`, `address: string` vs `Address` led to runtime errors
+  3. **Inconsistent APIs** — Some methods returned Core types, others SDK types
+
+  By standardizing on Core UTxO:
+  - **Zero conversion** — UTxOs flow directly from provider → wallet → builder → transaction
+  - **Type safety** — Branded types prevent mixing up transaction hashes, addresses, policy IDs
+  - **Unified model** — Single UTxO representation across the entire SDK
+
+  ### Migration
+
+  ```typescript
+  // Before
+  const lovelace = Assets.getAsset(utxo.assets, "lovelace")
+  const txId = utxo.txHash
+  const idx = utxo.outputIndex
+  const addr = utxo.address // string
+
+  // After
+  const lovelace = utxo.assets.lovelace
+  const txId = Core.TransactionHash.toHex(utxo.transactionId)
+  const idx = utxo.index // bigint
+  const addr = Core.Address.toBech32(utxo.address) // or use Address directly
+  ```
+
+- Updated dependencies [[`ef563f3`](https://github.com/IntersectMBO/evolution-sdk/commit/ef563f305879e6e7411d930a87733cc4e9f34314)]:
+  - @evolution-sdk/evolution@0.3.3
+
 ## 1.1.2
 
 ### Patch Changes

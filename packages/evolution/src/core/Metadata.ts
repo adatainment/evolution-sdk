@@ -1,4 +1,4 @@
-import { Either as E, FastCheck, ParseResult, Schema } from "effect"
+import { FastCheck, ParseResult, Schema } from "effect"
 
 import * as CBOR from "./CBOR.js"
 import * as Numeric from "./Numeric.js"
@@ -13,15 +13,15 @@ import * as TransactionMetadatum from "./TransactionMetadatum.js"
 export type MetadataLabel = typeof MetadataLabel.Type
 
 /**
- * Schema for transaction metadatum label (uint - unbounded positive integer).
- * Uses Numeric.NonNegativeInteger for consistency with other numeric types.
+ * Schema for transaction metadatum label (uint64 per Cardano CDDL spec).
+ * Labels must be in range 0 to 2^64-1.
  *
  * @since 2.0.0
  * @category schemas
  */
-export const MetadataLabel = Numeric.NonNegativeInteger.annotations({
+export const MetadataLabel = Numeric.Uint64Schema.annotations({
   identifier: "Metadata.MetadataLabel",
-  description: "A transaction metadatum label (non-negative integer)"
+  description: "A transaction metadatum label (0 to 2^64-1)"
 })
 
 /**
@@ -45,14 +45,17 @@ export type Metadata = typeof Metadata.Type
 
 /**
  * CDDL schema for Metadata (CBOR-compatible representation).
- * Maps bigint labels to encoded transaction metadatum values.
+ * Maps bigint labels to transaction metadatum values.
+ *
+ * Uses Schema.typeSchema(TransactionMetadatumSchema) because CBOR decoding
+ * returns runtime types (bigint, Uint8Array, Map) directly.
  *
  * @since 2.0.0
  * @category schemas
  */
 export const CDDLSchema = Schema.MapFromSelf({
   key: CBOR.Integer, // MetadataLabel as bigint
-  value: Schema.suspend(() => TransactionMetadatum.TransactionMetadatumSchema)
+  value: Schema.suspend(() => Schema.typeSchema(TransactionMetadatum.TransactionMetadatumSchema))
 })
 
 /**
@@ -63,24 +66,8 @@ export const CDDLSchema = Schema.MapFromSelf({
  */
 export const FromCDDL = Schema.transformOrFail(CDDLSchema, Schema.typeSchema(Metadata), {
   strict: true,
-  encode: (metadata) =>
-    E.gen(function* () {
-      const map = new Map<bigint, TransactionMetadatum.TransactionMetadatumEncoded>()
-      for (const [label, metadatum] of metadata.entries()) {
-        const encoded = yield* ParseResult.encodeEither(TransactionMetadatum.TransactionMetadatumSchema)(metadatum)
-        map.set(label, encoded)
-      }
-      return map
-    }),
-  decode: (cddl) =>
-    E.gen(function* () {
-      const map = new Map<MetadataLabel, TransactionMetadatum.TransactionMetadatum>()
-      for (const [label, encoded] of cddl.entries()) {
-        const metadatum = yield* ParseResult.decodeEither(TransactionMetadatum.TransactionMetadatumSchema)(encoded as any)
-        map.set(label, metadatum)
-      }
-      return map as Metadata
-    })
+  encode: (metadata) => ParseResult.succeed(new Map(metadata)),
+  decode: (cddl) => ParseResult.succeed(new Map(cddl) as Metadata)
 }).annotations({
   identifier: "Metadata.FromCDDL",
   description: "Transforms CBOR structure to Metadata"

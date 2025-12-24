@@ -1948,7 +1948,7 @@ export interface TransactionBuilderBase {
   /**
    * Attach metadata to the transaction.
    *
-   * Metadata is stored in the auxiliary data section and identified by labels (0-255)
+   * Metadata is stored in the auxiliary data section and identified by numeric labels
    * following the CIP-10 standard. Common use cases include:
    * - Transaction messages/comments (label 674, CIP-20)
    * - NFT metadata (label 721, CIP-25)
@@ -1963,28 +1963,19 @@ export interface TransactionBuilderBase {
    *
    * @example
    * ```typescript
-   * import * as TransactionMetadatum from "@evolution-sdk/core/TransactionMetadatum"
+   * import { fromEntries } from "@evolution-sdk/evolution/core/TransactionMetadatum"
    *
    * // Attach a simple message (CIP-20)
    * const tx = await builder
    *   .payToAddress({ address, assets: { lovelace: 2_000_000n } })
-   *   .attachMetadata({
-   *     label: 674n,
-   *     metadata: TransactionMetadatum.makeTransactionMetadatumMap(
-   *       new Map([[0n, TransactionMetadatum.makeTransactionMetadatumText("Hello, Cardano!")]])
-   *     )
-   *   })
+   *   .attachMetadata({ label: 674n, metadata: "Hello, Cardano!" })
    *   .build()
    *
    * // Attach NFT metadata (CIP-25)
-   * const nftMetadata = TransactionMetadatum.makeTransactionMetadatumMap(
-   *   new Map([
-   *     [TransactionMetadatum.makeTransactionMetadatumText("name"), 
-   *      TransactionMetadatum.makeTransactionMetadatumText("My NFT #42")],
-   *     [TransactionMetadatum.makeTransactionMetadatumText("image"), 
-   *      TransactionMetadatum.makeTransactionMetadatumText("ipfs://Qm...")],
-   *   ])
-   * )
+   * const nftMetadata = fromEntries([
+   *   ["name", "My NFT #42"],
+   *   ["image", "ipfs://Qm..."]
+   * ])
    * const tx = await builder
    *   .mintAssets({ assets: { [policyId + assetName]: 1n } })
    *   .attachMetadata({ label: 721n, metadata: nftMetadata })

@@ -1,5 +1,53 @@
 # docs
 
+## 0.0.15
+
+### Patch Changes
+
+- Updated dependencies [[`7905507`](https://github.com/IntersectMBO/evolution-sdk/commit/79055076ab31214dc4c7462553484e9c2bcaf22c)]:
+  - @evolution-sdk/evolution@0.3.8
+  - @evolution-sdk/devnet@1.1.8
+
+## 0.0.14
+
+### Patch Changes
+
+- Updated dependencies [[`c59507e`](https://github.com/IntersectMBO/evolution-sdk/commit/c59507eafd942cd5bce1d3608c9c3e9c99a4cac8), [`9ddc79d`](https://github.com/IntersectMBO/evolution-sdk/commit/9ddc79dbc9b6667b3f2981dd06875878d9ad14f5), [`0730f23`](https://github.com/IntersectMBO/evolution-sdk/commit/0730f2353490ff1fa75743cccc0d05b33cff1b23)]:
+  - @evolution-sdk/evolution@0.3.7
+  - @evolution-sdk/devnet@1.1.7
+
+## 0.0.13
+
+### Patch Changes
+
+- Updated dependencies [[`1e1aec8`](https://github.com/IntersectMBO/evolution-sdk/commit/1e1aec88dfc726ff66809f51671d80b3f469eb5c)]:
+  - @evolution-sdk/evolution@0.3.6
+  - @evolution-sdk/devnet@1.1.6
+
+## 0.0.12
+
+### Patch Changes
+
+- Updated dependencies [[`98b59fa`](https://github.com/IntersectMBO/evolution-sdk/commit/98b59fa49d5a4e454e242a9c400572677e2f986f)]:
+  - @evolution-sdk/devnet@1.1.5
+  - @evolution-sdk/evolution@0.3.5
+
+## 0.0.11
+
+### Patch Changes
+
+- Updated dependencies [[`aaf0882`](https://github.com/IntersectMBO/evolution-sdk/commit/aaf0882e280fad9769410a81419ebf1c6af48785), [`65b7259`](https://github.com/IntersectMBO/evolution-sdk/commit/65b7259b8b250b87d5420bca6458a5e862ba9406), [`c26391a`](https://github.com/IntersectMBO/evolution-sdk/commit/c26391a3783a5dca95b2ab1b2af95c98c62e4966)]:
+  - @evolution-sdk/devnet@1.1.4
+  - @evolution-sdk/evolution@0.3.4
+
+## 0.0.10
+
+### Patch Changes
+
+- Updated dependencies [[`ef563f3`](https://github.com/IntersectMBO/evolution-sdk/commit/ef563f305879e6e7411d930a87733cc4e9f34314)]:
+  - @evolution-sdk/devnet@1.1.3
+  - @evolution-sdk/evolution@0.3.3
+
 ## 0.0.9
 
 ### Patch Changes

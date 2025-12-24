@@ -2,7 +2,7 @@ import { Effect, Ref } from "effect"
 
 import type * as ScriptCore from "../../../core/Script.js"
 import * as ScriptHashCore from "../../../core/ScriptHash.js"
-import { TransactionBuilderError, TxContext } from "../TransactionBuilder.js"
+import { TxContext } from "../TransactionBuilder.js"
 
 /**
  * Attaches a script to the transaction by storing it in the builder state.
@@ -33,12 +33,4 @@ export const attachScriptToState = (script: ScriptCore.Script) =>
       ...state,
       scripts: updatedScripts
     })
-  }).pipe(
-    Effect.mapError(
-      (error) =>
-        new TransactionBuilderError({
-          message: "Failed to attach script",
-          cause: error
-        })
-    )
-  )
+  })

@@ -237,7 +237,7 @@ export const makeDatumOption = (datum: Datum.Datum): Effect.Effect<DatumOption.D
     Effect.mapError(
       (error) =>
         new TransactionBuilderError({
-          message: `Failed to parse datum: ${JSON.stringify(datum)}`,
+          message: `Failed to parse datum: ${error.message}`,
           cause: error
         })
     )
@@ -257,7 +257,7 @@ export const makeTxOutput = (params: {
   assets: CoreAssets.Assets
   datum?: DatumOption.DatumOption
   scriptRef?: CoreScript.Script
-}): Effect.Effect<TxOut.TransactionOutput, TransactionBuilderError> =>
+}): Effect.Effect<TxOut.TransactionOutput, never> =>
   Effect.gen(function* () {
     // Convert Script to ScriptRef for CBOR encoding if provided
     const scriptRefEncoded = params.scriptRef
@@ -273,15 +273,7 @@ export const makeTxOutput = (params: {
     })
 
     return output
-  }).pipe(
-    Effect.mapError(
-      (error) =>
-        new TransactionBuilderError({
-          message: `Failed to create TxOutput`,
-          cause: error
-        })
-    )
-  )
+  })
 
 /**
  * Convert parameters to core TransactionOutput.
@@ -297,7 +289,7 @@ export const txOutputToTransactionOutput = (params: {
   assets: CoreAssets.Assets
   datum?: DatumOption.DatumOption
   scriptRef?: CoreScript.Script
-}): Effect.Effect<TxOut.TransactionOutput, TransactionBuilderError> =>
+}): Effect.Effect<TxOut.TransactionOutput, never> =>
   Effect.gen(function* () {
     // Convert Script to ScriptRef for CBOR encoding if provided
     const scriptRefEncoded = params.scriptRef
@@ -313,15 +305,7 @@ export const txOutputToTransactionOutput = (params: {
     })
 
     return output
-  }).pipe(
-    Effect.mapError(
-      (error) =>
-        new TransactionBuilderError({
-          message: `Failed to create transaction output`,
-          cause: error
-        })
-    )
-  )
+  })
 
 /**
  * Merge additional assets into an existing UTxO.
@@ -335,7 +319,7 @@ export const txOutputToTransactionOutput = (params: {
 export const mergeAssetsIntoUTxO = (
   utxo: CoreUTxO.UTxO,
   additionalAssets: CoreAssets.Assets
-): Effect.Effect<CoreUTxO.UTxO, TransactionBuilderError> =>
+): Effect.Effect<CoreUTxO.UTxO, never> =>
   Effect.gen(function* () {
     // Merge assets using Core Assets helper
     const mergedAssets = CoreAssets.merge(utxo.assets, additionalAssets)
@@ -348,15 +332,7 @@ export const mergeAssetsIntoUTxO = (
       datumOption: utxo.datumOption,
       scriptRef: utxo.scriptRef
     })
-  }).pipe(
-    Effect.mapError(
-      (error) =>
-        new TransactionBuilderError({
-          message: "Failed to merge assets into UTxO",
-          cause: error
-        })
-    )
-  )
+  })
 
 /**
  * Merge additional assets into an existing TransactionOutput.
@@ -370,7 +346,7 @@ export const mergeAssetsIntoUTxO = (
 export const mergeAssetsIntoOutput = (
   output: TxOut.TransactionOutput,
   additionalAssets: CoreAssets.Assets
-): Effect.Effect<TxOut.TransactionOutput, TransactionBuilderError> =>
+): Effect.Effect<TxOut.TransactionOutput, never> =>
   Effect.gen(function* () {
     // Merge assets using Core Assets helper
     const mergedAssets = CoreAssets.merge(output.assets, additionalAssets)
@@ -383,15 +359,7 @@ export const mergeAssetsIntoOutput = (
       scriptRef: output.scriptRef
     })
     return newOutput
-  }).pipe(
-    Effect.mapError(
-      (error) =>
-        new TransactionBuilderError({
-          message: "Failed to merge assets into output",
-          cause: error
-        })
-    )
-  )
+  })
 
 // ============================================================================
 // Transaction Assembly
@@ -407,7 +375,7 @@ export const mergeAssetsIntoOutput = (
  */
 export const buildTransactionInputs = (
   utxos: ReadonlyArray<CoreUTxO.UTxO>
-): Effect.Effect<ReadonlyArray<TransactionInput.TransactionInput>, TransactionBuilderError> =>
+): Effect.Effect<ReadonlyArray<TransactionInput.TransactionInput>, never> =>
   Effect.gen(function* () {
     // Convert each Core UTxO to TransactionInput
     const inputs: Array<TransactionInput.TransactionInput> = []
@@ -440,15 +408,7 @@ export const buildTransactionInputs = (
     })
 
     return inputs
-  }).pipe(
-    Effect.mapError(
-      (error) =>
-        new TransactionBuilderError({
-          message: "Failed to build transaction inputs",
-          cause: error
-        })
-    )
-  )
+  })
 
 /**
  * Assemble a Transaction from inputs, outputs, and calculated fee.
@@ -692,7 +652,7 @@ export const assembleTransaction = (
         Effect.mapError(
           (providerError) =>
             new TransactionBuilderError({
-              message: "Failed to fetch full protocol parameters for scriptDataHash calculation",
+              message: `Failed to fetch full protocol parameters for scriptDataHash calculation: ${providerError.message}`,
               cause: providerError
             })
         )
@@ -822,7 +782,7 @@ export const assembleTransaction = (
     Effect.mapError(
       (error) =>
         new TransactionBuilderError({
-          message: "Failed to assemble transaction",
+          message: `Failed to assemble transaction: ${error.message}`,
           cause: error
         })
     )
@@ -858,7 +818,7 @@ export const calculateTransactionSize = (
     Effect.mapError(
       (error) =>
         new TransactionBuilderError({
-          message: "Failed to calculate transaction size",
+          message: `Failed to calculate transaction size: ${error.message}`,
           cause: error
         })
     )
@@ -1170,7 +1130,7 @@ export const calculateFeeIteratively = (
     priceMem?: number
     priceStep?: number
   }
-): Effect.Effect<bigint, TransactionBuilderError, TxContext> =>
+): Effect.Effect<bigint, TransactionBuilderError, TxContext | BuildOptionsTag> =>
   Effect.gen(function* () {
     // Get state to access mint field and collateral
     const stateRef = yield* TxContext
@@ -1258,12 +1218,27 @@ export const calculateFeeIteratively = (
       ]
     }
 
+    // Convert validity interval to slots for fee calculation
+    // Validity fields affect transaction size and must be included
+    const buildOptions = yield* BuildOptionsTag
+    const slotConfig = buildOptions.slotConfig!
+    let ttl: bigint | undefined
+    let validityIntervalStart: bigint | undefined
+    if (state.validity?.to !== undefined) {
+      ttl = Time.unixTimeToSlot(state.validity.to, slotConfig)
+    }
+    if (state.validity?.from !== undefined) {
+      validityIntervalStart = Time.unixTimeToSlot(state.validity.from, slotConfig)
+    }
+
     while (iterations < maxIterations) {
       // Build transaction with current fee estimate
       const body = new TransactionBody.TransactionBody({
         inputs: inputs as Array<TransactionInput.TransactionInput>,
         outputs: transactionOutputs,
         fee: currentFee,
+        ttl, // Include TTL for accurate size calculation
+        validityIntervalStart, // Include validity start for accurate size calculation
         mint, // Include mint field for accurate size calculation
         scriptDataHash: placeholderScriptDataHash, // Include scriptDataHash for accurate size
         auxiliaryDataHash: placeholderAuxiliaryDataHash, // Include auxiliaryDataHash for accurate size
@@ -1341,7 +1316,7 @@ export const calculateFeeIteratively = (
     Effect.mapError(
       (error) =>
         new TransactionBuilderError({
-          message: "Fee calculation failed to converge",
+          message: `Fee calculation failed to converge: ${error.message}`,
           cause: error
         })
     )

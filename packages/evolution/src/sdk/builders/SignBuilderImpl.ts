@@ -108,7 +108,7 @@ export const makeSignBuilder = (params: {
         const walletWitnessSet = yield* wallet.Effect.signTx(transaction, { utxos, referenceUtxos }).pipe(
           Effect.mapError(
             (walletError) =>
-              new TransactionBuilderError({ message: "Failed to sign transaction", cause: walletError })
+              new TransactionBuilderError({ message: `Failed to sign transaction: ${walletError.message}`, cause: walletError })
           )
         )
 
@@ -257,7 +257,7 @@ export const makeSignBuilder = (params: {
         const witnessSet = yield* wallet.Effect.signTx(transaction, { utxos, referenceUtxos }).pipe(
           Effect.mapError(
             (walletError) =>
-              new TransactionBuilderError({ message: "Failed to create partial signature", cause: walletError })
+              new TransactionBuilderError({ message: `Failed to create partial signature: ${walletError.message}`, cause: walletError })
           )
         )
 

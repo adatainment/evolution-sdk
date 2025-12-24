@@ -42,7 +42,10 @@ export const makeSubmitBuilder = (
         const txHash = yield* provider.Effect.submitTx(txCborHex).pipe(
           Effect.mapError(
             (providerError) =>
-              new TransactionBuilderError({ message: "Failed to submit transaction", cause: providerError })
+              new TransactionBuilderError({ 
+                message: `Failed to submit transaction: ${providerError.message}`, 
+                cause: providerError 
+              })
           )
         )
         

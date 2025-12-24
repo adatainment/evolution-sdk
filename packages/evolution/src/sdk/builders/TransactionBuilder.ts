@@ -54,10 +54,36 @@ import { attachScriptToState } from "./operations/Attach.js"
 import { createAttachMetadataProgram } from "./operations/AttachMetadata.js"
 import { createCollectFromProgram } from "./operations/Collect.js"
 import { createMintProgram } from "./operations/Mint.js"
-import type { AddSignerParams, AttachMetadataParams, AuthCommitteeHotParams, CollectFromParams, DelegateToParams, DeregisterDRepParams, DeregisterStakeParams, MintTokensParams, PayToAddressParams, ReadFromParams, RegisterAndDelegateToParams, RegisterDRepParams, RegisterPoolParams, RegisterStakeParams, ResignCommitteeColdParams, RetirePoolParams, UpdateDRepParams, ValidityParams, WithdrawParams } from "./operations/Operations.js"
+import type {
+  AddSignerParams,
+  AttachMetadataParams,
+  AuthCommitteeHotParams,
+  CollectFromParams,
+  DelegateToParams,
+  DeregisterDRepParams,
+  DeregisterStakeParams,
+  MintTokensParams,
+  PayToAddressParams,
+  ReadFromParams,
+  RegisterAndDelegateToParams,
+  RegisterDRepParams,
+  RegisterPoolParams,
+  RegisterStakeParams,
+  ResignCommitteeColdParams,
+  RetirePoolParams,
+  UpdateDRepParams,
+  ValidityParams,
+  WithdrawParams
+} from "./operations/Operations.js"
 import { createPayToAddressProgram } from "./operations/Pay.js"
 import { createReadFromProgram } from "./operations/ReadFrom.js"
-import { createDelegateToProgram, createDeregisterStakeProgram, createRegisterAndDelegateToProgram, createRegisterStakeProgram, createWithdrawProgram } from "./operations/Stake.js"
+import {
+  createDelegateToProgram,
+  createDeregisterStakeProgram,
+  createRegisterAndDelegateToProgram,
+  createRegisterStakeProgram,
+  createWithdrawProgram
+} from "./operations/Stake.js"
 import { createSetValidityProgram } from "./operations/Validity.js"
 import { executeBalance } from "./phases/Balance.js"
 import { executeChangeCreation } from "./phases/ChangeCreation.js"
@@ -92,7 +118,15 @@ export class TransactionBuilderError extends Data.TaggedError("TransactionBuilde
 /**
  * Build phases
  */
-type Phase = "selection" | "changeCreation" | "feeCalculation" | "balance" | "evaluation" | "collateral" | "fallback" | "complete"
+type Phase =
+  | "selection"
+  | "changeCreation"
+  | "feeCalculation"
+  | "balance"
+  | "evaluation"
+  | "collateral"
+  | "fallback"
+  | "complete"
 
 /**
  * BuildContext - state machine context
@@ -202,10 +236,7 @@ const resolveAvailableUtxos = (
   }
 
   if (config.wallet && config.provider) {
-    return Effect.flatMap(
-      config.wallet.Effect.address(), 
-      (addr) => config.provider!.Effect.getUtxos(addr)
-    )
+    return Effect.flatMap(config.wallet.Effect.address(), (addr) => config.provider!.Effect.getUtxos(addr))
   }
 
   return Effect.fail(
@@ -238,7 +269,7 @@ const resolveEvaluator = (config: TxBuilderConfig, options?: BuildOptions): Eval
           Effect.mapError(
             (providerError) =>
               new EvaluationError({
-                message: "Provider evaluation failed",
+                message: `Provider evaluation failed: ${providerError.message}`,
                 cause: providerError
               })
           )
@@ -363,7 +394,7 @@ const assembleAndValidateTransaction = Effect.gen(function* () {
 
   // SAFETY CHECK: Validate transaction size against protocol limit
   // Include collateral UTxOs in witness estimation - they require VKey witnesses too!
-  const allUtxosForWitnesses = finalState.collateral 
+  const allUtxosForWitnesses = finalState.collateral
     ? [...selectedUtxos, ...finalState.collateral.inputs]
     : selectedUtxos
   const fakeWitnessSet = yield* buildFakeWitnessSet(allUtxosForWitnesses)
@@ -504,7 +535,7 @@ const buildPartialEffectCore = (
     Effect.mapError(
       (error) =>
         new TransactionBuilderError({
-          message: "Partial build failed",
+          message: `Partial build failed: ${error.message}`,
           cause: error
         })
     )
@@ -642,7 +673,13 @@ export class EvaluationError extends Data.TaggedError("EvaluationError")<{
     const lines = ["Script evaluation failed:"]
     for (const f of this.failures) {
       const labelPart = f.label ? ` [${f.label}]` : ""
-      const refPart = f.utxoRef ? ` UTxO: ${f.utxoRef}` : f.credential ? ` Credential: ${f.credential}` : f.policyId ? ` Policy: ${f.policyId}` : ""
+      const refPart = f.utxoRef
+        ? ` UTxO: ${f.utxoRef}`
+        : f.credential
+          ? ` Credential: ${f.credential}`
+          : f.policyId
+            ? ` Policy: ${f.policyId}`
+            : ""
       lines.push(`  ${f.purpose}:${f.index}${labelPart}${refPart}`)
       lines.push(`    Error: ${f.validationError}`)
       if (f.traces.length > 0) {
@@ -1407,7 +1444,10 @@ export class TxBuilderConfigTag extends Context.Tag("TxBuilderConfig")<TxBuilder
  * @since 2.0.0
  * @category context
  */
-export class AvailableUtxosTag extends Context.Tag("AvailableUtxos")<AvailableUtxosTag, ReadonlyArray<CoreUTxO.UTxO>>() {}
+export class AvailableUtxosTag extends Context.Tag("AvailableUtxos")<
+  AvailableUtxosTag,
+  ReadonlyArray<CoreUTxO.UTxO>
+>() {}
 
 /**
  * Context tag providing BuildOptions for the current build.
@@ -1581,9 +1621,9 @@ export interface TransactionBuilderBase {
    * ```typescript
    * // Mint tokens from a native script policy
    * const tx = await builder
-   *   .mintAssets({ 
-   *     assets: { 
-   *       "<policyId><assetName>": 1000n 
+   *   .mintAssets({
+   *     assets: {
+   *       "<policyId><assetName>": 1000n
    *     }
    *   })
    *   .build()
@@ -1591,9 +1631,9 @@ export interface TransactionBuilderBase {
    * // Mint from Plutus script policy with redeemer
    * const tx = await builder
    *   .attachScript(mintingScript)
-   *   .mintAssets({ 
-   *     assets: { 
-   *       "<policyId><assetName>": 1000n 
+   *   .mintAssets({
+   *     assets: {
+   *       "<policyId><assetName>": 1000n
    *     },
    *     redeemer: myRedeemer
    *   })
@@ -1957,6 +1997,65 @@ export interface TransactionBuilderBase {
   readonly attachMetadata: (params: AttachMetadataParams) => this
 
   // ============================================================================
+  // Composition Methods
+  // ============================================================================
+
+  /**
+   * Compose this builder with another builder's accumulated operations.
+   *
+   * Merges all queued operations from another transaction builder into this one.
+   * The other builder's programs are captured at compose time and will be executed
+   * when build() is called on this builder.
+   *
+   * This enables modular transaction building where common patterns can be
+   * encapsulated in reusable builder fragments.
+   *
+   * **Important**: Composition is one-way - changes to the other builder after
+   * compose() is called will not affect this builder.
+   *
+   * @example
+   * ```typescript
+   * // Create reusable builder for common operations
+   * const mintBuilder = builder
+   *   .mintAssets({ policyId, assets: { tokenName: 1n }, redeemer })
+   *   .attachScript({ script: mintingPolicy })
+   *
+   * // Compose into a transaction that also pays to an address
+   * const tx = await builder
+   *   .payToAddress({ address, assets: { lovelace: 5_000_000n } })
+   *   .compose(mintBuilder)
+   *   .build()
+   *
+   * // Compose multiple builders
+   * const fullTx = await builder
+   *   .compose(mintBuilder)
+   *   .compose(metadataBuilder)
+   *   .compose(certBuilder)
+   *   .build()
+   * ```
+   *
+   * @param other - Another transaction builder whose operations will be merged
+   * @returns The same builder for method chaining
+   *
+   * @since 2.0.0
+   * @category composition-methods
+   */
+  readonly compose: (other: TransactionBuilder) => this
+
+  /**
+   * Get a snapshot of the accumulated programs.
+   *
+   * Returns a read-only copy of all queued operations that have been added
+   * to this builder. Useful for inspection, debugging, or advanced composition patterns.
+   *
+   * @returns Read-only array of accumulated program steps
+   *
+   * @since 2.0.0
+   * @category composition-methods
+   */
+  readonly getPrograms: () => ReadonlyArray<ProgramStep>
+
+  // ============================================================================
   // Transaction Chaining Methods
   // ============================================================================
 
@@ -2262,10 +2361,15 @@ export function makeTxBuilder(config: TxBuilderConfig) {
       programs.push(createAttachMetadataProgram(params))
       return txBuilder
     },
+    compose: (other: TransactionBuilder) => {
+      const otherPrograms = other.getPrograms()
+      if (otherPrograms.length > 0) {
+        programs.push(...otherPrograms)
+      }
+      return txBuilder
+    },
 
-    // ============================================================================
-    // Hybrid completion methods - Execute with fresh state
-    // ============================================================================
+    getPrograms: () => [...programs],
 
     buildEffect: (options?: BuildOptions) => {
       return makeBuild(config, programs, options)

@@ -30,6 +30,7 @@ import type { Either } from "effect/Either"
 
 import type * as CoreAddress from "../../core/Address.js"
 import * as CoreAssets from "../../core/Assets/index.js"
+import type * as AuxiliaryData from "../../core/AuxiliaryData.js"
 import type * as Certificate from "../../core/Certificate.js"
 import type * as Coin from "../../core/Coin.js"
 import type * as PlutusData from "../../core/Data.js"
@@ -50,9 +51,10 @@ import type * as WalletNew from "../wallet/WalletNew.js"
 import type { CoinSelectionAlgorithm, CoinSelectionFunction } from "./CoinSelection.js"
 import { createAddSignerProgram } from "./operations/AddSigner.js"
 import { attachScriptToState } from "./operations/Attach.js"
+import { createAttachMetadataProgram } from "./operations/AttachMetadata.js"
 import { createCollectFromProgram } from "./operations/Collect.js"
 import { createMintProgram } from "./operations/Mint.js"
-import type { AddSignerParams, AuthCommitteeHotParams, CollectFromParams, DelegateToParams, DeregisterDRepParams, DeregisterStakeParams, MintTokensParams, PayToAddressParams, ReadFromParams, RegisterAndDelegateToParams, RegisterDRepParams, RegisterPoolParams, RegisterStakeParams, ResignCommitteeColdParams, RetirePoolParams, UpdateDRepParams, ValidityParams, WithdrawParams } from "./operations/Operations.js"
+import type { AddSignerParams, AttachMetadataParams, AuthCommitteeHotParams, CollectFromParams, DelegateToParams, DeregisterDRepParams, DeregisterStakeParams, MintTokensParams, PayToAddressParams, ReadFromParams, RegisterAndDelegateToParams, RegisterDRepParams, RegisterPoolParams, RegisterStakeParams, ResignCommitteeColdParams, RetirePoolParams, UpdateDRepParams, ValidityParams, WithdrawParams } from "./operations/Operations.js"
 import { createPayToAddressProgram } from "./operations/Pay.js"
 import { createReadFromProgram } from "./operations/ReadFrom.js"
 import { createDelegateToProgram, createDeregisterStakeProgram, createRegisterAndDelegateToProgram, createRegisterStakeProgram, createWithdrawProgram } from "./operations/Stake.js"
@@ -121,7 +123,8 @@ const initialTxBuilderState: TxBuilderState = {
   referenceInputs: [],
   certificates: [],
   withdrawals: new Map(),
-  requiredSigners: []
+  requiredSigners: [],
+  auxiliaryData: undefined
 }
 
 /**
@@ -369,7 +372,7 @@ const assembleAndValidateTransaction = Effect.gen(function* () {
     body: transaction.body,
     witnessSet: fakeWitnessSet,
     isValid: true,
-    auxiliaryData: null
+    auxiliaryData: finalState.auxiliaryData ?? null
   })
 
   const txSizeWithWitnesses = yield* calculateTransactionSize(txWithFakeWitnesses)
@@ -1279,6 +1282,7 @@ export interface TxBuilderState {
     readonly to?: Time.UnixTime // ttl
   }
   readonly requiredSigners: ReadonlyArray<KeyHash.KeyHash> // Extra signers required (for script validation)
+  readonly auxiliaryData?: AuxiliaryData.AuxiliaryData // Auxiliary data (metadata, scripts, etc.)
 }
 
 /**
@@ -1901,6 +1905,48 @@ export interface TransactionBuilderBase {
    */
   readonly addSigner: (params: AddSignerParams) => this
 
+  /**
+   * Attach metadata to the transaction.
+   *
+   * Metadata is stored in the auxiliary data section and identified by numeric labels
+   * following the CIP-10 standard. Common use cases include:
+   * - Transaction messages/comments (label 674, CIP-20)
+   * - NFT metadata (label 721, CIP-25)
+   * - Royalty information (label 777, CIP-27)
+   * - DApp-specific data
+   *
+   * Multiple metadata entries with different labels can be attached by calling this
+   * method multiple times. The same label cannot be used twice.
+   *
+   * Queues a deferred operation that will be executed when build() is called.
+   * Returns the same builder for method chaining.
+   *
+   * @example
+   * ```typescript
+   * import { fromEntries } from "@evolution-sdk/evolution/core/TransactionMetadatum"
+   *
+   * // Attach a simple message (CIP-20)
+   * const tx = await builder
+   *   .payToAddress({ address, assets: { lovelace: 2_000_000n } })
+   *   .attachMetadata({ label: 674n, metadata: "Hello, Cardano!" })
+   *   .build()
+   *
+   * // Attach NFT metadata (CIP-25)
+   * const nftMetadata = fromEntries([
+   *   ["name", "My NFT #42"],
+   *   ["image", "ipfs://Qm..."]
+   * ])
+   * const tx = await builder
+   *   .mintAssets({ assets: { [policyId + assetName]: 1n } })
+   *   .attachMetadata({ label: 721n, metadata: nftMetadata })
+   *   .build()
+   * ```
+   *
+   * @since 2.0.0
+   * @category metadata-methods
+   */
+  readonly attachMetadata: (params: AttachMetadataParams) => this
+
   // ============================================================================
   // Transaction Chaining Methods
   // ============================================================================
@@ -2201,6 +2247,10 @@ export function makeTxBuilder(config: TxBuilderConfig) {
     },
     addSigner: (params: AddSignerParams) => {
       programs.push(createAddSignerProgram(params))
+      return txBuilder
+    },
+    attachMetadata: (params: AttachMetadataParams) => {
+      programs.push(createAttachMetadataProgram(params))
       return txBuilder
     },
 

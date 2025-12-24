@@ -33,7 +33,7 @@ import * as TxOut from "../../core/TxOut.js"
 import * as CoreUTxO from "../../core/UTxO.js"
 import * as VKey from "../../core/VKey.js"
 import * as Withdrawals from "../../core/Withdrawals.js"
-import { hashScriptData } from "../../utils/Hash.js"
+import { hashAuxiliaryData, hashScriptData } from "../../utils/Hash.js"
 // SDK imports (for conversion utilities)
 import * as Address from "../Address.js"
 import type * as Datum from "../Datum.js"
@@ -772,6 +772,13 @@ export const assembleTransaction = (
       yield* Effect.logDebug(`[Assembly] Required signers: ${requiredSigners.length}`)
     }
 
+    // Compute auxiliary data hash if auxiliary data is present
+    let auxiliaryDataHash: ReturnType<typeof hashAuxiliaryData> | undefined
+    if (state.auxiliaryData) {
+      auxiliaryDataHash = hashAuxiliaryData(state.auxiliaryData)
+      yield* Effect.logDebug(`[Assembly] Computed auxiliaryDataHash: ${auxiliaryDataHash.toString()}`)
+    }
+
     const body = new TransactionBody.TransactionBody({
       inputs: inputs as Array<TransactionInput.TransactionInput>,
       outputs: transactionOutputs,
@@ -784,6 +791,7 @@ export const assembleTransaction = (
       referenceInputs, // Reference inputs for reading on-chain data (undefined if none)
       mint: state.mint && state.mint.map.size > 0 ? state.mint : undefined, // Mint field from minting operations
       scriptDataHash, // Hash of redeemers + datums + cost models (required for Plutus scripts)
+      auxiliaryDataHash, // Hash of auxiliary data (required when metadata is present)
       certificates, // Certificates for staking operations
       withdrawals, // Withdrawals for claiming staking rewards
       requiredSigners // Extra signers required for script validation
@@ -806,7 +814,7 @@ export const assembleTransaction = (
       body,
       witnessSet,
       isValid: true, // Assume valid until script evaluation proves otherwise
-      auxiliaryData: null // Will be set if metadata operations added
+      auxiliaryData: state.auxiliaryData ?? null
     })
 
     return transaction
@@ -1210,6 +1218,12 @@ export const calculateFeeIteratively = (
         })
       : undefined
 
+    // Create placeholder auxiliaryDataHash if auxiliary data is present
+    // This is needed for accurate size estimation (32 bytes + CBOR overhead)
+    const placeholderAuxiliaryDataHash = state.auxiliaryData
+      ? hashAuxiliaryData(state.auxiliaryData)
+      : undefined
+
     let currentFee = 0n
     let previousSize = 0
     let previousFee = 0n
@@ -1252,6 +1266,7 @@ export const calculateFeeIteratively = (
         fee: currentFee,
         mint, // Include mint field for accurate size calculation
         scriptDataHash: placeholderScriptDataHash, // Include scriptDataHash for accurate size
+        auxiliaryDataHash: placeholderAuxiliaryDataHash, // Include auxiliaryDataHash for accurate size
         collateralInputs, // Include collateral for accurate size
         collateralReturn, // Include collateral return for accurate size
         totalCollateral, // Include total collateral for accurate size
@@ -1265,7 +1280,7 @@ export const calculateFeeIteratively = (
         body,
         witnessSet: fakeWitnessSet, // Use fake witness set for accurate size
         isValid: true,
-        auxiliaryData: null
+        auxiliaryData: state.auxiliaryData ?? null
       })
 
       // Calculate size

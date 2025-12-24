@@ -231,3 +231,19 @@ export const Int64Generator = FastCheck.bigInt({
   min: INT64_MIN,
   max: INT64_MAX
 }).map(Int64Make)
+
+/**
+ * Schema for non-negative integers (unbounded).
+ *
+ * @since 2.0.0
+ * @category schemas
+ */
+export const NonNegativeInteger = Schema.BigInt.pipe(
+  Schema.filter((value) => value >= 0n),
+  Schema.annotations({
+    identifier: "NonNegativeInteger",
+    title: "Non-Negative Integer",
+    description: "A non-negative integer (0 or greater)"
+  })
+)
+

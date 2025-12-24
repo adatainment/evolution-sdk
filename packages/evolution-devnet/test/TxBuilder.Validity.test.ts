@@ -104,10 +104,10 @@ describe("TxBuilder Validity Interval", () => {
         address: myAddress,
         assets: Core.Assets.fromLovelace(5_000_000n)
       })
-      .build({ availableUtxos: [...genesisUtxos], debug: true })
+      .build({ availableUtxos: [...genesisUtxos] })
 
     const tx = await signBuilder.toTransaction()
-    
+
     // Verify TTL is set in transaction body and converted to a slot number
     expect(tx.body.ttl).toBeDefined()
     expect(typeof tx.body.ttl).toBe("bigint")
@@ -130,19 +130,19 @@ describe("TxBuilder Validity Interval", () => {
         address: myAddress,
         assets: Core.Assets.fromLovelace(5_000_000n)
       })
-      .build({ availableUtxos: [...genesisUtxos], debug: true })
+      .build({ availableUtxos: [...genesisUtxos] })
 
     const tx = await signBuilder.toTransaction()
-    
+
     // Verify both bounds are set as slot numbers
     expect(tx.body.ttl).toBeDefined()
     expect(typeof tx.body.ttl).toBe("bigint")
     expect(tx.body.ttl! > 0n).toBe(true)
-    
+
     expect(tx.body.validityIntervalStart).toBeDefined()
     expect(typeof tx.body.validityIntervalStart).toBe("bigint")
     expect(tx.body.validityIntervalStart! > 0n).toBe(true)
-    
+
     // TTL should be after validity start
     expect(tx.body.ttl! > tx.body.validityIntervalStart!).toBe(true)
   })
@@ -161,10 +161,10 @@ describe("TxBuilder Validity Interval", () => {
         address: myAddress,
         assets: Core.Assets.fromLovelace(5_000_000n)
       })
-      .build({ availableUtxos: [...genesisUtxos], debug: true })
+      .build({ availableUtxos: [...genesisUtxos] })
 
     const submitBuilder = await signBuilder.sign()
-    
+
     // Submission should fail due to expired TTL
     await expect(submitBuilder.submit()).rejects.toThrow()
   })
@@ -184,10 +184,10 @@ describe("TxBuilder Validity Interval", () => {
         address: myAddress,
         assets: Core.Assets.fromLovelace(5_000_000n)
       })
-      .build({ availableUtxos: [...genesisUtxos], debug: true })
+      .build({ availableUtxos: [...genesisUtxos] })
 
     const submitBuilder = await signBuilder.sign()
-    
+
     // Submission should fail because tx is not valid yet
     await expect(submitBuilder.submit()).rejects.toThrow()
   })

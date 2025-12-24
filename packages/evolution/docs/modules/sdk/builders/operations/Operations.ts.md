@@ -1,6 +1,6 @@
 ---
 title: sdk/builders/operations/Operations.ts
-nav_order: 157
+nav_order: 158
 parent: Modules
 ---
 
@@ -16,6 +16,8 @@ parent: Modules
   - [RegisterDRepParams (interface)](#registerdrepparams-interface)
   - [ResignCommitteeColdParams (interface)](#resigncommitteecoldparams-interface)
   - [UpdateDRepParams (interface)](#updatedrepparams-interface)
+- [metadata](#metadata)
+  - [AttachMetadataParams (interface)](#attachmetadataparams-interface)
 - [pool](#pool)
   - [RegisterPoolParams (interface)](#registerpoolparams-interface)
   - [RetirePoolParams (interface)](#retirepoolparams-interface)
@@ -138,6 +140,34 @@ export interface UpdateDRepParams {
   readonly anchor?: Anchor.Anchor
   /** Redeemer for script-controlled DRep credentials */
   readonly redeemer?: RedeemerBuilder.RedeemerArg
+}
+```
+
+Added in v2.0.0
+
+# metadata
+
+## AttachMetadataParams (interface)
+
+Parameters for attaching metadata to transaction.
+
+Metadata is attached to the auxiliary data section of the transaction.
+Each metadata entry is identified by a label (0-2^64-1) following CIP-10 standard.
+
+Common labels:
+
+- 674n: Message/comment metadata (CIP-20)
+- 721n: NFT metadata (CIP-25)
+- 777n: Royalty metadata (CIP-27)
+
+**Signature**
+
+```ts
+export interface AttachMetadataParams {
+  /** Metadata label (bigint 0-2^64-1). See CIP-10 for standard labels. */
+  readonly label: Metadata.MetadataLabel
+  /** Metadata content as TransactionMetadatum */
+  readonly metadata: TransactionMetadatum.TransactionMetadatum
 }
 ```
 

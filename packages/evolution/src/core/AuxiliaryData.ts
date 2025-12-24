@@ -6,6 +6,7 @@ import * as NativeScripts from "./NativeScripts.js"
 import * as PlutusV1 from "./PlutusV1.js"
 import * as PlutusV2 from "./PlutusV2.js"
 import * as PlutusV3 from "./PlutusV3.js"
+import * as TransactionMetadatum from "./TransactionMetadatum.js"
 
 // ============================================================================
 // Helper functions for Equal/Hash implementations
@@ -33,21 +34,23 @@ const metadataMapEquals = (x: Metadata.Metadata | undefined, y: Metadata.Metadat
   if (x.size !== y.size) return false
   for (const [key, value] of x) {
     if (!y.has(key)) return false
-    if (!Equal.equals(value, y.get(key))) return false
+    if (!TransactionMetadatum.equals(value, y.get(key)!)) return false
   }
   return true
 }
 
 /**
- * Hash an optional metadata Map with stable key ordering
+ * Hash an optional metadata Map using only cheap operations.
+ * Hashes size and keys (bigints) but NOT values (which may contain Uint8Array).
+ * This ensures equal objects have equal hashes without expensive value hashing.
  */
 const hashMetadataMap = (m: Metadata.Metadata | undefined): number => {
   if (!m) return Hash.hash(undefined)
   let h = Hash.hash(m.size)
+  // Only hash bigint keys (cheap), not TransactionMetadatum values (expensive)
   const sortedKeys = Array.from(m.keys()).sort((a, b) => Number(a - b))
   for (const key of sortedKeys) {
-    const value = m.get(key)!
-    h = Hash.combine(h)(Hash.combine(Hash.hash(key))(Hash.hash(value)))
+    h = Hash.combine(h)(Hash.hash(key))
   }
   return h
 }
@@ -90,7 +93,7 @@ const hashArray = <T>(arr: ReadonlyArray<T> | undefined): number => {
 export class ConwayAuxiliaryData extends Schema.TaggedClass<ConwayAuxiliaryData>("ConwayAuxiliaryData")(
   "ConwayAuxiliaryData",
   {
-    metadata: Schema.optional(Metadata.Metadata),
+    metadata: Schema.optional(Schema.typeSchema(Metadata.Metadata)),
     nativeScripts: Schema.optional(Schema.Array(NativeScripts.NativeScript)),
     plutusV1Scripts: Schema.optional(Schema.Array(PlutusV1.PlutusV1)),
     plutusV2Scripts: Schema.optional(Schema.Array(PlutusV2.PlutusV2)),
@@ -173,7 +176,7 @@ export class ConwayAuxiliaryData extends Schema.TaggedClass<ConwayAuxiliaryData>
 export class ShelleyMAAuxiliaryData extends Schema.TaggedClass<ShelleyMAAuxiliaryData>("ShelleyMAAuxiliaryData")(
   "ShelleyMAAuxiliaryData",
   {
-    metadata: Schema.optional(Metadata.Metadata),
+    metadata: Schema.optional(Schema.typeSchema(Metadata.Metadata)),
     nativeScripts: Schema.optional(Schema.Array(NativeScripts.NativeScript))
   }
 ) {
@@ -234,7 +237,7 @@ export class ShelleyMAAuxiliaryData extends Schema.TaggedClass<ShelleyMAAuxiliar
 export class ShelleyAuxiliaryData extends Schema.TaggedClass<ShelleyAuxiliaryData>("ShelleyAuxiliaryData")(
   "ShelleyAuxiliaryData",
   {
-    metadata: Metadata.Metadata
+    metadata: Schema.typeSchema(Metadata.Metadata)
   }
 ) {
   /**
@@ -324,7 +327,7 @@ const AnyEraCDDL = Schema.Union(
   CDDLSchema,
   // ShelleyMA array form; we accept arbitrary CBOR array and validate within decode
   CBOR.ArraySchema,
-  // Shelley map form (metadata only)
+  // Shelley map form (metadata only) - use Metadata CDDL schema
   Metadata.CDDLSchema
 )
 
@@ -337,8 +340,11 @@ export const FromCDDL = Schema.transformOrFail(AnyEraCDDL, Schema.typeSchema(Aux
         case "ConwayAuxiliaryData": {
           // const struct: Record<number, any> = {}
           const map = new globalThis.Map<bigint, CBOR.CBOR>()
-          if (auxData.metadata !== undefined)
-            map.set(0n, yield* ParseResult.encodeEither(Metadata.FromCDDL)(auxData.metadata))
+          if (auxData.metadata !== undefined) {
+            // Encode metadata through the schema which handles the transformation
+            const encoded = yield* ParseResult.encodeEither(Metadata.FromCDDL)(auxData.metadata)
+            map.set(0n, encoded as any)
+          }
           if (auxData.nativeScripts !== undefined) {
             const scripts = []
             for (const s of auxData.nativeScripts) {
@@ -374,7 +380,7 @@ export const FromCDDL = Schema.transformOrFail(AnyEraCDDL, Schema.typeSchema(Aux
           // Use empty map/array when values are absent to avoid CBOR specials and match CML decoding.
           const encodedMetadata: Map<bigint, CBOR.CBOR> =
             auxData.metadata !== undefined
-              ? new Map(yield* ParseResult.encodeEither(Metadata.FromCDDL)(auxData.metadata))
+              ? (new Map(yield* ParseResult.encodeEither(Metadata.FromCDDL)(auxData.metadata)) as any)
               : new Map()
           const encodedScripts: Array<CBOR.CBOR> = (() => {
             const list = auxData.nativeScripts ?? []
@@ -390,7 +396,7 @@ export const FromCDDL = Schema.transformOrFail(AnyEraCDDL, Schema.typeSchema(Aux
           // Encode Shelley era as plain metadata map (no tag)
           {
             const m = yield* ParseResult.encodeEither(Metadata.FromCDDL)(auxData.metadata)
-            return new Map(m)
+            return new Map(m) as any
           }
         }
       }
@@ -435,7 +441,7 @@ export const FromCDDL = Schema.transformOrFail(AnyEraCDDL, Schema.typeSchema(Aux
         let nativeScripts: Array<NativeScripts.NativeScript> | undefined
 
         if (arr.length >= 1 && arr[0] !== undefined) {
-          const m = yield* ParseResult.decodeEither(Metadata.FromCDDL)(arr[0])
+          const m = yield* ParseResult.decodeEither(Metadata.FromCDDL)(arr[0] as any)
           metadata = m.size === 0 ? undefined : m
         }
         if (arr.length >= 2 && arr[1] !== undefined) {
@@ -454,7 +460,7 @@ export const FromCDDL = Schema.transformOrFail(AnyEraCDDL, Schema.typeSchema(Aux
 
       // Shelley map form: metadata only
       if (input instanceof Map) {
-        const metadata = yield* ParseResult.decodeEither(Metadata.FromCDDL)(input)
+        const metadata = yield* ParseResult.decodeEither(Metadata.FromCDDL)(input as any)
         return new ShelleyAuxiliaryData({ metadata })
       }
 

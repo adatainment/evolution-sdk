@@ -662,20 +662,13 @@ export interface ChainResult {
   readonly txHash: string
 }
 
-// ============================================================================
-// Evaluator Interface - Generic abstraction for script evaluation
-// ============================================================================
-// NOTE: These interfaces are reserved for future UPLC script evaluation support.
-// The createUPLCEvaluator function currently returns dummy data and is not yet implemented.
-
 /**
  * Data required by script evaluators: cost models, execution limits, and slot configuration.
  *
- * **NOTE: NOT YET IMPLEMENTED** - Reserved for future UPLC script evaluation support.
+ * Used by custom evaluators for local UPLC script evaluation.
  *
  * @since 2.0.0
  * @category model
- * @experimental
  */
 export interface EvaluationContext {
   /** Cost models for script evaluation */
@@ -695,12 +688,10 @@ export interface EvaluationContext {
 /**
  * Interface for evaluating transaction scripts and computing execution units.
  *
- * **NOTE: NOT YET IMPLEMENTED** - Reserved for future custom script evaluation support.
- * When implemented, this will enable custom evaluation strategies including local UPLC execution.
+ * Implement this interface to provide custom script evaluation strategies, such as local UPLC execution.
  *
  * @since 2.0.0
  * @category model
- * @experimental
  */
 export interface Evaluator {
   /**

@@ -12,8 +12,8 @@ import { Effect, Ref } from "effect"
 
 import * as Bytes from "../../../core/Bytes.js"
 import * as CostModel from "../../../core/CostModel.js"
+import { INT64_MAX } from "../../../core/Numeric.js"
 import * as PolicyId from "../../../core/PolicyId.js"
-import * as Transaction from "../../../core/Transaction.js"
 import * as CoreUTxO from "../../../core/UTxO.js"
 import type * as ProtocolParametersModule from "../../ProtocolParameters.js"
 import * as EvaluationStateManager from "../EvaluationStateManager.js"
@@ -45,7 +45,10 @@ const costModelsToCBOR = (
   Effect.gen(function* () {
     // Convert Record<string, number> format to bigint arrays
     const plutusV1Costs = Object.values(protocolParams.costModels.PlutusV1).map((v) => BigInt(v))
-    const plutusV2Costs = Object.values(protocolParams.costModels.PlutusV2).map((v) => BigInt(v))
+    const plutusV2Costs = Object.values(protocolParams.costModels.PlutusV2)
+      .map((v) => BigInt(v))
+      // Filter out devnet placeholder values (2^63) that overflow i64 in WASM CBOR decoder
+      .filter((v) => v <= INT64_MAX)
     const plutusV3Costs = Object.values(protocolParams.costModels.PlutusV3).map((v) => BigInt(v))
 
     // Create CostModels instance
@@ -519,20 +522,8 @@ export const executeEvaluation = (): Effect.Effect<
     const allOutputs = [...updatedState.outputs, ...buildCtx.changeOutputs]
     const transaction = yield* assembleTransaction(inputs, allOutputs, buildCtx.calculatedFee)
 
-    // Step 5: Serialize transaction to CBOR hex
-    const txCborBytes = yield* Effect.try({
-      try: () => Transaction.toCBORBytes(transaction),
-      catch: (error) =>
-        new TransactionBuilderError({
-          message: "Failed to encode transaction to CBOR for evaluation",
-          cause: error
-        })
-    })
-
-    const txHex = Bytes.toHex(txCborBytes)
-    
     // Debug: Log transaction details
-    yield* Effect.logDebug(`[Evaluation] Transaction CBOR length: ${txHex.length} chars`)
+    yield* Effect.logDebug(`[Evaluation] Transaction has ${transaction.body.inputs.length} inputs, ${transaction.body.outputs.length} outputs`)
     yield* Effect.logDebug(`[Evaluation] Has collateral return: ${!!transaction.body.collateralReturn}`)
     if (transaction.body.collateralReturn) {
       const assets = transaction.body.collateralReturn.assets
@@ -570,7 +561,7 @@ export const executeEvaluation = (): Effect.Effect<
     ]
     
     const evalResults = yield* evaluator.evaluate(
-      txHex,
+      transaction,
       additionalUtxos, // UTxOs being spent + reference inputs (needed to resolve script hashes and datums)
       evaluationContext
     ).pipe(

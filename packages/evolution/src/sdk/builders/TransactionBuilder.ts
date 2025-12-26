@@ -264,8 +264,14 @@ const resolveEvaluator = (config: TxBuilderConfig, options?: BuildOptions): Eval
   // Priority 2: Wrap provider's evaluateTx as an Evaluator
   if (config.provider) {
     return {
-      evaluate: (tx: string, additionalUtxos: ReadonlyArray<CoreUTxO.UTxO> | undefined, _context: EvaluationContext) =>
-        config.provider!.Effect.evaluateTx(tx, additionalUtxos as Array<CoreUTxO.UTxO> | undefined).pipe(
+      evaluate: (
+        tx: Transaction.Transaction,
+        additionalUtxos: ReadonlyArray<CoreUTxO.UTxO> | undefined,
+        _context: EvaluationContext
+      ) => {
+        // Serialize Transaction to CBOR hex for provider
+        const txHex = Transaction.toCBORHex(tx)
+        return config.provider!.Effect.evaluateTx(txHex, additionalUtxos as Array<CoreUTxO.UTxO> | undefined).pipe(
           Effect.mapError(
             (providerError) =>
               new EvaluationError({
@@ -274,6 +280,7 @@ const resolveEvaluator = (config: TxBuilderConfig, options?: BuildOptions): Eval
               })
           )
         )
+      }
     }
   }
 
@@ -610,7 +617,7 @@ export interface Evaluator {
    * @category methods
    */
   evaluate: (
-    tx: string,
+    tx: Transaction.Transaction,
     additionalUtxos: ReadonlyArray<CoreUTxO.UTxO> | undefined,
     context: EvaluationContext
   ) => Effect.Effect<ReadonlyArray<EvalRedeemer>, EvaluationError>
@@ -689,68 +696,6 @@ export class EvaluationError extends Data.TaggedError("EvaluationError")<{
     return lines.join("\n")
   }
 }
-
-// ============================================================================
-// Factory Functions
-// ============================================================================
-
-/**
- * Standard UPLC evaluation function signature (matches UPLC.eval_phase_two_raw).
- *
- * **NOTE: NOT YET IMPLEMENTED** - Reserved for future UPLC evaluation support.
- *
- * @since 2.0.0
- * @category types
- * @experimental
- */
-export type UPLCEvalFunction = (
-  tx_bytes: Uint8Array,
-  utxos_bytes_x: Array<Uint8Array>,
-  utxos_bytes_y: Array<Uint8Array>,
-  cost_mdls_bytes: Uint8Array,
-  initial_budget_n: bigint,
-  initial_budget_d: bigint,
-  slot_config_x: bigint,
-  slot_config_y: bigint,
-  slot_config_z: number
-) => Array<Uint8Array>
-
-/**
- * Creates an evaluator from a standard UPLC evaluation function.
- *
- * **NOTE: NOT YET IMPLEMENTED** - This function currently returns an evaluator
- * that produces dummy data. Reserved for future UPLC script evaluation support.
- *
- * @since 2.0.0
- * @category evaluators
- * @experimental
- */
-export const createUPLCEvaluator = (_evalFunction: UPLCEvalFunction): Evaluator => ({
-  evaluate: (_tx: string, _additionalUtxos: ReadonlyArray<CoreUTxO.UTxO> | undefined, _context: EvaluationContext) =>
-    Effect.gen(function* () {
-      // Implementation: Call UPLC evaluation with provided parameters
-      // _evalFunction(
-      //   fromHex(_tx),
-      //   utxosToInputBytes(_additionalUtxos),
-      //   utxosToOutputBytes(_additionalUtxos),
-      //   _context.costModels,
-      //   _context.maxTxExSteps,
-      //   _context.maxTxExMem,
-      //   _context.slotConfig.zeroTime,
-      //   _context.slotConfig.zeroSlot,
-      //   _context.slotConfig.slotLength
-      // )
-
-      // Return dummy EvalRedeemer for now
-      const dummyEvalRedeemer: EvalRedeemer = {
-        ex_units: { mem: 1000000, steps: 5000000 },
-        redeemer_index: 0,
-        redeemer_tag: "spend"
-      }
-
-      return [dummyEvalRedeemer] as const
-    })
-})
 
 // ============================================================================
 // Provider Integration

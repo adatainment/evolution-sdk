@@ -53,7 +53,7 @@ import { createAddSignerProgram } from "./operations/AddSigner.js"
 import { attachScriptToState } from "./operations/Attach.js"
 import { createAttachMetadataProgram } from "./operations/AttachMetadata.js"
 import { createCollectFromProgram } from "./operations/Collect.js"
-import { createMintProgram } from "./operations/Mint.js"
+import { createMintAssetsProgram } from "./operations/Mint.js"
 import type {
   AddSignerParams,
   AttachMetadataParams,
@@ -2274,7 +2274,7 @@ export function makeTxBuilder(config: TxBuilderConfig) {
 
     mintAssets: (params: MintTokensParams) => {
       // Create ProgramStep for deferred execution
-      const program = createMintProgram(params)
+      const program = createMintAssetsProgram(params)
       programs.push(program)
       return txBuilder // Return same instance for chaining
     },

@@ -43,7 +43,7 @@ For script-controlled credentials, tracks redeemer for evaluation.
 ```ts
 export declare const createDelegateToProgram: (
   params: DelegateToParams
-) => Effect.Effect<undefined, TransactionBuilderError, TxContext>
+) => Effect.Effect<void, TransactionBuilderError, TxContext | TxBuilderConfigTag>
 ```
 
 Added in v2.0.0
@@ -61,7 +61,7 @@ For script-controlled credentials, tracks redeemer for evaluation.
 ```ts
 export declare const createDeregisterStakeProgram: (
   params: DeregisterStakeParams
-) => Effect.Effect<undefined, TransactionBuilderError, TxContext | TxBuilderConfigTag>
+) => Effect.Effect<void, TransactionBuilderError, TxContext | TxBuilderConfigTag>
 ```
 
 Added in v2.0.0
@@ -84,7 +84,7 @@ For script-controlled credentials, tracks redeemer for evaluation.
 ```ts
 export declare const createRegisterAndDelegateToProgram: (
   params: RegisterAndDelegateToParams
-) => Effect.Effect<undefined, TransactionBuilderError, TxContext | TxBuilderConfigTag>
+) => Effect.Effect<void, TransactionBuilderError, TxContext | TxBuilderConfigTag>
 ```
 
 Added in v2.0.0
@@ -100,7 +100,7 @@ Requires keyDeposit from protocol parameters.
 ```ts
 export declare const createRegisterStakeProgram: (
   params: RegisterStakeParams
-) => Effect.Effect<undefined, TransactionBuilderError, TxContext | TxBuilderConfigTag>
+) => Effect.Effect<void, TransactionBuilderError, TxContext | TxBuilderConfigTag>
 ```
 
 Added in v2.0.0
@@ -119,7 +119,7 @@ Use amount: 0n to trigger stake validator without withdrawing (coordinator patte
 export declare const createWithdrawProgram: (
   params: WithdrawParams,
   config: TxBuilderConfig
-) => Effect.Effect<undefined, TransactionBuilderError, TxContext>
+) => Effect.Effect<void, TransactionBuilderError, TxContext>
 ```
 
 Added in v2.0.0

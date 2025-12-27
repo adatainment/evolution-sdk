@@ -15,13 +15,13 @@ Added in v2.0.0
 <h2 class="text-delta">Table of contents</h2>
 
 - [programs](#programs)
-  - [createMintProgram](#createmintprogram)
+  - [createMintAssetsProgram](#createmintassetsprogram)
 
 ---
 
 # programs
 
-## createMintProgram
+## createMintAssetsProgram
 
 Creates a ProgramStep for mintAssets operation.
 Adds minting information to the transaction and tracks redeemers by PolicyId.
@@ -42,9 +42,9 @@ Implementation:
 **Signature**
 
 ```ts
-export declare const createMintProgram: (
+export declare const createMintAssetsProgram: (
   params: MintTokensParams
-) => Effect.Effect<undefined, TransactionBuilderError, TxContext>
+) => Effect.Effect<void, TransactionBuilderError, TxContext>
 ```
 
 Added in v2.0.0

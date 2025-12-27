@@ -45,7 +45,7 @@ Implementation:
 ```ts
 export declare const createReadFromProgram: (
   params: ReadFromParams
-) => Effect.Effect<undefined, TransactionBuilderError, TxContext>
+) => Effect.Effect<void, TransactionBuilderError, TxContext>
 ```
 
 Added in v2.0.0

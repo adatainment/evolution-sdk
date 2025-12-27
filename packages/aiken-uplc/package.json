@@ -1,6 +1,6 @@
 {
   "name": "@evolution-sdk/aiken-uplc",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "description": "Aiken UPLC evaluator for Evolution SDK with WASM-based local script evaluation",
   "type": "module",
   "main": "./dist/index.js",
@@ -33,8 +33,8 @@
     "dist/**/*.wasm"
   ],
   "scripts": {
-    "build:wasm": "rm -rf dist/browser dist/node && cd rust && wasm-pack build --target bundler --out-dir ../dist/browser && wasm-pack build --target nodejs --out-dir ../dist/node && pnpm clean-wasm",
-    "clean-wasm": "rm -f dist/browser/.gitignore dist/browser/package.json dist/node/.gitignore dist/node/package.json",
+    "build:wasm": "rm -rf src/browser src/node && cd rust && wasm-pack build --target bundler --out-dir ../src/browser && wasm-pack build --target nodejs --out-dir ../src/node && pnpm clean-wasm",
+    "clean-wasm": "rm -f src/browser/.gitignore src/browser/package.json src/node/.gitignore src/node/package.json",
     "build": "tsc -b tsconfig.build.json",
     "dev": "tsc -b tsconfig.build.json --watch",
     "type-check": "tsc --noEmit",

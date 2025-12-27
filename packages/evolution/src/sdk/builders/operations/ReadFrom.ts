@@ -30,7 +30,7 @@ import type { ReadFromParams } from "./Operations.js"
  * @since 2.0.0
  * @category programs
  */
-export const createReadFromProgram = (params: ReadFromParams) =>
+export const createReadFromProgram = (params: ReadFromParams): Effect.Effect<void, TransactionBuilderError, TxContext> =>
   Effect.gen(function* () {
     const ctx = yield* TxContext
 

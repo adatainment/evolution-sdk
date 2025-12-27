@@ -29,7 +29,7 @@ import type { AttachMetadataParams } from "./Operations.js"
  * @since 2.0.0
  * @category programs
  */
-export const createAttachMetadataProgram = (params: AttachMetadataParams) =>
+export const createAttachMetadataProgram = (params: AttachMetadataParams): Effect.Effect<void, TransactionBuilderError, TxContext> =>
   Effect.gen(function* () {
     const ctx = yield* TxContext
 

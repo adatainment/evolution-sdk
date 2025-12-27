@@ -382,7 +382,7 @@ export const executeEvaluation = (): Effect.Effect<
       Effect.mapError(
         (providerError) =>
           new TransactionBuilderError({
-            message: "Failed to fetch full protocol parameters for evaluation",
+            message: `Failed to fetch full protocol parameters for evaluation: ${providerError.message}`,
             cause: providerError
           })
       )
@@ -594,7 +594,7 @@ export const executeEvaluation = (): Effect.Effect<
           })
 
           return new TransactionBuilderError({
-            message: "Script evaluation failed",
+            message: `Script evaluation failed: ${evalError.message}`,
             cause: enhancedError
           })
         }

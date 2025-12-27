@@ -28,7 +28,7 @@ const credentialToKey = (credential: Certificate.StakeRegistration["stakeCredent
  * @since 2.0.0
  * @category programs
  */
-export const createRegisterStakeProgram = (params: RegisterStakeParams) =>
+export const createRegisterStakeProgram = (params: RegisterStakeParams): Effect.Effect<void, TransactionBuilderError, TxContext | TxBuilderConfigTag> =>
   Effect.gen(function* () {
     const ctx = yield* TxContext
     const config = yield* TxBuilderConfigTag
@@ -119,7 +119,7 @@ export const createRegisterStakeProgram = (params: RegisterStakeParams) =>
  * @since 2.0.0
  * @category programs
  */
-export const createDelegateToProgram = (params: DelegateToParams) =>
+export const createDelegateToProgram = (params: DelegateToParams): Effect.Effect<void, TransactionBuilderError, TxContext | TxBuilderConfigTag> =>
   Effect.gen(function* () {
     const ctx = yield* TxContext
 
@@ -226,7 +226,7 @@ export const createDelegateToProgram = (params: DelegateToParams) =>
  * @since 2.0.0
  * @category programs
  */
-export const createRegisterAndDelegateToProgram = (params: RegisterAndDelegateToParams) =>
+export const createRegisterAndDelegateToProgram = (params: RegisterAndDelegateToParams): Effect.Effect<void, TransactionBuilderError, TxContext | TxBuilderConfigTag> =>
   Effect.gen(function* () {
     const ctx = yield* TxContext
     const config = yield* TxBuilderConfigTag
@@ -349,7 +349,7 @@ export const createRegisterAndDelegateToProgram = (params: RegisterAndDelegateTo
  * @since 2.0.0
  * @category programs
  */
-export const createDeregisterStakeProgram = (params: DeregisterStakeParams) =>
+export const createDeregisterStakeProgram = (params: DeregisterStakeParams): Effect.Effect<void, TransactionBuilderError, TxContext | TxBuilderConfigTag> =>
   Effect.gen(function* () {
     const ctx = yield* TxContext
     const config = yield* TxBuilderConfigTag
@@ -437,7 +437,7 @@ export const createDeregisterStakeProgram = (params: DeregisterStakeParams) =>
  * @since 2.0.0
  * @category programs
  */
-export const createWithdrawProgram = (params: WithdrawParams, config: TxBuilderConfig) =>
+export const createWithdrawProgram = (params: WithdrawParams, config: TxBuilderConfig): Effect.Effect<void, TransactionBuilderError, TxContext> =>
   Effect.gen(function* () {
     const ctx = yield* TxContext
 

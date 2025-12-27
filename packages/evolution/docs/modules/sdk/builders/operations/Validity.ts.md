@@ -44,7 +44,7 @@ Implementation:
 ```ts
 export declare const createSetValidityProgram: (
   params: ValidityParams
-) => Effect.Effect<undefined, TransactionBuilderError, TxContext>
+) => Effect.Effect<void, TransactionBuilderError, TxContext>
 ```
 
 Added in v2.0.0

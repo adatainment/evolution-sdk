@@ -90,7 +90,7 @@ describe("TxBuilder Validity Interval", () => {
     }
   }, 60_000)
 
-  it("should build transaction with TTL and convert to slot correctly", { timeout: 60_000 }, async () => {
+  it("should build and submit transaction with TTL", { timeout: 60_000 }, async () => {
     const client = createTestClient(0)
     const myAddress = await client.address()
 
@@ -113,9 +113,17 @@ describe("TxBuilder Validity Interval", () => {
     expect(typeof tx.body.ttl).toBe("bigint")
     expect(tx.body.ttl! > 0n).toBe(true)
     expect(tx.body.validityIntervalStart).toBeUndefined()
+
+    // Submit and confirm
+    const submitBuilder = await signBuilder.sign()
+    const txHash = await submitBuilder.submit()
+    expect(txHash.length).toBe(64)
+
+    const confirmed = await client.awaitTx(txHash, 1000)
+    expect(confirmed).toBe(true)
   })
 
-  it("should build transaction with both validity bounds and convert to slots", { timeout: 60_000 }, async () => {
+  it("should build and submit transaction with both validity bounds", { timeout: 60_000 }, async () => {
     const client = createTestClient(0)
     const myAddress = await client.address()
 
@@ -130,7 +138,7 @@ describe("TxBuilder Validity Interval", () => {
         address: myAddress,
         assets: Core.Assets.fromLovelace(5_000_000n)
       })
-      .build({ availableUtxos: [...genesisUtxos] })
+      .build()
 
     const tx = await signBuilder.toTransaction()
 
@@ -145,6 +153,14 @@ describe("TxBuilder Validity Interval", () => {
 
     // TTL should be after validity start
     expect(tx.body.ttl! > tx.body.validityIntervalStart!).toBe(true)
+
+    // Submit and confirm
+    const submitBuilder = await signBuilder.sign()
+    const txHash = await submitBuilder.submit()
+    expect(txHash.length).toBe(64)
+
+    const confirmed = await client.awaitTx(txHash, 1000)
+    expect(confirmed).toBe(true)
   })
 
   it("should reject expired transaction", { timeout: 60_000 }, async () => {

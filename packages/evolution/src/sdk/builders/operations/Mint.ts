@@ -34,7 +34,7 @@ import type { MintTokensParams } from "./Operations.js"
  * @since 2.0.0
  * @category programs
  */
-export const createMintProgram = (params: MintTokensParams) =>
+export const createMintAssetsProgram = (params: MintTokensParams): Effect.Effect<void, TransactionBuilderError, TxContext> =>
   Effect.gen(function* () {
     const ctx = yield* TxContext
 

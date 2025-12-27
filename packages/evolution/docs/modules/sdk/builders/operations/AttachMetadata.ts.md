@@ -42,7 +42,7 @@ Implementation:
 ```ts
 export declare const createAttachMetadataProgram: (
   params: AttachMetadataParams
-) => Effect.Effect<void, never, TxContext>
+) => Effect.Effect<void, TransactionBuilderError, TxContext>
 ```
 
 Added in v2.0.0

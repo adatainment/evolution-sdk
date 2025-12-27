@@ -35,7 +35,7 @@ import type { CollectFromParams } from "./Operations.js"
  * @since 2.0.0
  * @category programs
  */
-export const createCollectFromProgram = (params: CollectFromParams) =>
+export const createCollectFromProgram = (params: CollectFromParams): Effect.Effect<void, TransactionBuilderError, TxContext> =>
   Effect.gen(function* () {
     const ctx = yield* TxContext
     const state = yield* Ref.get(ctx)

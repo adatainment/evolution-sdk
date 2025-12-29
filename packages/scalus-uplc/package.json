@@ -1,0 +1,32 @@
+{
+  "name": "@evolution-sdk/scalus-uplc",
+  "version": "0.0.1",
+  "description": "Scalus UPLC evaluator adapter for Evolution SDK",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.node.ts",
+      "node": "./src/index.node.ts",
+      "default": "./src/index.node.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b tsconfig.build.json",
+    "dev": "tsc -b tsconfig.build.json --watch",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "clean": "rm -rf dist .turbo .tsbuildinfo"
+  },
+  "dependencies": {
+    "effect": "^3.19.3",
+    "scalus": "^0.14.0"
+  },
+  "peerDependencies": {
+    "@evolution-sdk/evolution": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2",
+    "@effect/vitest": "^0.19.3",
+    "vitest": "^3.2.4"
+  }
+}

@@ -1,43 +1,9 @@
-import * as Bytes from "@evolution-sdk/evolution/core/Bytes"
 import * as Transaction from "@evolution-sdk/evolution/core/Transaction"
 import type * as UTxO from "@evolution-sdk/evolution/core/UTxO"
 import * as TransactionBuilder from "@evolution-sdk/evolution/sdk/builders/TransactionBuilder"
 import type * as EvalRedeemer from "@evolution-sdk/evolution/sdk/EvalRedeemer"
 import { Effect } from "effect"
 import * as Scalus from "scalus"
-
-/**
- * Parse Scalus error string into ScriptFailure array.
- */
-function parseScalusError(error: unknown): Array<TransactionBuilder.ScriptFailure> {
-  const failures: Array<TransactionBuilder.ScriptFailure> = []
-
-  // Check if it's a PlutusScriptEvaluationException with logs
-  if (error && typeof error === "object" && "logs" in error) {
-    const logs = (error as any).logs || []
-    const errorMessage = error instanceof Error ? error.message : String(error)
-
-    // TODO: Parse error message for structured failures
-    // For rough draft: simple fallback
-    failures.push({
-      purpose: "unknown",
-      index: 0,
-      validationError: errorMessage,
-      traces: logs
-    })
-  } else {
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    failures.push({
-      purpose: "unknown",
-      index: 0,
-      validationError: errorMessage,
-      traces: []
-    })
-  }
-
-  return failures
-}
-
 /**
  * Build CBOR-encoded UTxO map for Scalus.
  * Scalus expects: Map[TransactionInput, TransactionOutput]

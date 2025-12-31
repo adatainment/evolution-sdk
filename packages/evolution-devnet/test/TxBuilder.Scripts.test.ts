@@ -245,7 +245,6 @@ describe("TxBuilder Script Handling", () => {
       availableUtxos: [fundingUtxo],
       protocolParameters: PROTOCOL_PARAMS,
       evaluator: createAikenEvaluator,
-      debug: true // Enable debug logging
     })
 
     const tx = await signBuilder.toTransaction()

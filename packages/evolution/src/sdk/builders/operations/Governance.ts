@@ -20,12 +20,6 @@ import type {
   UpdateDRepParams
 } from "./Operations.js"
 
-/**
- * Get hex string from credential hash for use as map key
- */
-const credentialToKey = (credential: Credential.Credential): string =>
-  Bytes.toHex(credential.hash)
-
 // ============================================================================
 // DRep Operations
 // ============================================================================
@@ -42,6 +36,19 @@ export const createRegisterDRepProgram = (params: RegisterDRepParams): Effect.Ef
   Effect.gen(function* () {
     const ctx = yield* TxContext
     const config = yield* TxBuilderConfigTag
+
+    // Check if script-controlled
+    const isScriptControlled = params.drepCredential._tag === "ScriptHash"
+
+    // Script-controlled DRep registration requires a redeemer (Publishing purpose).
+    // The script is invoked to authorize the registration.
+    if (isScriptControlled && !params.redeemer) {
+      return yield* Effect.fail(
+        new TransactionBuilderError({
+          message: "Redeemer required for script-controlled DRep credential registration"
+        })
+      )
+    }
 
     // Get drepDeposit from protocol parameters via provider
     if (!config.provider) {
@@ -66,13 +73,44 @@ export const createRegisterDRepProgram = (params: RegisterDRepParams): Effect.Ef
       anchor: params.anchor
     })
 
-    yield* Ref.update(ctx, (state) => ({
-      ...state,
-      certificates: [...state.certificates, certificate]
-    }))
+    yield* Ref.update(ctx, (state) => {
+      let newRedeemers = state.redeemers
+      let newDeferredRedeemers = state.deferredRedeemers
+
+      // Track redeemer if script-controlled
+      if (params.redeemer && isScriptControlled) {
+        const deferred = RedeemerBuilder.toDeferredRedeemer(params.redeemer)
+        const certKey = `cert:${Bytes.toHex(params.drepCredential.hash)}`
+
+        if (deferred._tag === "static") {
+          newRedeemers = new Map(state.redeemers)
+          newRedeemers.set(certKey, {
+            tag: "cert",
+            data: deferred.data,
+            exUnits: undefined,
+            label: params.label
+          })
+        } else {
+          newDeferredRedeemers = new Map(state.deferredRedeemers)
+          newDeferredRedeemers.set(certKey, {
+            tag: "cert",
+            deferred,
+            exUnits: undefined,
+            label: params.label
+          })
+        }
+      }
+
+      return {
+        ...state,
+        certificates: [...state.certificates, certificate],
+        redeemers: newRedeemers,
+        deferredRedeemers: newDeferredRedeemers
+      }
+    })
 
     yield* Effect.logDebug(
-      `[RegisterDRep] Added RegDrepCert for DRep ${credentialToKey(params.drepCredential)} with deposit ${drepDeposit}`
+      `[RegisterDRep] Added RegDrepCert for DRep ${Bytes.toHex(params.drepCredential.hash)} with deposit ${drepDeposit}`
     )
   })
 
@@ -111,7 +149,7 @@ export const createUpdateDRepProgram = (params: UpdateDRepParams): Effect.Effect
       // Track redeemer if script-controlled
       if (params.redeemer && isScriptControlled) {
         const deferred = RedeemerBuilder.toDeferredRedeemer(params.redeemer)
-        const certKey = `cert:${credentialToKey(params.drepCredential)}`
+        const certKey = `cert:${Bytes.toHex(params.drepCredential.hash)}`
 
         if (deferred._tag === "static") {
           newRedeemers = new Map(state.redeemers)
@@ -141,7 +179,7 @@ export const createUpdateDRepProgram = (params: UpdateDRepParams): Effect.Effect
     })
 
     yield* Effect.logDebug(
-      `[UpdateDRep] Added UpdateDrepCert for DRep ${credentialToKey(params.drepCredential)}`
+      `[UpdateDRep] Added UpdateDrepCert for DRep ${Bytes.toHex(params.drepCredential.hash)}`
     )
   })
 
@@ -197,7 +235,7 @@ export const createDeregisterDRepProgram = (params: DeregisterDRepParams): Effec
       // Track redeemer if script-controlled
       if (params.redeemer && isScriptControlled) {
         const deferred = RedeemerBuilder.toDeferredRedeemer(params.redeemer)
-        const certKey = `cert:${credentialToKey(params.drepCredential)}`
+        const certKey = `cert:${Bytes.toHex(params.drepCredential.hash)}`
 
         if (deferred._tag === "static") {
           newRedeemers = new Map(state.redeemers)
@@ -227,7 +265,7 @@ export const createDeregisterDRepProgram = (params: DeregisterDRepParams): Effec
     })
 
     yield* Effect.logDebug(
-      `[DeregisterDRep] Added UnregDrepCert for DRep ${credentialToKey(params.drepCredential)} with refund ${drepDeposit}`
+      `[DeregisterDRep] Added UnregDrepCert for DRep ${Bytes.toHex(params.drepCredential.hash)} with refund ${drepDeposit}`
     )
   })
 
@@ -271,7 +309,7 @@ export const createAuthCommitteeHotProgram = (params: AuthCommitteeHotParams): E
       // Track redeemer if script-controlled
       if (params.redeemer && isScriptControlled) {
         const deferred = RedeemerBuilder.toDeferredRedeemer(params.redeemer)
-        const certKey = `cert:${credentialToKey(params.coldCredential)}`
+        const certKey = `cert:${Bytes.toHex(params.coldCredential.hash)}`
 
         if (deferred._tag === "static") {
           newRedeemers = new Map(state.redeemers)
@@ -301,7 +339,7 @@ export const createAuthCommitteeHotProgram = (params: AuthCommitteeHotParams): E
     })
 
     yield* Effect.logDebug(
-      `[AuthCommitteeHot] Added AuthCommitteeHotCert for cold ${credentialToKey(params.coldCredential)} to hot ${credentialToKey(params.hotCredential)}`
+      `[AuthCommitteeHot] Added AuthCommitteeHotCert for cold ${Bytes.toHex(params.coldCredential.hash)} to hot ${Bytes.toHex(params.hotCredential.hash)}`
     )
   })
 
@@ -341,7 +379,7 @@ export const createResignCommitteeColdProgram = (params: ResignCommitteeColdPara
       // Track redeemer if script-controlled
       if (params.redeemer && isScriptControlled) {
         const deferred = RedeemerBuilder.toDeferredRedeemer(params.redeemer)
-        const certKey = `cert:${credentialToKey(params.coldCredential)}`
+        const certKey = `cert:${Bytes.toHex(params.coldCredential.hash)}`
 
         if (deferred._tag === "static") {
           newRedeemers = new Map(state.redeemers)
@@ -371,6 +409,6 @@ export const createResignCommitteeColdProgram = (params: ResignCommitteeColdPara
     })
 
     yield* Effect.logDebug(
-      `[ResignCommitteeCold] Added ResignCommitteeColdCert for cold credential ${credentialToKey(params.coldCredential)}`
+      `[ResignCommitteeCold] Added ResignCommitteeColdCert for cold credential ${Bytes.toHex(params.coldCredential.hash)}`
     )
   })

@@ -37,12 +37,14 @@ import type * as PlutusData from "../../core/Data.js"
 import type * as KeyHash from "../../core/KeyHash.js"
 import type * as Mint from "../../core/Mint.js"
 import type * as Network from "../../core/Network.js"
+import type * as ProposalProcedures from "../../core/ProposalProcedures.js"
 import type * as RewardAccount from "../../core/RewardAccount.js"
 import type * as CoreScript from "../../core/Script.js"
 import * as Time from "../../core/Time/index.js"
 import * as Transaction from "../../core/Transaction.js"
 import type * as TxOut from "../../core/TxOut.js"
 import type * as CoreUTxO from "../../core/UTxO.js"
+import type * as VotingProcedures from "../../core/VotingProcedures.js"
 import { runEffectPromise } from "../../utils/effect-runtime.js"
 import type { EvalRedeemer } from "../EvalRedeemer.js"
 import type * as ProtocolParametersSDK from "../ProtocolParameters.js"
@@ -74,6 +76,7 @@ import type {
   DeregisterStakeParams,
   MintTokensParams,
   PayToAddressParams,
+  ProposeParams,
   ReadFromParams,
   RegisterAndDelegateToParams,
   RegisterDRepParams,
@@ -83,10 +86,12 @@ import type {
   RetirePoolParams,
   UpdateDRepParams,
   ValidityParams,
+  VoteParams,
   WithdrawParams
 } from "./operations/Operations.js"
 import { createPayToAddressProgram } from "./operations/Pay.js"
 import { createRegisterPoolProgram, createRetirePoolProgram } from "./operations/Pool.js"
+import { createProposeProgram } from "./operations/Propose.js"
 import { createReadFromProgram } from "./operations/ReadFrom.js"
 import {
   createDelegateToDRepProgram,
@@ -99,6 +104,7 @@ import {
   createWithdrawProgram
 } from "./operations/Stake.js"
 import { createSetValidityProgram } from "./operations/Validity.js"
+import { createVoteProgram } from "./operations/Vote.js"
 import { executeBalance } from "./phases/Balance.js"
 import { executeChangeCreation } from "./phases/ChangeCreation.js"
 import { executeCollateral } from "./phases/Collateral.js"
@@ -1325,6 +1331,8 @@ export interface TxBuilderState {
   readonly withdrawals: Map<RewardAccount.RewardAccount, bigint> // Withdrawal amounts by reward account
   readonly poolDeposits: Map<string, bigint> // Pool deposits keyed by pool key hash
   readonly mint?: Mint.Mint // Assets being minted/burned (positive = mint, negative = burn)
+  readonly votingProcedures?: VotingProcedures.VotingProcedures // Voting procedures for governance actions (Conway)
+  readonly proposalProcedures?: ProposalProcedures.ProposalProcedures // Proposal procedures for governance actions (Conway)
   readonly collateral?: {
     // Collateral data for script transactions
     readonly inputs: ReadonlyArray<CoreUTxO.UTxO>
@@ -1348,7 +1356,7 @@ export interface TxBuilderState {
  * @category state
  */
 export interface RedeemerData {
-  readonly tag: "spend" | "mint" | "cert" | "reward"
+  readonly tag: "spend" | "mint" | "cert" | "reward" | "vote"
   readonly data: PlutusData.Data
   readonly exUnits?: {
     // Optional: from script evaluation
@@ -1367,7 +1375,7 @@ export interface RedeemerData {
  * @category state
  */
 export interface DeferredRedeemerData {
-  readonly tag: "spend" | "mint" | "cert" | "reward"
+  readonly tag: "spend" | "mint" | "cert" | "reward" | "vote"
   readonly deferred: DeferredRedeemer
   readonly exUnits?: {
     readonly mem: bigint
@@ -1978,6 +1986,118 @@ export interface TransactionBuilderBase {
   readonly setValidity: (params: ValidityParams) => this
 
   /**
+   * Submit votes on governance actions.
+   *
+   * Submits voting procedures to vote on governance proposals. Supports multiple
+   * voters voting on multiple proposals in a single transaction.
+   *
+   * For script-controlled voters (DRep, Constitutional Committee member, or stake pool
+   * with script credential), provide a redeemer to satisfy the vote purpose validator.
+   * The redeemer will be applied to all script voters in the voting procedures.
+   *
+   * Use VotingProcedures.singleVote() helper for simple cases or construct
+   * VotingProcedures directly for complex multi-voter scenarios.
+   *
+   * Queues a deferred operation that will be executed when build() is called.
+   * Returns the same builder for method chaining.
+   *
+   * @example
+   * ```typescript
+   * import * as VotingProcedures from "@evolution-sdk/core/VotingProcedures"
+   * import * as Vote from "@evolution-sdk/core/Vote"
+   * import * as Data from "@evolution-sdk/core/Data"
+   *
+   * // Simple single vote with helper
+   * await client.newTx()
+   *   .vote({
+   *     votingProcedures: VotingProcedures.singleVote(
+   *       new VotingProcedures.DRepVoter({ credential: myDRepCred }),
+   *       govActionId,
+   *       new VotingProcedures.VotingProcedure({ 
+   *         vote: Vote.yes(), 
+   *         anchor: null 
+   *       })
+   *     ),
+   *     redeemer: Data.to(new Constr(0, [])) // for script DRep
+   *   })
+   *   .attachScript({ script: voteScript })
+   *   .build()
+   *   .then(tx => tx.sign())
+   *   .then(tx => tx.submit())
+   *
+   * // Multiple votes from same voter
+   * await client.newTx()
+   *   .vote({
+   *     votingProcedures: VotingProcedures.multiVote(
+   *       new VotingProcedures.DRepVoter({ credential: myDRepCred }),
+   *       [
+   *         [govActionId1, new VotingProcedures.VotingProcedure({ vote: Vote.yes(), anchor: null })],
+   *         [govActionId2, new VotingProcedures.VotingProcedure({ vote: Vote.no(), anchor: null })]
+   *       ]
+   *     )
+   *   })
+   *   .build()
+   * ```
+   *
+   * @since 2.0.0
+   * @category governance-methods
+   */
+  readonly vote: (params: VoteParams) => this
+
+  /**
+   * Submit a governance action proposal.
+   *
+   * Submits a governance action proposal to the blockchain.
+   * The deposit (govActionDeposit) is automatically fetched from protocol parameters
+   * and will be refunded to the specified reward account when the proposal is finalized.
+   *
+   * Call .propose() multiple times to submit multiple proposals in one transaction.
+   * Consistent with .registerStake() and .registerDRep() - no manual deposit handling.
+   *
+   * The deposit amount is automatically deducted during transaction balancing.
+   *
+   * Queues a deferred operation that will be executed when build() is called.
+   * Returns the same builder for method chaining.
+   *
+   * @example
+   * ```typescript
+   * import * as GovernanceAction from "@evolution-sdk/core/GovernanceAction"
+   * import * as RewardAccount from "@evolution-sdk/core/RewardAccount"
+   *
+   * // Submit single proposal (deposit auto-fetched)
+   * await client.newTx()
+   *   .propose({
+   *     governanceAction: new GovernanceAction.InfoAction({}),
+   *     rewardAccount: myRewardAccount,
+   *     anchor: myAnchor // or null
+   *   })
+   *   .build()
+   *   .then(tx => tx.sign())
+   *   .then(tx => tx.submit())
+   *
+   * // Multiple proposals in one transaction
+   * await client.newTx()
+   *   .propose({
+   *     governanceAction: new GovernanceAction.InfoAction({}),
+   *     rewardAccount: myRewardAccount,
+   *     anchor: null
+   *   })
+   *   .propose({
+   *     governanceAction: new GovernanceAction.NoConfidenceAction({ govActionId: null }),
+   *     rewardAccount: myRewardAccount,
+   *     anchor: myOtherAnchor
+   *   })
+   *   .build()
+   *   .then(tx => tx.sign())
+   *   .then(tx => tx.submit())
+   * ```
+   *
+   * @since 2.0.0
+   * @category governance-methods
+   */
+  readonly propose: (params: ProposeParams) => this
+
+  /**
    * Add a required signer to the transaction.
    *
    * Adds a key hash to the transaction's requiredSigners field. This is used to
@@ -2438,6 +2558,16 @@ export function makeTxBuilder(config: TxBuilderConfig) {
     },
     setValidity: (params: ValidityParams) => {
       programs.push(createSetValidityProgram(params))
+      return txBuilder
+    },
+    vote: (params: VoteParams) => {
+      const program = createVoteProgram(params)
+      programs.push(program)
+      return txBuilder
+    },
+    propose: (params: ProposeParams) => {
+      const program = createProposeProgram(params)
+      programs.push(program)
       return txBuilder
     },
     addSigner: (params: AddSignerParams) => {

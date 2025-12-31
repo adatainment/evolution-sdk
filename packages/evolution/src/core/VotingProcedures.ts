@@ -830,3 +830,62 @@ export const toCBORBytes = (data: VotingProcedures, options: CBOR.CodecOptions =
  */
 export const toCBORHex = (data: VotingProcedures, options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTIONS) =>
   Schema.encodeSync(FromCBORHex(options))(data)
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Create VotingProcedures for a single vote.
+ *
+ * Convenience function for the common case of one voter voting on one proposal.
+ *
+ * @example
+ * ```typescript
+ * const procedures = singleVote(
+ *   new DRepVoter({ credential: myDRepCred }),
+ *   govActionId,
+ *   new VotingProcedure({ vote: Vote.yes(), anchor: null })
+ * )
+ * ```
+ *
+ * @since 2.0.0
+ * @category helpers
+ */
+export const singleVote = (
+  voter: Voter,
+  govActionId: GovernanceAction.GovActionId,
+  procedure: VotingProcedure
+): VotingProcedures => {
+  return new VotingProcedures({
+    procedures: new Map([[voter, new Map([[govActionId, procedure]])]])
+  })
+}
+
+/**
+ * Create VotingProcedures for one voter voting on multiple proposals.
+ *
+ * Convenience function for submitting multiple votes from a single voter.
+ *
+ * @example
+ * ```typescript
+ * const procedures = multiVote(
+ *   new DRepVoter({ credential: myDRepCred }),
+ *   [
+ *     [govActionId1, new VotingProcedure({ vote: Vote.yes(), anchor: null })],
+ *     [govActionId2, new VotingProcedure({ vote: Vote.no(), anchor: null })]
+ *   ]
+ * )
+ * ```
+ *
+ * @since 2.0.0
+ * @category helpers
+ */
+export const multiVote = (
+  voter: Voter,
+  votes: ReadonlyArray<readonly [GovernanceAction.GovActionId, VotingProcedure]>
+): VotingProcedures => {
+  return new VotingProcedures({
+    procedures: new Map([[voter, new Map(votes)]])
+  })
+}

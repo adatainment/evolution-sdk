@@ -38,6 +38,7 @@ import { hashAuxiliaryData, hashScriptData } from "../../utils/Hash.js"
 import * as Address from "../Address.js"
 import type * as Datum from "../Datum.js"
 // Internal imports
+import { voterToKey } from "./phases/utils.js"
 import type { UnfrackOptions } from "./TransactionBuilder.js"
 import { BuildOptionsTag, TransactionBuilderError, TxBuilderConfigTag,TxContext } from "./TransactionBuilder.js"
 import * as Unfrack from "./Unfrack.js"
@@ -435,6 +436,7 @@ export const assembleTransaction = (
     const state = yield* Ref.get(stateRef)
 
     yield* Effect.logDebug(`[Assembly] Building transaction with ${inputs.length} inputs, ${outputs.length} outputs`)
+    yield* Effect.logDebug(`[Assembly] Reference inputs in state: ${state.referenceInputs.length}`)
     yield* Effect.logDebug(`[Assembly] Scripts in state: ${state.scripts.size}`)
     yield* Effect.logDebug(`[Assembly] Redeemers in state: ${state.redeemers.size}`)
 
@@ -555,8 +557,17 @@ export const assembleTransaction = (
         const credentialHex = key.slice(5) // Remove "cert:" prefix
         for (let i = 0; i < state.certificates.length; i++) {
           const cert = state.certificates[i]!
+          // Check stakeCredential (for stake-related certs)
           if ("stakeCredential" in cert && cert.stakeCredential) {
             const certCredHex = Bytes.toHex((cert.stakeCredential as { hash: Uint8Array }).hash)
+            if (certCredHex === credentialHex) {
+              redeemerIndex = i
+              break
+            }
+          }
+          // Check drepCredential (for DRep-related certs: RegDrepCert, UnregDrepCert, UpdateDrepCert)
+          if ("drepCredential" in cert && cert.drepCredential) {
+            const certCredHex = Bytes.toHex((cert.drepCredential as { hash: Uint8Array }).hash)
             if (certCredHex === credentialHex) {
               redeemerIndex = i
               break
@@ -588,6 +599,35 @@ export const assembleTransaction = (
         }
         if (redeemerIndex === undefined) {
           yield* Effect.logWarning(`[Assembly] Could not find withdrawal index for key: ${key}`)
+          continue
+        }
+      } else if (redeemerData.tag === "vote") {
+        // For vote redeemers, find matching voter in votingProcedures (sorted order)
+        // Key format: `drep:{credentialHex}` | `cc:{credentialHex}` | `pool:{poolKeyHashHex}`
+        
+        if (!state.votingProcedures) {
+          yield* Effect.logWarning(`[Assembly] Vote redeemer found but no votingProcedures in state`)
+          continue
+        }
+        
+        // Build sorted voter keys from votingProcedures using shared utility
+        const sortedVoterKeys: Array<string> = []
+        for (const voter of state.votingProcedures.procedures.keys()) {
+          sortedVoterKeys.push(voterToKey(voter))
+        }
+        
+        // Sort keys lexicographically (as per Cardano ledger rules)
+        sortedVoterKeys.sort()
+        
+        // Find the index of our voter key
+        for (let i = 0; i < sortedVoterKeys.length; i++) {
+          if (sortedVoterKeys[i] === key) {
+            redeemerIndex = i
+            break
+          }
+        }
+        if (redeemerIndex === undefined) {
+          yield* Effect.logWarning(`[Assembly] Could not find voter index for key: ${key}`)
           continue
         }
       } else {
@@ -754,7 +794,9 @@ export const assembleTransaction = (
       auxiliaryDataHash, // Hash of auxiliary data (required when metadata is present)
       certificates, // Certificates for staking operations
       withdrawals, // Withdrawals for claiming staking rewards
-      requiredSigners // Extra signers required for script validation
+      requiredSigners, // Extra signers required for script validation
+      votingProcedures: state.votingProcedures, // Voting procedures for governance voting
+      proposalProcedures: state.proposalProcedures // Proposal procedures for governance proposals
     })
 
     // Create witness set with scripts and redeemers
@@ -1119,7 +1161,7 @@ export const calculateFeeIteratively = (
   redeemers: Map<
     string,
     {
-      readonly tag: "spend" | "mint" | "cert" | "reward"
+      readonly tag: "spend" | "mint" | "cert" | "reward" | "vote"
       readonly data: PlutusData.Data
       readonly exUnits?: { readonly mem: bigint; readonly steps: bigint }
     }
@@ -1248,7 +1290,9 @@ export const calculateFeeIteratively = (
         certificates, // Include certificates for accurate size calculation
         withdrawals, // Include withdrawals for accurate size calculation
         requiredSigners, // Include requiredSigners for accurate size calculation
-        referenceInputs: referenceInputsForFee // Include reference inputs for accurate size calculation
+        referenceInputs: referenceInputsForFee, // Include reference inputs for accurate size calculation
+        votingProcedures: state.votingProcedures, // Include voting procedures for accurate size calculation
+        proposalProcedures: state.proposalProcedures // Include proposal procedures for accurate size calculation
       })
 
       const transaction = new Transaction.Transaction({

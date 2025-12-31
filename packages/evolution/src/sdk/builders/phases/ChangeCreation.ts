@@ -27,7 +27,7 @@ import {
 import { calculateMinimumUtxoLovelace, txOutputToTransactionOutput } from "../TxBuilderImpl.js"
 import * as Unfrack from "../Unfrack.js"
 import type { PhaseResult } from "./Phases.js"
-import { calculateCertificateBalance, calculateWithdrawals } from "./utils.js"
+import { calculateCertificateBalance, calculateProposalDeposits, calculateWithdrawals } from "./utils.js"
 
 /**
  * Helper: Format assets for logging (BigInt-safe, truncates long unit names)
@@ -177,6 +177,9 @@ export const executeChangeCreation = (): Effect.Effect<
       state.poolDeposits
     )
 
+    // Calculate proposal deposits
+    const proposalDeposits = calculateProposalDeposits(state.proposalProcedures)
+
     // Calculate total withdrawals
     const totalWithdrawals = calculateWithdrawals(state.withdrawals)
 
@@ -188,6 +191,7 @@ export const executeChangeCreation = (): Effect.Effect<
     leftoverBeforeFee = CoreAssets.addLovelace(leftoverBeforeFee, certificateRefunds)
     leftoverBeforeFee = CoreAssets.subtract(leftoverBeforeFee, outputAssets)
     leftoverBeforeFee = CoreAssets.subtractLovelace(leftoverBeforeFee, certificateDeposits)
+    leftoverBeforeFee = CoreAssets.subtractLovelace(leftoverBeforeFee, proposalDeposits)
 
     // Subtract fee and filter out zero-quantity tokens (they shouldn't go into change output)
     const rawLeftover = CoreAssets.subtractLovelace(leftoverBeforeFee, buildCtx.calculatedFee)

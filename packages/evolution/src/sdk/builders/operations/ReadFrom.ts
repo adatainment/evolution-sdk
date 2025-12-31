@@ -34,6 +34,8 @@ export const createReadFromProgram = (params: ReadFromParams): Effect.Effect<voi
   Effect.gen(function* () {
     const ctx = yield* TxContext
 
+    yield* Effect.logDebug(`[ReadFrom] Adding ${params.referenceInputs.length} reference input(s)`)
+
     // 1. Validate reference inputs exist
     if (params.referenceInputs.length === 0) {
       return yield* Effect.fail(
@@ -68,4 +70,6 @@ export const createReadFromProgram = (params: ReadFromParams): Effect.Effect<voi
       ...state,
       referenceInputs: [...state.referenceInputs, ...params.referenceInputs]
     }))
+    
+    yield* Effect.logDebug(`[ReadFrom] State now has ${state.referenceInputs.length + params.referenceInputs.length} reference input(s)`)
   })

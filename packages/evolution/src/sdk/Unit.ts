@@ -1,10 +1,10 @@
 import * as Label from "../core/Assets/Label.js"
-import type * as PolicyId from "./PolicyId.js"
+import * as PolicyId from "../core/PolicyId.js"
 
 export type Unit = string
 
 export interface UnitDetails {
-  policyId: PolicyId.PolicyId
+  policyId: string
   assetName: string | undefined
   name: string | undefined
   label: number | undefined
@@ -45,7 +45,7 @@ export const fromUnit = (unit: Unit): UnitDetails => {
 /**
  * Create a unit string from policy ID, name, and optional label.
  */
-export const toUnit = (policyId: PolicyId.PolicyId, name?: string | undefined, label?: number | undefined): Unit => {
+export const toUnit = (policyId: string, name?: string | undefined, label?: number | undefined): Unit => {
   // For lovelace (empty policy ID), return "lovelace"
   if (!policyId || policyId === "") {
     return "lovelace"

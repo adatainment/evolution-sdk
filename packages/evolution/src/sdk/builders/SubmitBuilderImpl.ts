@@ -13,7 +13,7 @@
 
 import { Effect } from "effect"
 
-import * as Transaction from "../../core/Transaction.js"
+import type * as Transaction from "../../core/Transaction.js"
 import type * as TransactionWitnessSet from "../../core/TransactionWitnessSet.js"
 import type * as Provider from "../provider/Provider.js"
 import type { SubmitBuilder, SubmitBuilderEffect } from "./SubmitBuilder.js"
@@ -35,11 +35,8 @@ export const makeSubmitBuilder = (
       Effect.gen(function* () {
         yield* Effect.logDebug("Submitting transaction to provider")
         
-        // Convert transaction to CBOR hex for provider submission
-        const txCborHex = Transaction.toCBORHex(signedTransaction)
-        
-        // Submit via provider's Effect.submitTx
-        const txHash = yield* provider.Effect.submitTx(txCborHex).pipe(
+        // Submit via provider's Effect.submitTx (accepts Transaction directly)
+        const txHash = yield* provider.Effect.submitTx(signedTransaction).pipe(
           Effect.mapError(
             (providerError) =>
               new TransactionBuilderError({ 

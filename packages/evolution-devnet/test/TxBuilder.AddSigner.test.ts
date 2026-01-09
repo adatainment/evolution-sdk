@@ -12,6 +12,7 @@ import * as Genesis from "@evolution-sdk/devnet/Genesis"
 import { Core } from "@evolution-sdk/evolution"
 import * as Address from "@evolution-sdk/evolution/core/Address"
 import * as KeyHash from "@evolution-sdk/evolution/core/KeyHash"
+import * as TransactionHash from "@evolution-sdk/evolution/core/TransactionHash"
 import { createClient } from "@evolution-sdk/evolution/sdk/client/ClientImpl"
 
 describe("TxBuilder addSigner (Devnet Submit)", () => {
@@ -111,7 +112,7 @@ describe("TxBuilder addSigner (Devnet Submit)", () => {
     const submitBuilder = await signBuilder.sign()
     const txHash = await submitBuilder.submit()
 
-    expect(txHash.length).toBe(64)
+    expect(TransactionHash.toHex(txHash).length).toBe(64)
 
     const confirmed = await client.awaitTx(txHash, 1000)
     expect(confirmed).toBe(true)
@@ -172,7 +173,7 @@ describe("TxBuilder addSigner (Devnet Submit)", () => {
 
     // Submit and verify confirmation
     const txHash = await submitBuilder.submit()
-    expect(txHash.length).toBe(64)
+    expect(TransactionHash.toHex(txHash).length).toBe(64)
 
     const confirmed = await client1.awaitTx(txHash, 1000)
     expect(confirmed).toBe(true)

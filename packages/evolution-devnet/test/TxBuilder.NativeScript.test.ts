@@ -15,6 +15,7 @@ import { Core } from "@evolution-sdk/evolution"
 import * as Address from "@evolution-sdk/evolution/core/Address"
 import * as NativeScripts from "@evolution-sdk/evolution/core/NativeScripts"
 import * as ScriptHash from "@evolution-sdk/evolution/core/ScriptHash"
+import * as TransactionHash from "@evolution-sdk/evolution/core/TransactionHash"
 import * as Text from "@evolution-sdk/evolution/core/Text"
 import * as UTxO from "@evolution-sdk/evolution/core/UTxO"
 import { createClient } from "@evolution-sdk/evolution/sdk/client/ClientImpl"
@@ -152,7 +153,7 @@ describe("TxBuilder NativeScript (Devnet Submit)", () => {
     const submitBuilder = await signBuilder.assemble([witness1, witness2])
     const txHash = await submitBuilder.submit()
 
-    expect(txHash.length).toBe(64)
+    expect(TransactionHash.toHex(txHash).length).toBe(64)
 
     const confirmed = await client1.awaitTx(txHash, 1000)
     expect(confirmed).toBe(true)
@@ -205,7 +206,7 @@ describe("TxBuilder NativeScript (Devnet Submit)", () => {
     const submitBuilder = await signBuilder.sign()
     const txHash = await submitBuilder.submit()
 
-    expect(txHash.length).toBe(64)
+    expect(TransactionHash.toHex(txHash).length).toBe(64)
 
     const confirmed = await client1.awaitTx(txHash, 1000)
     expect(confirmed).toBe(true)
@@ -265,7 +266,7 @@ describe("TxBuilder NativeScript (Devnet Submit)", () => {
     const submitBuilder = await signBuilder.assemble([witness1, witness2])
     const txHash = await submitBuilder.submit()
 
-    expect(txHash.length).toBe(64)
+    expect(TransactionHash.toHex(txHash).length).toBe(64)
 
     const confirmed = await client1.awaitTx(txHash, 1000)
     expect(confirmed).toBe(true)
@@ -324,7 +325,7 @@ describe("TxBuilder NativeScript (Devnet Submit)", () => {
 
     const submitBuilder = await signBuilder.sign()
     const txHash = await submitBuilder.submit()
-    expect(txHash.length).toBe(64)
+    expect(TransactionHash.toHex(txHash).length).toBe(64)
     const confirmed = await client.awaitTx(txHash, 1000)
     expect(confirmed).toBe(true)
   })
@@ -392,7 +393,7 @@ describe("TxBuilder NativeScript (Devnet Submit)", () => {
     const submitBuilder = await signBuilder.sign()
     const txHash = await submitBuilder.submit()
 
-    expect(txHash.length).toBe(64)
+    expect(TransactionHash.toHex(txHash).length).toBe(64)
 
     const confirmed = await client.awaitTx(txHash, 1000)
     expect(confirmed).toBe(true)
@@ -446,7 +447,7 @@ describe("TxBuilder NativeScript (Devnet Submit)", () => {
     expect(scriptUtxos.length).toBeGreaterThan(0)
 
     const scriptUtxo = scriptUtxos.find(
-      (u) => UTxO.toOutRefString(u).startsWith(fundTxHash)
+      (u) => UTxO.toOutRefString(u).startsWith(TransactionHash.toHex(fundTxHash))
     )
     expect(scriptUtxo).toBeDefined()
 
@@ -471,7 +472,7 @@ describe("TxBuilder NativeScript (Devnet Submit)", () => {
     const spendSubmitBuilder = await spendSignBuilder.assemble([witness1, witness2])
     const spendTxHash = await spendSubmitBuilder.submit()
 
-    expect(spendTxHash.length).toBe(64)
+    expect(TransactionHash.toHex(spendTxHash).length).toBe(64)
 
     const spendConfirmed = await client1.awaitTx(spendTxHash, 1000)
     expect(spendConfirmed).toBe(true)
@@ -512,14 +513,14 @@ describe("TxBuilder NativeScript (Devnet Submit)", () => {
     const refScriptSubmitBuilder = await refScriptSignBuilder.sign()
     const refScriptTxHash = await refScriptSubmitBuilder.submit()
 
-    expect(refScriptTxHash.length).toBe(64)
+    expect(TransactionHash.toHex(refScriptTxHash).length).toBe(64)
     await client1.awaitTx(refScriptTxHash, 1000)
     await new Promise((resolve) => setTimeout(resolve, 2_000))
 
     // Find the UTxO with the reference script
     const walletUtxos = await client1.getUtxos(address1)
     const refScriptUtxo = walletUtxos.find(
-      (u) => UTxO.toOutRefString(u).startsWith(refScriptTxHash) && u.scriptRef !== undefined
+      (u) => UTxO.toOutRefString(u).startsWith(TransactionHash.toHex(refScriptTxHash)) && u.scriptRef !== undefined
     )
     expect(refScriptUtxo).toBeDefined()
     expect(refScriptUtxo!.scriptRef).toBeDefined()
@@ -551,7 +552,7 @@ describe("TxBuilder NativeScript (Devnet Submit)", () => {
     const mintSubmitBuilder = await mintSignBuilder.assemble([mintWitness1, mintWitness2])
     const mintTxHash = await mintSubmitBuilder.submit()
 
-    expect(mintTxHash.length).toBe(64)
+    expect(TransactionHash.toHex(mintTxHash).length).toBe(64)
 
     const mintConfirmed = await client1.awaitTx(mintTxHash, 1000)
     expect(mintConfirmed).toBe(true)
@@ -598,7 +599,7 @@ describe("TxBuilder NativeScript (Devnet Submit)", () => {
     const refScriptSubmitBuilder = await refScriptSignBuilder.sign()
     const refScriptTxHash = await refScriptSubmitBuilder.submit()
 
-    expect(refScriptTxHash.length).toBe(64)
+    expect(TransactionHash.toHex(refScriptTxHash).length).toBe(64)
     await client1.awaitTx(refScriptTxHash, 1000)
     await new Promise((resolve) => setTimeout(resolve, 2_000))
 
@@ -621,13 +622,13 @@ describe("TxBuilder NativeScript (Devnet Submit)", () => {
     const scriptUtxos = await client1.getUtxos(scriptAddress)
     expect(scriptUtxos.length).toBeGreaterThan(0)
 
-    const scriptUtxo = scriptUtxos.find((u) => UTxO.toOutRefString(u).startsWith(fundTxHash))
+    const scriptUtxo = scriptUtxos.find((u) => UTxO.toOutRefString(u).startsWith(TransactionHash.toHex(fundTxHash)))
     expect(scriptUtxo).toBeDefined()
 
     // Find the UTxO with the reference script (fetch AFTER fund tx to get fresh state)
     const walletUtxos = await client1.getUtxos(address1)
     const refScriptUtxo = walletUtxos.find(
-      (u) => UTxO.toOutRefString(u).startsWith(refScriptTxHash) && u.scriptRef !== undefined
+      (u) => UTxO.toOutRefString(u).startsWith(TransactionHash.toHex(refScriptTxHash)) && u.scriptRef !== undefined
     )
     expect(refScriptUtxo).toBeDefined()
     expect(refScriptUtxo!.scriptRef).toBeDefined()
@@ -653,7 +654,7 @@ describe("TxBuilder NativeScript (Devnet Submit)", () => {
     const spendSubmitBuilder = await spendSignBuilder.assemble([witness1, witness2])
     const spendTxHash = await spendSubmitBuilder.submit()
     
-    expect(spendTxHash.length).toBe(64)
+    expect(TransactionHash.toHex(spendTxHash).length).toBe(64)
     const spendConfirmed = await client1.awaitTx(spendTxHash, 1000)
     expect(spendConfirmed).toBe(true)
   })

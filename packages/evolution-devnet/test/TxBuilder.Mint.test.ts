@@ -9,6 +9,7 @@ import * as NativeScripts from "@evolution-sdk/evolution/core/NativeScripts"
 import * as PolicyId from "@evolution-sdk/evolution/core/PolicyId"
 import * as ScriptHash from "@evolution-sdk/evolution/core/ScriptHash"
 import * as Text from "@evolution-sdk/evolution/core/Text"
+import * as TransactionHash from "@evolution-sdk/evolution/core/TransactionHash"
 import { createClient } from "@evolution-sdk/evolution/sdk/client/ClientImpl"
 
 const CoreAssets = Core.Assets
@@ -133,7 +134,7 @@ describe("TxBuilder Minting (Devnet Submit)", () => {
 
     const submitBuilder = await signBuilder.sign()
     const txHash = await submitBuilder.submit()
-    expect(txHash.length).toBe(64)
+    expect(TransactionHash.toHex(txHash).length).toBe(64)
 
     const confirmed = await client.awaitTx(txHash, 1000)
     expect(confirmed).toBe(true)
@@ -257,7 +258,7 @@ describe("TxBuilder Minting (Devnet Submit)", () => {
     // Submit burn transaction and verify
     const burnSubmitBuilder = await burnBuilder.sign()
     const burnTxHash = await burnSubmitBuilder.submit()
-    expect(burnTxHash.length).toBe(64)
+    expect(TransactionHash.toHex(burnTxHash).length).toBe(64)
 
     const burnConfirmed = await client.awaitTx(burnTxHash, 1000)
     expect(burnConfirmed).toBe(true)

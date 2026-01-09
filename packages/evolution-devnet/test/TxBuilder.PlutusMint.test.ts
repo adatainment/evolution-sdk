@@ -19,6 +19,7 @@ import * as PlutusV3 from "@evolution-sdk/evolution/core/PlutusV3"
 import * as PolicyId from "@evolution-sdk/evolution/core/PolicyId"
 import * as ScriptHash from "@evolution-sdk/evolution/core/ScriptHash"
 import * as Text from "@evolution-sdk/evolution/core/Text"
+import * as TransactionHash from "@evolution-sdk/evolution/core/TransactionHash"
 import { createClient } from "@evolution-sdk/evolution/sdk/client/ClientImpl"
 
 const CoreAssets = Core.Assets
@@ -179,7 +180,7 @@ describe("TxBuilder Plutus Minting (Devnet Submit)", () => {
     // Submit transaction
     const submitBuilder = await signBuilder.sign()
     const txHash = await submitBuilder.submit()
-    expect(txHash.length).toBe(64)
+    expect(TransactionHash.toHex(txHash).length).toBe(64)
 
     const confirmed = await client.awaitTx(txHash, 1000)
     expect(confirmed).toBe(true)
@@ -308,7 +309,7 @@ describe("TxBuilder Plutus Minting (Devnet Submit)", () => {
     // Submit burn transaction
     const burnSubmitBuilder = await burnBuilder.sign()
     const burnTxHash = await burnSubmitBuilder.submit()
-    expect(burnTxHash.length).toBe(64)
+    expect(TransactionHash.toHex(burnTxHash).length).toBe(64)
 
     // eslint-disable-next-line no-console
     console.log(`✓ Submitted Plutus burn tx: ${burnTxHash}`)

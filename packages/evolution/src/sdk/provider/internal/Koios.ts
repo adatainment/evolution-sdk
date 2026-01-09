@@ -5,10 +5,9 @@ import type { ParseError } from "effect/ParseResult"
 
 import * as CoreAddress from "../../../core/Address.js"
 import * as CoreAssets from "../../../core/Assets/index.js"
+import type * as Credential from "../../../core/Credential.js"
 import * as TransactionHash from "../../../core/TransactionHash.js"
 import * as CoreUTxO from "../../../core/UTxO.js"
-import type * as Address from "../../Address.js"
-import type * as Credential from "../../Credential.js"
 import * as HttpUtils from "./HttpUtils.js"
 
 export const ProtocolParametersSchema = Schema.Struct({
@@ -320,7 +319,7 @@ export const toUTxO = (koiosUTxO: UTxO, addressStr: string): CoreUTxO.UTxO => {
 
 export const getUtxosEffect = (
   baseUrl: string,
-  addressOrCredential: Address.Address | Credential.Credential,
+  addressOrCredential: string | Credential.Credential,
   headers: Record<string, string> | undefined
 ): Effect.Effect<
   Array<CoreUTxO.UTxO>,

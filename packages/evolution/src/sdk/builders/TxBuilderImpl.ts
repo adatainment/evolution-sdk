@@ -1,16 +1,15 @@
 // Effect-TS imports
-import { Effect, Ref, Schema } from "effect"
+import { Effect, Ref } from "effect"
 import type * as Array from "effect/Array"
 
 // Core imports
-import type * as CoreAddress from "../../core/Address.js"
+import * as CoreAddress from "../../core/Address.js"
 import * as CoreAssets from "../../core/Assets/index.js"
 import * as Bytes from "../../core/Bytes.js"
-import * as Bytes32 from "../../core/Bytes32.js"
 import type * as Certificate from "../../core/Certificate.js"
 import * as CostModel from "../../core/CostModel.js"
-import * as PlutusData from "../../core/Data.js"
-import * as DatumOption from "../../core/DatumOption.js"
+import type * as PlutusData from "../../core/Data.js"
+import type * as DatumOption from "../../core/DatumOption.js"
 import * as Ed25519Signature from "../../core/Ed25519Signature.js"
 import type * as KeyHash from "../../core/KeyHash.js"
 import * as NativeScripts from "../../core/NativeScripts.js"
@@ -34,9 +33,6 @@ import * as CoreUTxO from "../../core/UTxO.js"
 import * as VKey from "../../core/VKey.js"
 import * as Withdrawals from "../../core/Withdrawals.js"
 import { hashAuxiliaryData, hashScriptData } from "../../utils/Hash.js"
-// SDK imports (for conversion utilities)
-import * as Address from "../Address.js"
-import type * as Datum from "../Datum.js"
 // Internal imports
 import { voterToKey } from "./phases/utils.js"
 import type { UnfrackOptions } from "./TransactionBuilder.js"
@@ -85,7 +81,7 @@ export const isScriptAddress = (address: string): Effect.Effect<boolean, Transac
   Effect.gen(function* () {
     // Parse address to structure
     const addressStructure = yield* Effect.try({
-      try: () => Address.toCoreAddress(address),
+      try: () => CoreAddress.fromBech32(address),
       catch: (error) =>
         new TransactionBuilderError({
           message: `Failed to parse address: ${address}`,
@@ -208,33 +204,7 @@ export const calculateReferenceScriptFee = (
 // Helper Functions - Output Construction
 // ============================================================================
 
-/**
- * Convert SDK Datum to core DatumOption.
- * Parses CBOR hex strings for inline datums and hashes for datum references.
- *
- * @since 2.0.0
- * @category helpers
- */
-export const makeDatumOption = (datum: Datum.Datum): Effect.Effect<DatumOption.DatumOption, TransactionBuilderError> =>
-  Effect.gen(function* () {
-    if (datum.type === "inlineDatum") {
-      // Parse PlutusData from CBOR hex using Schema
-      const plutusData = yield* Schema.decodeUnknown(PlutusData.FromCBORHex())(datum.inline)
-      return new DatumOption.InlineDatum({ data: plutusData })
-    }
-
-    if (datum.type === "datumHash") {
-      // Parse datum hash from hex string to Uint8Array using Schema
-      const hashBytes = yield* Schema.decodeUnknown(Bytes32.BytesFromHex)(datum.hash)
-      return new DatumOption.DatumHash({ hash: hashBytes })
-    }
-
-    return yield* Effect.fail(
-      new TransactionBuilderError({
-        message: `Unknown datum type: ${(datum as any).type}`
-      })
-    )
-  }).pipe(
+.pipe(
     Effect.mapError(
       (error) =>
         new TransactionBuilderError({
@@ -897,7 +867,7 @@ export const calculateMinimumFee = (
 export const extractPaymentKeyHash = (address: string): Effect.Effect<Uint8Array | null, TransactionBuilderError> =>
   Effect.gen(function* () {
     const addressStructure = yield* Effect.try({
-      try: () => Address.toCoreAddress(address),
+      try: () => CoreAddress.fromBech32(address),
       catch: (error) =>
         new TransactionBuilderError({
           message: `Failed to parse address ${address}`,

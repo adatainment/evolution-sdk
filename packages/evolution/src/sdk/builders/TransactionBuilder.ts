@@ -47,7 +47,6 @@ import type * as CoreUTxO from "../../core/UTxO.js"
 import type * as VotingProcedures from "../../core/VotingProcedures.js"
 import { runEffectPromise } from "../../utils/effect-runtime.js"
 import type { EvalRedeemer } from "../EvalRedeemer.js"
-import type * as ProtocolParametersSDK from "../ProtocolParameters.js"
 import type * as Provider from "../provider/Provider.js"
 import type * as WalletNew from "../wallet/WalletNew.js"
 import type { CoinSelectionAlgorithm, CoinSelectionFunction } from "./CoinSelection.js"
@@ -381,9 +380,8 @@ const resolveEvaluator = (config: TxBuilderConfig, options?: BuildOptions): Eval
         additionalUtxos: ReadonlyArray<CoreUTxO.UTxO> | undefined,
         _context: EvaluationContext
       ) => {
-        // Serialize Transaction to CBOR hex for provider
-        const txHex = Transaction.toCBORHex(tx)
-        return config.provider!.Effect.evaluateTx(txHex, additionalUtxos as Array<CoreUTxO.UTxO> | undefined).pipe(
+        // Provider now accepts Transaction directly
+        return config.provider!.Effect.evaluateTx(tx, additionalUtxos as Array<CoreUTxO.UTxO> | undefined).pipe(
           Effect.mapError((providerError) => {
             // Parse provider error into structured failures
             const failures = parseProviderError(providerError)
@@ -1447,7 +1445,7 @@ export class ProtocolParametersTag extends Context.Tag("ProtocolParameters")<
  */
 export class FullProtocolParametersTag extends Context.Tag("FullProtocolParameters")<
   FullProtocolParametersTag,
-  ProtocolParametersSDK.ProtocolParameters
+  Provider.ProtocolParameters
 >() {}
 
 /**

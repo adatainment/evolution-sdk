@@ -175,7 +175,7 @@ describe("TxBuilder Vote Validator (script DRep)", () => {
 
     // Test Voting purpose - vote using script-controlled DRep
     const govActionId = new GovernanceAction.GovActionId({
-      transactionId: TransactionHash.fromHex(proposeTx),
+      transactionId: proposeTx,
       govActionIndex: 0n
     })
     const scriptDRep = DRep.fromScriptHash(scriptHash)
@@ -301,7 +301,7 @@ describe("TxBuilder Vote Validator (script DRep)", () => {
     // Find config UTxO
     const allUtxos = await client0.getUtxos(address0)
     const configUtxo = allUtxos.find(u => 
-      Core.UTxO.toOutRefString(u).startsWith(configTxHash) && 
+      Core.UTxO.toOutRefString(u).startsWith(TransactionHash.toHex(configTxHash)) && 
       u.assets.lovelace === 5_000_000n
     )
     if (!configUtxo) throw new Error("Config UTxO not found")
@@ -311,7 +311,7 @@ describe("TxBuilder Vote Validator (script DRep)", () => {
       Data.list([pkh0.hash, pkh1.hash])
     ])
     const govActionId = new GovernanceAction.GovActionId({
-      transactionId: TransactionHash.fromHex(proposeTx),
+      transactionId: proposeTx,
       govActionIndex: 0n
     })
     const scriptDRep = DRep.fromScriptHash(scriptHash)
@@ -435,7 +435,7 @@ describe("TxBuilder Vote Validator (script DRep)", () => {
     // Find config UTxO
     const allUtxos = await client0.getUtxos(address0)
     const configUtxo = allUtxos.find(u => 
-      Core.UTxO.toOutRefString(u).startsWith(configTxHash) && 
+      Core.UTxO.toOutRefString(u).startsWith(TransactionHash.toHex(configTxHash)) && 
       u.assets.lovelace === 5_000_000n
     )
     if (!configUtxo) throw new Error("Config UTxO not found")
@@ -448,7 +448,7 @@ describe("TxBuilder Vote Validator (script DRep)", () => {
       Data.list([pkh0.hash, pkh1.hash])
     ])
     const govActionId = new GovernanceAction.GovActionId({
-      transactionId: TransactionHash.fromHex(proposeTx),
+      transactionId: proposeTx,
       govActionIndex: 0n
     })
     const scriptDRep = DRep.fromScriptHash(scriptHash)

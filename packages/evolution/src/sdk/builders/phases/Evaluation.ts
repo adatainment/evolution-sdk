@@ -15,7 +15,7 @@ import * as CostModel from "../../../core/CostModel.js"
 import { INT64_MAX } from "../../../core/Numeric.js"
 import * as PolicyId from "../../../core/PolicyId.js"
 import * as CoreUTxO from "../../../core/UTxO.js"
-import type * as ProtocolParametersModule from "../../ProtocolParameters.js"
+import type * as Provider from "../../provider/Provider.js"
 import * as EvaluationStateManager from "../EvaluationStateManager.js"
 import type { IndexedInput } from "../RedeemerBuilder.js"
 import {
@@ -41,7 +41,7 @@ import { voterToKey } from "./utils.js"
  * and converts them to the CBOR-encoded format expected by UPLC evaluators.
  */
 const costModelsToCBOR = (
-  protocolParams: ProtocolParametersModule.ProtocolParameters
+  protocolParams: Provider.ProtocolParameters
 ): Effect.Effect<Uint8Array, TransactionBuilderError> =>
   Effect.gen(function* () {
     // Convert Record<string, number> format to bigint arrays
@@ -588,10 +588,7 @@ export const executeEvaluation = (): Effect.Effect<
           // Update redeemer with ExUnits from evaluation
           evaluatedRedeemers.set(utxoRef, {
             ...redeemer,
-            exUnits: {
-              mem: BigInt(evalRedeemer.ex_units.mem),
-              steps: BigInt(evalRedeemer.ex_units.steps)
-            }
+            exUnits: evalRedeemer.ex_units
           })
 
           yield* Effect.logDebug(
@@ -618,10 +615,7 @@ export const executeEvaluation = (): Effect.Effect<
           // Update redeemer with ExUnits from evaluation
           evaluatedRedeemers.set(policyIdHex, {
             ...redeemer,
-            exUnits: {
-              mem: BigInt(evalRedeemer.ex_units.mem),
-              steps: BigInt(evalRedeemer.ex_units.steps)
-            }
+            exUnits: evalRedeemer.ex_units
           })
 
           yield* Effect.logDebug(
@@ -633,8 +627,8 @@ export const executeEvaluation = (): Effect.Effect<
             `[Evaluation] No redeemer found in state for policy ${policyIdHex}`
           )
         }
-      } else if (evalRedeemer.redeemer_tag === "publish") {
-        // For certificate redeemers (Conway calls them "publish"), map index to credential key
+      } else if (evalRedeemer.redeemer_tag === "cert") {
+        // For certificate redeemers, map index to credential key
         const certKey = certIndexMapping.get(evalRedeemer.redeemer_index)
         if (!certKey) {
           yield* Effect.logWarning(
@@ -648,10 +642,7 @@ export const executeEvaluation = (): Effect.Effect<
           // Update redeemer with ExUnits from evaluation
           evaluatedRedeemers.set(certKey, {
             ...redeemer,
-            exUnits: {
-              mem: BigInt(evalRedeemer.ex_units.mem),
-              steps: BigInt(evalRedeemer.ex_units.steps)
-            }
+            exUnits: evalRedeemer.ex_units
           })
 
           yield* Effect.logDebug(
@@ -663,7 +654,7 @@ export const executeEvaluation = (): Effect.Effect<
             `[Evaluation] No redeemer found in state for cert ${certKey}`
           )
         }
-      } else if (evalRedeemer.redeemer_tag === "withdraw") {
+      } else if (evalRedeemer.redeemer_tag === "reward") {
         // For withdrawal redeemers, map index to credential key
         const rewardKey = withdrawalIndexMapping.get(evalRedeemer.redeemer_index)
         if (!rewardKey) {
@@ -678,10 +669,7 @@ export const executeEvaluation = (): Effect.Effect<
           // Update redeemer with ExUnits from evaluation
           evaluatedRedeemers.set(rewardKey, {
             ...redeemer,
-            exUnits: {
-              mem: BigInt(evalRedeemer.ex_units.mem),
-              steps: BigInt(evalRedeemer.ex_units.steps)
-            }
+            exUnits: evalRedeemer.ex_units
           })
 
           yield* Effect.logDebug(

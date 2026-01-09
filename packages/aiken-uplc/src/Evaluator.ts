@@ -121,8 +121,8 @@ function evalRedeemerFromCBOR(bytes: Uint8Array): EvalRedeemer.EvalRedeemer {
     redeemer_tag: tagMap[redeemer.tag],
     redeemer_index: Number(redeemer.index),
     ex_units: {
-      mem: Number(redeemer.exUnits.mem),
-      steps: Number(redeemer.exUnits.steps)
+      mem: BigInt(redeemer.exUnits.mem),
+      steps: BigInt(redeemer.exUnits.steps)
     }
   }
 }

@@ -189,7 +189,7 @@ describe("TxBuilder Vote Operations (script-free)", () => {
     expect(await proposerClient.awaitTx(proposeTxHash, 1000)).toBe(true)
 
     const govActionId = new GovernanceAction.GovActionId({
-      transactionId: TransactionHash.fromHex(proposeTxHash),
+      transactionId: proposeTxHash,
       govActionIndex: 0n
     })
 
@@ -246,7 +246,7 @@ describe("TxBuilder Vote Operations (script-free)", () => {
 
     // --- Now vote on the newly created InfoAction proposal using a key-based DRep ---
     const govActionIdLocal = new GovernanceAction.GovActionId({
-      transactionId: TransactionHash.fromHex(txHash),
+      transactionId: txHash,
       govActionIndex: 0n
     })
 
@@ -324,7 +324,7 @@ describe("TxBuilder Vote Operations (script-free)", () => {
     
     // --- Now vote on the newly created NoConfidenceAction proposal ---
     const govActionIdLocal = new GovernanceAction.GovActionId({
-      transactionId: TransactionHash.fromHex(txHash),
+      transactionId: txHash,
       govActionIndex: 0n
     })
 
@@ -403,7 +403,7 @@ describe("TxBuilder Vote Operations (script-free)", () => {
 
     // --- Now vote on the newly created HardForkInitiationAction proposal ---
     const govActionIdLocal = new GovernanceAction.GovActionId({
-      transactionId: TransactionHash.fromHex(txHash),
+      transactionId: txHash,
       govActionIndex: 0n
     })
 
@@ -485,7 +485,7 @@ describe("TxBuilder Vote Operations (script-free)", () => {
 
     // --- Now vote on the newly created TreasuryWithdrawalsAction proposal ---
     const govActionIdLocal = new GovernanceAction.GovActionId({
-      transactionId: TransactionHash.fromHex(txHash),
+      transactionId: txHash,
       govActionIndex: 0n
     })
 
@@ -566,7 +566,7 @@ describe("TxBuilder Vote Operations (script-free)", () => {
 
     // --- Now vote on the newly created UpdateCommitteeAction proposal ---
     const govActionIdLocal = new GovernanceAction.GovActionId({
-      transactionId: TransactionHash.fromHex(txHash),
+      transactionId: txHash,
       govActionIndex: 0n
     })
 
@@ -651,7 +651,7 @@ describe("TxBuilder Vote Operations (script-free)", () => {
 
     // --- Now vote on the newly created NewConstitutionAction proposal ---
     const govActionIdLocal = new GovernanceAction.GovActionId({
-      transactionId: TransactionHash.fromHex(txHash),
+      transactionId: txHash,
       govActionIndex: 0n
     })
 
@@ -735,7 +735,7 @@ describe("TxBuilder Vote Operations (script-free)", () => {
 
     // --- Now vote on the newly created proposal using a key-based DRep ---
     const govActionIdLocal = new GovernanceAction.GovActionId({
-      transactionId: TransactionHash.fromHex(txHash),
+      transactionId: txHash,
       govActionIndex: 0n
     })
 

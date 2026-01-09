@@ -1,6 +1,7 @@
 import type { Effect } from "effect"
 
 import type * as Transaction from "../../core/Transaction.js"
+import type * as TransactionHash from "../../core/TransactionHash.js"
 import type * as TransactionWitnessSet from "../../core/TransactionWitnessSet.js"
 import type { EffectToPromiseAPI } from "../Type.js"
 import type { SubmitBuilder } from "./SubmitBuilder.js"
@@ -27,7 +28,7 @@ export interface SignBuilderEffect {
 
   // Signing methods
   readonly sign: () => Effect.Effect<SubmitBuilder, TransactionBuilderError>
-  readonly signAndSubmit: () => Effect.Effect<string, TransactionBuilderError>
+  readonly signAndSubmit: () => Effect.Effect<TransactionHash.TransactionHash, TransactionBuilderError>
   readonly signWithWitness: (
     witnessSet: TransactionWitnessSet.TransactionWitnessSet
   ) => Effect.Effect<SubmitBuilder, TransactionBuilderError>

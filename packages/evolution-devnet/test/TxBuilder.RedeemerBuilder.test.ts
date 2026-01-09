@@ -19,6 +19,7 @@ import * as PlutusV3 from "@evolution-sdk/evolution/core/PlutusV3"
 import * as PolicyId from "@evolution-sdk/evolution/core/PolicyId"
 import * as ScriptHash from "@evolution-sdk/evolution/core/ScriptHash"
 import * as Text from "@evolution-sdk/evolution/core/Text"
+import * as TransactionHash from "@evolution-sdk/evolution/core/TransactionHash"
 import { createClient } from "@evolution-sdk/evolution/sdk/client/ClientImpl"
 import { Schema } from "effect"
 
@@ -267,7 +268,7 @@ describe("TxBuilder RedeemerBuilder", () => {
 
     const spendSubmitBuilder = await spendSignBuilder.sign()
     const spendTxHash = await spendSubmitBuilder.submit()
-    expect(spendTxHash.length).toBe(64)
+    expect(TransactionHash.toHex(spendTxHash).length).toBe(64)
 
     const spendConfirmed = await client.awaitTx(spendTxHash, 1000)
     expect(spendConfirmed).toBe(true)

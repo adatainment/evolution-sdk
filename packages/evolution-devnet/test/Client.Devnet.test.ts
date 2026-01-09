@@ -149,7 +149,7 @@ describe("Client with Devnet", () => {
     expect(submitBuilder.witnessSet.vkeyWitnesses).toBeDefined()
 
     const txHash = await submitBuilder.submit()
-    expect(txHash.length).toBe(64)
+    expect(Core.TransactionHash.toHex(txHash).length).toBe(64)
 
     const confirmed = await client.awaitTx(txHash, 1000)
     expect(confirmed).toBe(true)

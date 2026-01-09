@@ -4,6 +4,7 @@ import * as Config from "@evolution-sdk/devnet/Config"
 import * as Genesis from "@evolution-sdk/devnet/Genesis"
 import { Core } from "@evolution-sdk/evolution"
 import * as Address from "@evolution-sdk/evolution/core/Address"
+import * as TransactionHash from "@evolution-sdk/evolution/core/TransactionHash"
 import type { SignBuilder } from "@evolution-sdk/evolution/sdk/builders/SignBuilder"
 import { createClient } from "@evolution-sdk/evolution/sdk/client/ClientImpl"
 
@@ -96,7 +97,7 @@ describe("TxBuilder.chainResult", () => {
     expect(new Set(txHashes).size).toBe(TX_COUNT)
 
     // Submit all transactions
-    const submittedHashes: Array<string> = []
+    const submittedHashes: Array<TransactionHash.TransactionHash> = []
     for (const tx of txs) {
       const hash = await tx.signAndSubmit()
       submittedHashes.push(hash)
@@ -104,7 +105,7 @@ describe("TxBuilder.chainResult", () => {
 
     // Verify computed hashes match submitted hashes
     for (let i = 0; i < TX_COUNT; i++) {
-      expect(submittedHashes[i]).toBe(txs[i].chainResult().txHash)
+      expect(TransactionHash.toHex(submittedHashes[i])).toBe(txs[i].chainResult().txHash)
     }
 
     // Wait for all to confirm

@@ -4,9 +4,9 @@ import * as Config from "@evolution-sdk/devnet/Config"
 import * as Genesis from "@evolution-sdk/devnet/Genesis"
 import { Cardano } from "@evolution-sdk/evolution"
 import * as Address from "@evolution-sdk/evolution/Address"
-import * as TransactionHash from "@evolution-sdk/evolution/TransactionHash"
 import type { SignBuilder } from "@evolution-sdk/evolution/sdk/builders/SignBuilder"
 import { createClient } from "@evolution-sdk/evolution/sdk/client/ClientImpl"
+import * as TransactionHash from "@evolution-sdk/evolution/TransactionHash"
 
 describe("TxBuilder.chainResult", () => {
   let devnetCluster: Cluster.Cluster | undefined

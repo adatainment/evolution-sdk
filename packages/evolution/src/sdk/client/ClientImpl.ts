@@ -11,10 +11,10 @@ import type * as Time from "../../Time/index.js"
 import * as Transaction from "../../Transaction.js"
 import * as TransactionHash from "../../TransactionHash.js"
 import * as TransactionWitnessSet from "../../TransactionWitnessSet.js"
-import * as CoreUTxO from "../../UTxO.js"
-import * as VKey from "../../VKey.js"
 import { runEffectPromise } from "../../utils/effect-runtime.js"
 import { hashTransaction } from "../../utils/Hash.js"
+import * as CoreUTxO from "../../UTxO.js"
+import * as VKey from "../../VKey.js"
 import {
   makeTxBuilder,
   type ReadOnlyTransactionBuilder,

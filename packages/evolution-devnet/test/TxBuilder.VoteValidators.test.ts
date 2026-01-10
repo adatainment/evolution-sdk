@@ -22,10 +22,10 @@ import * as GovernanceAction from "@evolution-sdk/evolution/GovernanceAction"
 import * as PlutusV3 from "@evolution-sdk/evolution/PlutusV3"
 import * as RewardAccount from "@evolution-sdk/evolution/RewardAccount"
 import * as ScriptHash from "@evolution-sdk/evolution/ScriptHash"
+import { createClient } from "@evolution-sdk/evolution/sdk/client/ClientImpl"
 import * as TransactionHash from "@evolution-sdk/evolution/TransactionHash"
 import * as Url from "@evolution-sdk/evolution/Url"
 import * as VotingProcedures from "@evolution-sdk/evolution/VotingProcedures"
-import { createClient } from "@evolution-sdk/evolution/sdk/client/ClientImpl"
 
 import plutusJson from "../../evolution/test/spec/plutus.json"
 

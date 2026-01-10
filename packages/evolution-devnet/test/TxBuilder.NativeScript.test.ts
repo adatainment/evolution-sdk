@@ -15,10 +15,10 @@ import { Cardano } from "@evolution-sdk/evolution"
 import * as Address from "@evolution-sdk/evolution/Address"
 import * as NativeScripts from "@evolution-sdk/evolution/NativeScripts"
 import * as ScriptHash from "@evolution-sdk/evolution/ScriptHash"
+import { createClient } from "@evolution-sdk/evolution/sdk/client/ClientImpl"
 import * as Text from "@evolution-sdk/evolution/Text"
 import * as TransactionHash from "@evolution-sdk/evolution/TransactionHash"
 import * as UTxO from "@evolution-sdk/evolution/UTxO"
-import { createClient } from "@evolution-sdk/evolution/sdk/client/ClientImpl"
 
 // Time utility functions (duplicated from core since Time module is not externally accessible)
 const now = (): bigint => BigInt(Date.now())

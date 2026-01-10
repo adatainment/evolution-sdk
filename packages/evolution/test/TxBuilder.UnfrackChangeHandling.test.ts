@@ -2,8 +2,8 @@ import { describe, expect, it } from "@effect/vitest"
 
 import * as CoreAddress from "../src/Address.js"
 import * as CoreAssets from "../src/Assets/index.js"
-import * as CoreUTxO from "../src/UTxO.js"
 import { makeTxBuilder } from "../src/sdk/builders/TransactionBuilder.js"
+import * as CoreUTxO from "../src/UTxO.js"
 import { createCoreTestUtxo } from "./utils/utxo-helpers.js"
 
 const PROTOCOL_PARAMS = {

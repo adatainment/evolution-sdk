@@ -1,11 +1,11 @@
 import * as CoreAddress from "../../src/Address.js"
 import * as CoreAssets from "../../src/Assets/index.js"
-import * as CoreTransactionHash from "../../src/TransactionHash.js"
-import * as CoreUTxO from "../../src/UTxO.js"
 import type * as Assets from "../../src/sdk/Assets.js"
 import type * as Datum from "../../src/sdk/Datum.js"
 import type * as Script from "../../src/sdk/Script.js"
 import type * as UTxO from "../../src/sdk/UTxO.js"
+import * as CoreTransactionHash from "../../src/TransactionHash.js"
+import * as CoreUTxO from "../../src/UTxO.js"
 
 /**
  * Options for creating a test UTxO.

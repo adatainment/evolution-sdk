@@ -12,8 +12,8 @@ import * as Genesis from "@evolution-sdk/devnet/Genesis"
 import { Cardano } from "@evolution-sdk/evolution"
 import * as Address from "@evolution-sdk/evolution/Address"
 import * as KeyHash from "@evolution-sdk/evolution/KeyHash"
-import * as TransactionHash from "@evolution-sdk/evolution/TransactionHash"
 import { createClient } from "@evolution-sdk/evolution/sdk/client/ClientImpl"
+import * as TransactionHash from "@evolution-sdk/evolution/TransactionHash"
 
 describe("TxBuilder addSigner (Devnet Submit)", () => {
   let devnetCluster: Cluster.Cluster | undefined

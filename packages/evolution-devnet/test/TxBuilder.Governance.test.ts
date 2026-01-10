@@ -7,15 +7,14 @@ import { afterAll, beforeAll, describe, expect, it } from "@effect/vitest"
 import * as Cluster from "@evolution-sdk/devnet/Cluster"
 import * as Config from "@evolution-sdk/devnet/Config"
 import * as Genesis from "@evolution-sdk/devnet/Genesis"
-import type { Core } from "@evolution-sdk/evolution"
 import * as Address from "@evolution-sdk/evolution/Address"
 import * as Anchor from "@evolution-sdk/evolution/Anchor"
 import * as Bytes from "@evolution-sdk/evolution/Bytes"
 import * as Bytes32 from "@evolution-sdk/evolution/Bytes32"
 import * as Credential from "@evolution-sdk/evolution/Credential"
 import * as KeyHash from "@evolution-sdk/evolution/KeyHash"
-import * as Url from "@evolution-sdk/evolution/Url"
 import { createClient } from "@evolution-sdk/evolution/sdk/client/ClientImpl"
+import * as Url from "@evolution-sdk/evolution/Url"
 
 describe("TxBuilder Governance Operations", () => {
   let devnetCluster: Cluster.Cluster | undefined

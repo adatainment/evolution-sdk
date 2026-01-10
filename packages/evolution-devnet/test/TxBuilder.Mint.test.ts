@@ -2,17 +2,17 @@ import { afterAll, beforeAll, describe, expect, it } from "@effect/vitest"
 import * as Cluster from "@evolution-sdk/devnet/Cluster"
 import * as Config from "@evolution-sdk/devnet/Config"
 import * as Genesis from "@evolution-sdk/devnet/Genesis"
-import { Core } from "@evolution-sdk/evolution"
-import * as CoreAddress from "@evolution-sdk/evolution/core/Address"
-import * as AssetName from "@evolution-sdk/evolution/core/AssetName"
-import * as NativeScripts from "@evolution-sdk/evolution/core/NativeScripts"
-import * as PolicyId from "@evolution-sdk/evolution/core/PolicyId"
-import * as ScriptHash from "@evolution-sdk/evolution/core/ScriptHash"
-import * as Text from "@evolution-sdk/evolution/core/Text"
-import * as TransactionHash from "@evolution-sdk/evolution/core/TransactionHash"
+import { Cardano } from "@evolution-sdk/evolution"
+import * as CoreAddress from "@evolution-sdk/evolution/Address"
+import * as AssetName from "@evolution-sdk/evolution/AssetName"
+import * as NativeScripts from "@evolution-sdk/evolution/NativeScripts"
+import * as PolicyId from "@evolution-sdk/evolution/PolicyId"
+import * as ScriptHash from "@evolution-sdk/evolution/ScriptHash"
+import * as Text from "@evolution-sdk/evolution/Text"
+import * as TransactionHash from "@evolution-sdk/evolution/TransactionHash"
 import { createClient } from "@evolution-sdk/evolution/sdk/client/ClientImpl"
 
-const CoreAssets = Core.Assets
+const CoreAssets = Cardano.Assets
 
 describe("TxBuilder Minting (Devnet Submit)", () => {
   // ============================================================================
@@ -21,7 +21,7 @@ describe("TxBuilder Minting (Devnet Submit)", () => {
 
   let devnetCluster: Cluster.Cluster | undefined
   let genesisConfig: Config.ShelleyGenesis
-  let genesisUtxos: ReadonlyArray<Core.UTxO.UTxO> = []
+  let genesisUtxos: ReadonlyArray<Cardano.UTxO.UTxO> = []
   let nativeScript: NativeScripts.NativeScript
   let policyId: string
 

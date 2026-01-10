@@ -10,27 +10,27 @@ import { afterAll, beforeAll, describe, expect, it } from "@effect/vitest"
 import * as Cluster from "@evolution-sdk/devnet/Cluster"
 import * as Config from "@evolution-sdk/devnet/Config"
 import * as Genesis from "@evolution-sdk/devnet/Genesis"
-import { Core } from "@evolution-sdk/evolution"
-import * as Address from "@evolution-sdk/evolution/core/Address"
-import * as Anchor from "@evolution-sdk/evolution/core/Anchor"
-import * as Bytes from "@evolution-sdk/evolution/core/Bytes"
-import * as Bytes32 from "@evolution-sdk/evolution/core/Bytes32"
-import * as Data from "@evolution-sdk/evolution/core/Data"
-import * as DatumOption from "@evolution-sdk/evolution/core/DatumOption"
-import * as DRep from "@evolution-sdk/evolution/core/DRep"
-import * as GovernanceAction from "@evolution-sdk/evolution/core/GovernanceAction"
-import * as PlutusV3 from "@evolution-sdk/evolution/core/PlutusV3"
-import * as RewardAccount from "@evolution-sdk/evolution/core/RewardAccount"
-import * as ScriptHash from "@evolution-sdk/evolution/core/ScriptHash"
-import * as TransactionHash from "@evolution-sdk/evolution/core/TransactionHash"
-import * as Url from "@evolution-sdk/evolution/core/Url"
-import * as VotingProcedures from "@evolution-sdk/evolution/core/VotingProcedures"
+import { Cardano } from "@evolution-sdk/evolution"
+import * as Address from "@evolution-sdk/evolution/Address"
+import * as Anchor from "@evolution-sdk/evolution/Anchor"
+import * as Bytes from "@evolution-sdk/evolution/Bytes"
+import * as Bytes32 from "@evolution-sdk/evolution/Bytes32"
+import * as Data from "@evolution-sdk/evolution/Data"
+import * as DatumOption from "@evolution-sdk/evolution/DatumOption"
+import * as DRep from "@evolution-sdk/evolution/DRep"
+import * as GovernanceAction from "@evolution-sdk/evolution/GovernanceAction"
+import * as PlutusV3 from "@evolution-sdk/evolution/PlutusV3"
+import * as RewardAccount from "@evolution-sdk/evolution/RewardAccount"
+import * as ScriptHash from "@evolution-sdk/evolution/ScriptHash"
+import * as TransactionHash from "@evolution-sdk/evolution/TransactionHash"
+import * as Url from "@evolution-sdk/evolution/Url"
+import * as VotingProcedures from "@evolution-sdk/evolution/VotingProcedures"
 import { createClient } from "@evolution-sdk/evolution/sdk/client/ClientImpl"
 
 import plutusJson from "../../evolution/test/spec/plutus.json"
 
 // Alias for readability
-const Time = Core.Time
+const Time = Cardano.Time
 
 const TEST_MNEMONIC =
   "test test test test test test test test test test test test test test test test test test test test test test test sauce"
@@ -69,7 +69,7 @@ describe("TxBuilder Vote Validator (script DRep)", () => {
       }
     })
   }
-  const genesisUtxosByAccount: Map<number, Core.UTxO.UTxO> = new Map()
+  const genesisUtxosByAccount: Map<number, Cardano.UTxO.UTxO> = new Map()
 
   beforeAll(async () => {
     const accounts = [0, 1].map(accountIndex =>
@@ -288,7 +288,7 @@ describe("TxBuilder Vote Validator (script DRep)", () => {
       .newTx()
       .payToAddress({
         address: address0,
-        assets: Core.Assets.fromLovelace(5_000_000n),
+        assets: Cardano.Assets.fromLovelace(5_000_000n),
         datum: new DatumOption.InlineDatum({ data: configDatum })
       })
       .build()
@@ -301,7 +301,7 @@ describe("TxBuilder Vote Validator (script DRep)", () => {
     // Find config UTxO
     const allUtxos = await client0.getUtxos(address0)
     const configUtxo = allUtxos.find(u => 
-      Core.UTxO.toOutRefString(u).startsWith(TransactionHash.toHex(configTxHash)) && 
+      Cardano.UTxO.toOutRefString(u).startsWith(TransactionHash.toHex(configTxHash)) && 
       u.assets.lovelace === 5_000_000n
     )
     if (!configUtxo) throw new Error("Config UTxO not found")
@@ -422,7 +422,7 @@ describe("TxBuilder Vote Validator (script DRep)", () => {
       .newTx()
       .payToAddress({
         address: address0,
-        assets: Core.Assets.fromLovelace(5_000_000n),
+        assets: Cardano.Assets.fromLovelace(5_000_000n),
         datum: new DatumOption.InlineDatum({ data: configDatum })
       })
       .build()
@@ -435,7 +435,7 @@ describe("TxBuilder Vote Validator (script DRep)", () => {
     // Find config UTxO
     const allUtxos = await client0.getUtxos(address0)
     const configUtxo = allUtxos.find(u => 
-      Core.UTxO.toOutRefString(u).startsWith(TransactionHash.toHex(configTxHash)) && 
+      Cardano.UTxO.toOutRefString(u).startsWith(TransactionHash.toHex(configTxHash)) && 
       u.assets.lovelace === 5_000_000n
     )
     if (!configUtxo) throw new Error("Config UTxO not found")

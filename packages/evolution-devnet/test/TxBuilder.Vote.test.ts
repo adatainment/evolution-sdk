@@ -8,26 +8,26 @@ import * as Cluster from "@evolution-sdk/devnet/Cluster"
 import * as Config from "@evolution-sdk/devnet/Config"
 import * as Genesis from "@evolution-sdk/devnet/Genesis"
 import type { Core } from "@evolution-sdk/evolution"
-import * as Address from "@evolution-sdk/evolution/core/Address"
-import * as Anchor from "@evolution-sdk/evolution/core/Anchor"
-import * as Bytes32 from "@evolution-sdk/evolution/core/Bytes32"
-import * as Constitution from "@evolution-sdk/evolution/core/Constitution"
-import * as DRep from "@evolution-sdk/evolution/core/DRep"
-import * as GovernanceAction from "@evolution-sdk/evolution/core/GovernanceAction"
-import * as KeyHash from "@evolution-sdk/evolution/core/KeyHash"
-import * as ProtocolParamUpdate from "@evolution-sdk/evolution/core/ProtocolParamUpdate"
-import * as ProtocolVersion from "@evolution-sdk/evolution/core/ProtocolVersion"
-import * as RewardAccount from "@evolution-sdk/evolution/core/RewardAccount"
-import * as UnitInterval from "@evolution-sdk/evolution/core/UnitInterval"
-import * as Url from "@evolution-sdk/evolution/core/Url"
-import * as VotingProcedures from "@evolution-sdk/evolution/core/VotingProcedures"
+import * as Address from "@evolution-sdk/evolution/Address"
+import * as Anchor from "@evolution-sdk/evolution/Anchor"
+import * as Bytes32 from "@evolution-sdk/evolution/Bytes32"
+import * as Constitution from "@evolution-sdk/evolution/Constitution"
+import * as DRep from "@evolution-sdk/evolution/DRep"
+import * as GovernanceAction from "@evolution-sdk/evolution/GovernanceAction"
+import * as KeyHash from "@evolution-sdk/evolution/KeyHash"
+import * as ProtocolParamUpdate from "@evolution-sdk/evolution/ProtocolParamUpdate"
+import * as ProtocolVersion from "@evolution-sdk/evolution/ProtocolVersion"
+import * as RewardAccount from "@evolution-sdk/evolution/RewardAccount"
+import * as UnitInterval from "@evolution-sdk/evolution/UnitInterval"
+import * as Url from "@evolution-sdk/evolution/Url"
+import * as VotingProcedures from "@evolution-sdk/evolution/VotingProcedures"
 import { createClient } from "@evolution-sdk/evolution/sdk/client/ClientImpl"
 
 describe("TxBuilder Vote Operations (script-free)", () => {
   let devnetCluster: Cluster.Cluster | undefined
   let genesisConfig: Config.ShelleyGenesis
   let conwayGenesis: Config.ConwayGenesis
-  const genesisUtxosByAccount: Map<number, Core.UTxO.UTxO> = new Map()
+  const genesisUtxosByAccount: Map<number, Cardano.UTxO.UTxO> = new Map()
 
   const TEST_MNEMONIC =
     "test test test test test test test test test test test test test test test test test test test test test test test sauce"

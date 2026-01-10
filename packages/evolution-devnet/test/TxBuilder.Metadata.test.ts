@@ -9,16 +9,16 @@ import { afterAll, beforeAll, describe, expect, it } from "@effect/vitest"
 import * as Cluster from "@evolution-sdk/devnet/Cluster"
 import * as Config from "@evolution-sdk/devnet/Config"
 import * as Genesis from "@evolution-sdk/devnet/Genesis"
-import { Core } from "@evolution-sdk/evolution"
-import * as Address from "@evolution-sdk/evolution/core/Address"
-import * as TransactionHash from "@evolution-sdk/evolution/core/TransactionHash"
-import { fromEntries } from "@evolution-sdk/evolution/core/TransactionMetadatum"
+import { Cardano } from "@evolution-sdk/evolution"
+import * as Address from "@evolution-sdk/evolution/Address"
+import * as TransactionHash from "@evolution-sdk/evolution/TransactionHash"
+import { fromEntries } from "@evolution-sdk/evolution/TransactionMetadatum"
 import { createClient } from "@evolution-sdk/evolution/sdk/client/ClientImpl"
 
 describe("TxBuilder attachMetadata (Devnet Submit)", () => {
   let devnetCluster: Cluster.Cluster | undefined
   let genesisConfig: Config.ShelleyGenesis
-  let genesisUtxos: ReadonlyArray<Core.UTxO.UTxO> = []
+  let genesisUtxos: ReadonlyArray<Cardano.UTxO.UTxO> = []
 
   const TEST_MNEMONIC =
     "test test test test test test test test test test test test test test test test test test test test test test test sauce"
@@ -93,7 +93,7 @@ describe("TxBuilder attachMetadata (Devnet Submit)", () => {
       })
       .payToAddress({
         address: myAddress,
-        assets: Core.Assets.fromLovelace(5_000_000n)
+        assets: Cardano.Assets.fromLovelace(5_000_000n)
       })
       .build({ availableUtxos: [...genesisUtxos] })
 
@@ -141,7 +141,7 @@ describe("TxBuilder attachMetadata (Devnet Submit)", () => {
       })
       .payToAddress({
         address: myAddress,
-        assets: Core.Assets.fromLovelace(5_000_000n)
+        assets: Cardano.Assets.fromLovelace(5_000_000n)
       })
       .build()
 
@@ -206,7 +206,7 @@ describe("TxBuilder attachMetadata (Devnet Submit)", () => {
       })
       .payToAddress({
         address: myAddress,
-        assets: Core.Assets.fromLovelace(5_000_000n)
+        assets: Cardano.Assets.fromLovelace(5_000_000n)
       })
       .build()
 

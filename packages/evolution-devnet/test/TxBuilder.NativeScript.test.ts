@@ -11,13 +11,13 @@ import { afterAll, beforeAll, describe, expect, it } from "@effect/vitest"
 import * as Cluster from "@evolution-sdk/devnet/Cluster"
 import * as Config from "@evolution-sdk/devnet/Config"
 import * as Genesis from "@evolution-sdk/devnet/Genesis"
-import { Core } from "@evolution-sdk/evolution"
-import * as Address from "@evolution-sdk/evolution/core/Address"
-import * as NativeScripts from "@evolution-sdk/evolution/core/NativeScripts"
-import * as ScriptHash from "@evolution-sdk/evolution/core/ScriptHash"
-import * as Text from "@evolution-sdk/evolution/core/Text"
-import * as TransactionHash from "@evolution-sdk/evolution/core/TransactionHash"
-import * as UTxO from "@evolution-sdk/evolution/core/UTxO"
+import { Cardano } from "@evolution-sdk/evolution"
+import * as Address from "@evolution-sdk/evolution/Address"
+import * as NativeScripts from "@evolution-sdk/evolution/NativeScripts"
+import * as ScriptHash from "@evolution-sdk/evolution/ScriptHash"
+import * as Text from "@evolution-sdk/evolution/Text"
+import * as TransactionHash from "@evolution-sdk/evolution/TransactionHash"
+import * as UTxO from "@evolution-sdk/evolution/UTxO"
 import { createClient } from "@evolution-sdk/evolution/sdk/client/ClientImpl"
 
 // Time utility functions (duplicated from core since Time module is not externally accessible)
@@ -35,7 +35,7 @@ const slotToUnixTime = (slot: bigint, slotConfig: Cluster.SlotConfig): bigint =>
 describe("TxBuilder NativeScript (Devnet Submit)", () => {
   let devnetCluster: Cluster.Cluster | undefined
   let genesisConfig: Config.ShelleyGenesis
-  let genesisUtxos: ReadonlyArray<Core.UTxO.UTxO> = []
+  let genesisUtxos: ReadonlyArray<Cardano.UTxO.UTxO> = []
 
   const TEST_MNEMONIC =
     "test test test test test test test test test test test test test test test test test test test test test test test sauce"
@@ -127,11 +127,11 @@ describe("TxBuilder NativeScript (Devnet Submit)", () => {
       .newTx()
       .attachScript({ script: multiSigScript })
       .mintAssets({
-        assets: Core.Assets.fromRecord({ [unit]: 500n })
+        assets: Cardano.Assets.fromRecord({ [unit]: 500n })
       })
       .payToAddress({
         address: address1,
-        assets: Core.Assets.fromLovelace(2_000_000n)
+        assets: Cardano.Assets.fromLovelace(2_000_000n)
       })
       .build({ availableUtxos: [...genesisUtxos] })
 
@@ -189,11 +189,11 @@ describe("TxBuilder NativeScript (Devnet Submit)", () => {
       .newTx()
       .attachScript({ script: anyScript })
       .mintAssets({
-        assets: Core.Assets.fromRecord({ [unit]: 100n })
+        assets: Cardano.Assets.fromRecord({ [unit]: 100n })
       })
       .payToAddress({
         address: address1,
-        assets: Core.Assets.fromLovelace(2_000_000n)
+        assets: Cardano.Assets.fromLovelace(2_000_000n)
       })
       .build()
 
@@ -245,11 +245,11 @@ describe("TxBuilder NativeScript (Devnet Submit)", () => {
       .newTx()
       .attachScript({ script: nOfKScript })
       .mintAssets({
-        assets: Core.Assets.fromRecord({ [unit]: 200n })
+        assets: Cardano.Assets.fromRecord({ [unit]: 200n })
       })
       .payToAddress({
         address: address1,
-        assets: Core.Assets.fromLovelace(2_000_000n)
+        assets: Cardano.Assets.fromLovelace(2_000_000n)
       })
       .build()
 
@@ -308,11 +308,11 @@ describe("TxBuilder NativeScript (Devnet Submit)", () => {
       .attachScript({ script: timelockScript })
       .setValidity({ to: futureUnixTime })
       .mintAssets({
-        assets: Core.Assets.fromRecord({ [unit]: 50n })
+        assets: Cardano.Assets.fromRecord({ [unit]: 50n })
       })
       .payToAddress({
         address: myAddress,
-        assets: Core.Assets.fromLovelace(2_000_000n)
+        assets: Cardano.Assets.fromLovelace(2_000_000n)
       })
       .build()
 
@@ -376,11 +376,11 @@ describe("TxBuilder NativeScript (Devnet Submit)", () => {
       .attachScript({ script: complexScript })
       .setValidity({ to: beforeUnixTime })
       .mintAssets({
-        assets: Core.Assets.fromRecord({ [unit]: 25n })
+        assets: Cardano.Assets.fromRecord({ [unit]: 25n })
       })
       .payToAddress({
         address: myAddress,
-        assets: Core.Assets.fromLovelace(2_000_000n)
+        assets: Cardano.Assets.fromLovelace(2_000_000n)
       })
       .build()
 
@@ -432,7 +432,7 @@ describe("TxBuilder NativeScript (Devnet Submit)", () => {
       .newTx()
       .payToAddress({
         address: scriptAddress,
-        assets: Core.Assets.fromLovelace(10_000_000n)
+        assets: Cardano.Assets.fromLovelace(10_000_000n)
       })
       .build()
 
@@ -459,7 +459,7 @@ describe("TxBuilder NativeScript (Devnet Submit)", () => {
       .collectFrom({ inputs: [scriptUtxo!] })
       .payToAddress({
         address: address1,
-        assets: Core.Assets.fromLovelace(5_000_000n)
+        assets: Cardano.Assets.fromLovelace(5_000_000n)
       })
       .build()
 
@@ -505,7 +505,7 @@ describe("TxBuilder NativeScript (Devnet Submit)", () => {
       .newTx()
       .payToAddress({
         address: address1,
-        assets: Core.Assets.fromLovelace(5_000_000n),
+        assets: Cardano.Assets.fromLovelace(5_000_000n),
         script: multiSigScript
       })
       .build()
@@ -533,11 +533,11 @@ describe("TxBuilder NativeScript (Devnet Submit)", () => {
       .newTx()
       .readFrom({ referenceInputs: [refScriptUtxo!] }) // Reference the UTxO with the script
       .mintAssets({
-        assets: Core.Assets.fromRecord({ [unit]: 100n })
+        assets: Cardano.Assets.fromRecord({ [unit]: 100n })
       })
       .payToAddress({
         address: address1,
-        assets: Core.Assets.fromLovelace(2_000_000n)
+        assets: Cardano.Assets.fromLovelace(2_000_000n)
       })
       .build()
 
@@ -591,7 +591,7 @@ describe("TxBuilder NativeScript (Devnet Submit)", () => {
       .newTx()
       .payToAddress({
         address: address1,
-        assets: Core.Assets.fromLovelace(5_000_000n),
+        assets: Cardano.Assets.fromLovelace(5_000_000n),
         script: multiSigScript
       })
       .build()
@@ -608,7 +608,7 @@ describe("TxBuilder NativeScript (Devnet Submit)", () => {
       .newTx()
       .payToAddress({
         address: scriptAddress,
-        assets: Core.Assets.fromLovelace(10_000_000n)
+        assets: Cardano.Assets.fromLovelace(10_000_000n)
       })
       .build()
 
@@ -641,7 +641,7 @@ describe("TxBuilder NativeScript (Devnet Submit)", () => {
       .collectFrom({ inputs: [scriptUtxo!] }) // Spend from the script address
       .payToAddress({
         address: address1,
-        assets: Core.Assets.fromLovelace(5_000_000n)
+        assets: Cardano.Assets.fromLovelace(5_000_000n)
       })
       .build()
 

@@ -9,23 +9,23 @@ import { afterAll, beforeAll, describe, expect, it } from "@effect/vitest"
 import * as Cluster from "@evolution-sdk/devnet/Cluster"
 import * as Config from "@evolution-sdk/devnet/Config"
 import * as Genesis from "@evolution-sdk/devnet/Genesis"
-import { Core } from "@evolution-sdk/evolution"
-import * as CoreAddress from "@evolution-sdk/evolution/core/Address"
-import * as AssetName from "@evolution-sdk/evolution/core/AssetName"
-import * as Bytes from "@evolution-sdk/evolution/core/Bytes"
-import * as Data from "@evolution-sdk/evolution/core/Data"
-import * as DatumOption from "@evolution-sdk/evolution/core/DatumOption"
-import * as PlutusV3 from "@evolution-sdk/evolution/core/PlutusV3"
-import * as PolicyId from "@evolution-sdk/evolution/core/PolicyId"
-import * as ScriptHash from "@evolution-sdk/evolution/core/ScriptHash"
-import * as Text from "@evolution-sdk/evolution/core/Text"
-import * as TransactionHash from "@evolution-sdk/evolution/core/TransactionHash"
+import { Cardano } from "@evolution-sdk/evolution"
+import * as CoreAddress from "@evolution-sdk/evolution/Address"
+import * as AssetName from "@evolution-sdk/evolution/AssetName"
+import * as Bytes from "@evolution-sdk/evolution/Bytes"
+import * as Data from "@evolution-sdk/evolution/Data"
+import * as DatumOption from "@evolution-sdk/evolution/DatumOption"
+import * as PlutusV3 from "@evolution-sdk/evolution/PlutusV3"
+import * as PolicyId from "@evolution-sdk/evolution/PolicyId"
+import * as ScriptHash from "@evolution-sdk/evolution/ScriptHash"
+import * as Text from "@evolution-sdk/evolution/Text"
+import * as TransactionHash from "@evolution-sdk/evolution/TransactionHash"
 import { createClient } from "@evolution-sdk/evolution/sdk/client/ClientImpl"
 import { Schema } from "effect"
 
 import plutusJson from "../../evolution/test/spec/plutus.json"
 
-const CoreAssets = Core.Assets
+const CoreAssets = Cardano.Assets
 
 const getMintMultiValidator = () => {
   const validator = plutusJson.validators.find((v) => v.title === "mint_multi_validator.mint_multi_validator.spend")
@@ -45,7 +45,7 @@ const { compiledCode: MINT_MULTI_COMPILED_CODE, hash: MINT_MULTI_POLICY_ID_HEX }
 describe("TxBuilder RedeemerBuilder", () => {
   let devnetCluster: Cluster.Cluster | undefined
   let genesisConfig: Config.ShelleyGenesis
-  let genesisUtxos: ReadonlyArray<Core.UTxO.UTxO> = []
+  let genesisUtxos: ReadonlyArray<Cardano.UTxO.UTxO> = []
 
   const TEST_MNEMONIC =
     "test test test test test test test test test test test test test test test test test test test test test test test sauce"
@@ -61,7 +61,7 @@ describe("TxBuilder RedeemerBuilder", () => {
   const makeCounterDatum = (counter: bigint): Data.Data => Data.constr(0n, [Data.int(counter)])
 
   /** Parse counter value from UTxO inline datum */
-  const parseCounterDatum = (utxo: Core.UTxO.UTxO): bigint => {
+  const parseCounterDatum = (utxo: Cardano.UTxO.UTxO): bigint => {
     const datumOption = utxo.datumOption
     if (!datumOption || datumOption._tag !== "InlineDatum") {
       throw new Error("UTxO has no inline datum")
@@ -230,7 +230,7 @@ describe("TxBuilder RedeemerBuilder", () => {
       .attachScript({ script: mintMultiScript })
       .collectFrom({
         inputs: scriptUtxos,
-        redeemer: ({ index, utxo }: { index: number; utxo: Core.UTxO.UTxO }): Data.Data => {
+        redeemer: ({ index, utxo }: { index: number; utxo: Cardano.UTxO.UTxO }): Data.Data => {
           const datumCounter = parseCounterDatum(utxo)
           return makeSpendRedeemer(datumCounter + BigInt(index))
         }
@@ -238,7 +238,7 @@ describe("TxBuilder RedeemerBuilder", () => {
       .mintAssets({
         assets: CoreAssets.fromRecord({ [unit]: -300n }),
         redeemer: {
-          all: (inputs: ReadonlyArray<{ index: number; utxo: Core.UTxO.UTxO }>): Data.Data => {
+          all: (inputs: ReadonlyArray<{ index: number; utxo: Cardano.UTxO.UTxO }>): Data.Data => {
             const entries: Array<[bigint, bigint]> = inputs.map((input) => {
               const datumCounter = parseCounterDatum(input.utxo)
               return [BigInt(input.index), datumCounter + BigInt(input.index)]

@@ -519,7 +519,7 @@ import { Core, createClient } from "@evolution-sdk/evolution";
 // Type for clients with common provider methods
 interface ProviderClient {
   getUtxos: (address: Core.Address.Address) => Promise<any>;
-  submitTx: (txCbor: string) => Promise<string>;
+  submitTx: (tx: Core.Transaction.Transaction) => Promise<Core.TransactionHash.TransactionHash>;
   getProtocolParameters: () => Promise<any>;
 }
 
@@ -569,8 +569,8 @@ class ProviderWithFallback {
     return this.withFallback((client) => client.getUtxos(address));
   }
   
-  async submitTx(txCbor: string) {
-    return this.withFallback((client) => client.submitTx(txCbor));
+  async submitTx(tx: Core.Transaction.Transaction) {
+    return this.withFallback((client) => client.submitTx(tx));
   }
   
   async getProtocolParameters() {

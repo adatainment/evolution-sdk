@@ -4,8 +4,11 @@
  * This operation marks the transaction as a "send all" transaction,
  * which triggers special handling in the build phases:
  * 1. All wallet UTxOs are collected as inputs
- * 2. A single output is created with all assets minus fee
- * 3. No change output is created (everything goes to recipient)
+ * 2. A single output is created with all assets minus fee to the recipient
+ *
+ * Note: Internally the output is stored in `changeOutputs` (the standard mechanism
+ * for phase-created outputs), but semantically it represents the full transfer to
+ * the recipient - not traditional "change" that returns to the sender.
  *
  * @module operations/SendAll
  * @since 2.0.0

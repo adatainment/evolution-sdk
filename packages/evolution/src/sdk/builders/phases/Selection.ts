@@ -302,13 +302,8 @@ export const executeSelection = (): Effect.Effect<PhaseResult, TransactionBuilde
       // Update attempt counter
       yield* Ref.update(buildCtxRef, (ctx) => ({ ...ctx, attempt: ctx.attempt + 1, shortfall: 0n }))
 
-      // Check if this is a script transaction (has redeemers or deferred redeemers)
-      // If so, route to Collateral BEFORE ChangeCreation
-      if (stateAfterSelection.redeemers.size > 0 || stateAfterSelection.deferredRedeemers.size > 0) {
-        yield* Effect.logDebug("[Selection] Script transaction detected - routing to Collateral phase")
-        return { next: "collateral" as const }
-      }
-
+      // sendAll is always a simple payment transaction (no scripts)
+      // All script operations (collectFrom, mint, staking, governance) are blocked above
       return { next: "changeCreation" as const }
     }
 

@@ -232,8 +232,9 @@ export const executeChangeCreation = (): Effect.Effect<
         assets: tentativeLeftover
       })
 
-      // Store sendAll output as a change output (not in state.outputs)
-      // This ensures the phase loop doesn't double-count it in outputAssets
+      // Store sendAll output in changeOutputs (the standard pattern for outputs created during phases).
+      // This follows the same convention as normal change outputs - outputs created during the
+      // phase loop go in changeOutputs, while state.outputs contains user-specified outputs.
       yield* Ref.update(buildCtxRef, (ctx) => ({
         ...ctx,
         changeOutputs: [sendAllOutput]

@@ -1,5 +1,23 @@
 # @evolution-sdk/evolution
 
+## 0.4.0
+
+### Minor Changes
+
+- [#131](https://github.com/IntersectMBO/evolution-sdk/pull/131) [`d21109b`](https://github.com/IntersectMBO/evolution-sdk/commit/d21109b3f42bdee33f1c8e3ecf274ca04735f8f5) Thanks [@solidsnakedev](https://github.com/solidsnakedev)! - Add `sendAll()` API to TxBuilder for draining wallet assets to a single address.
+
+  This new method simplifies the common use case of transferring all wallet assets:
+  - Automatically selects all wallet UTxOs as inputs
+  - Creates a single output with all assets minus the transaction fee
+  - Properly calculates minUTxO for the destination output
+  - Validates incompatibility with other operations (payToAddress, collectFrom, mint, staking, governance)
+
+  Usage:
+
+  ```typescript
+  const tx = await client.newTx().sendAll({ to: recipientAddress }).build()
+  ```
+
 ## 0.3.13
 
 ### Patch Changes

@@ -833,7 +833,8 @@ export interface UnfrackAdaOptions {
   readonly subdividePercentages?: ReadonlyArray<number>
 
   /**
-   * Maximum ADA-only UTxOs to consolidate in one transaction
+   * Maximum ADA-only UTxOs to consolidate in one transaction.
+   * NOTE: Not yet implemented. Will hook into coin selection to merge dust UTxOs.
    * @default 20
    */
   readonly maxUtxosToConsolidate?: number

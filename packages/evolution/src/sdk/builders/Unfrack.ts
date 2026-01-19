@@ -30,7 +30,7 @@ const DEFAULT_UNFRACK_OPTIONS = {
   ada: {
     subdivideThreshold: 100_000000n,
     subdividePercentages: [50, 15, 10, 10, 5, 5, 5],
-    maxUtxosToConsolidate: 20
+    maxUtxosToConsolidate: 20 // NOTE: Not yet implemented
   },
   tokens: {
     bundleSize: 10,

@@ -5,7 +5,7 @@ import * as AuxiliaryDataHash from "../AuxiliaryDataHash.js"
 import * as CBOR from "../CBOR.js"
 import * as CostModel from "../CostModel.js"
 import * as Data from "../Data.js"
-import * as DatumOption from "../DatumOption.js"
+import * as DatumHash from "../DatumHash.js"
 import * as Redeemer from "../Redeemer.js"
 import * as Redeemers from "../Redeemers.js"
 import * as ScriptDataHash from "../ScriptDataHash.js"
@@ -197,10 +197,10 @@ export const hashAuxiliaryData = (aux: AuxiliaryData.AuxiliaryData): AuxiliaryDa
 export const hashPlutusData = (
   pd: Data.Data,
   options: CBOR.CodecOptions = CBOR.CML_DATA_DEFAULT_OPTIONS
-): DatumOption.DatumHash => {
+): DatumHash.DatumHash => {
   const bytes = Data.toCBORBytes(pd, options)
   const digest = blake2b(bytes, { dkLen: 32 })
-  return new DatumOption.DatumHash({ hash: digest })
+  return new DatumHash.DatumHash({ hash: digest })
 }
 
 /**

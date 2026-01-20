@@ -4,7 +4,7 @@ import { Context, Data } from "effect"
 import type * as CoreAddress from "../../Address.js"
 import type * as Credential from "../../Credential.js"
 import type * as PlutusData from "../../Data.js"
-import type * as DatumOption from "../../DatumOption.js"
+import type * as DatumHash from "../../DatumHash.js"
 import type * as PoolKeyHash from "../../PoolKeyHash.js"
 import type * as RewardAddress from "../../RewardAddress.js"
 import type * as Transaction from "../../Transaction.js"
@@ -110,7 +110,7 @@ export interface ProviderEffect {
    * Query a datum by its hash.
    * Returns the parsed PlutusData structure.
    */
-  readonly getDatum: (datumHash: DatumOption.DatumHash) => Effect.Effect<PlutusData.Data, ProviderError>
+  readonly getDatum: (datumHash: DatumHash.DatumHash) => Effect.Effect<PlutusData.Data, ProviderError>
   /**
    * Wait for a transaction to be confirmed on the blockchain.
    */

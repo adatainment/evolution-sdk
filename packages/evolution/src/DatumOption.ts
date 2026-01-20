@@ -1,123 +1,9 @@
-import { Either as E, Equal, FastCheck, Hash, Inspectable, ParseResult, Schema } from "effect"
+import { Either as E, FastCheck, ParseResult, Schema } from "effect"
 
-import * as Bytes from "./Bytes.js"
-import * as Bytes32 from "./Bytes32.js"
 import * as CBOR from "./CBOR.js"
 import * as PlutusData from "./Data.js"
-
-/**
- * Schema for DatumHash variant of DatumOption.
- * Represents a reference to datum data stored elsewhere via its hash.
- *
- * @since 2.0.0
- * @category schemas
- */
-export class DatumHash extends Schema.TaggedClass<DatumHash>()("DatumHash", {
-  hash: Bytes32.BytesFromHex
-}) {
-  /**
-   * @since 2.0.0
-   * @category json
-   */
-  toJSON() {
-    return { _tag: "DatumHash" as const, hash: this.hash }
-  }
-
-  /**
-   * @since 2.0.0
-   * @category string
-   */
-  toString(): string {
-    return Inspectable.format(this.toJSON())
-  }
-
-  /**
-   * @since 2.0.0
-   * @category inspect
-   */
-  [Inspectable.NodeInspectSymbol](): unknown {
-    return this.toJSON()
-  }
-
-  /**
-   * @since 2.0.0
-   * @category equality
-   */
-  [Equal.symbol](that: unknown): boolean {
-    return that instanceof DatumHash && Bytes.equals(this.hash, that.hash)
-  }
-
-  /**
-   * @since 2.0.0
-   * @category hash
-   */
-  [Hash.symbol](): number {
-    return Hash.array(Array.from(this.hash))
-  }
-}
-
-export const DatumHashFromBytes = Schema.transform(
-  Schema.typeSchema(Bytes32.BytesFromHex),
-  Schema.typeSchema(DatumHash),
-  {
-    strict: true,
-    decode: (bytes) => new DatumHash({ hash: bytes }, { disableValidation: true }),
-    encode: (dh) => dh.hash
-  }
-).annotations({
-  identifier: "DatumOption.DatumHashFromBytes"
-})
-
-/**
- * Schema for InlineDatum variant of DatumOption.
- * Represents inline plutus data embedded directly in the transaction output.
- *
- * @since 2.0.0
- * @category schemas
- */
-export class InlineDatum extends Schema.TaggedClass<InlineDatum>()("InlineDatum", {
-  data: PlutusData.DataSchema
-}) {
-  /**
-   * @since 2.0.0
-   * @category json
-   */
-  toJSON() {
-    return { _tag: "InlineDatum" as const, data: this.data }
-  }
-
-  /**
-   * @since 2.0.0
-   * @category string
-   */
-  toString(): string {
-    return Inspectable.format(this.toJSON())
-  }
-
-  /**
-   * @since 2.0.0
-   * @category inspect
-   */
-  [Inspectable.NodeInspectSymbol](): unknown {
-    return this.toJSON()
-  }
-
-  /**
-   * @since 2.0.0
-   * @category equality
-   */
-  [Equal.symbol](that: unknown): boolean {
-    return that instanceof InlineDatum && PlutusData.equals(this.data, that.data)
-  }
-
-  /**
-   * @since 2.0.0
-   * @category hash
-   */
-  [Hash.symbol](): number {
-    return Hash.cached(this, PlutusData.hash(this.data))
-  }
-}
+import * as DatumHash from "./DatumHash.js"
+import * as InlineDatum from "./InlineDatum.js"
 
 /**
  * Schema for DatumOption representing optional datum information in transaction outputs.
@@ -131,7 +17,7 @@ export class InlineDatum extends Schema.TaggedClass<InlineDatum>()("InlineDatum"
  * @since 2.0.0
  * @category schemas
  */
-export const DatumOptionSchema = Schema.Union(DatumHash, InlineDatum).annotations({
+export const DatumOptionSchema = Schema.Union(DatumHash.DatumHash, InlineDatum.InlineDatum).annotations({
   identifier: "DatumOption"
 })
 
@@ -150,7 +36,7 @@ export type DatumOption = typeof DatumOptionSchema.Type
  * @since 2.0.0
  * @category predicates
  */
-export const isDatumHash = Schema.is(DatumHash)
+export const isDatumHash = DatumHash.isDatumHash
 
 /**
  * Check if a DatumOption is inline data.
@@ -158,12 +44,7 @@ export const isDatumHash = Schema.is(DatumHash)
  * @since 2.0.0
  * @category predicates
  */
-export const isInlineDatum = Schema.is(InlineDatum)
-
-export const datumHashArbitrary = FastCheck.uint8Array({ minLength: 32, maxLength: 32 }).map(
-  (hash) => new DatumHash({ hash })
-)
-export const inlineDatumArbitrary = PlutusData.arbitrary.map((data) => new InlineDatum({ data }))
+export const isInlineDatum = InlineDatum.isInlineDatum
 
 /**
  * FastCheck arbitrary for generating random DatumOption instances
@@ -171,7 +52,7 @@ export const inlineDatumArbitrary = PlutusData.arbitrary.map((data) => new Inlin
  * @since 2.0.0
  * @category testing
  */
-export const arbitrary = FastCheck.oneof(datumHashArbitrary, inlineDatumArbitrary)
+export const arbitrary = FastCheck.oneof(DatumHash.arbitrary, InlineDatum.arbitrary)
 
 export const CDDLSchema = Schema.Union(
   Schema.Tuple(Schema.Literal(0n), CBOR.ByteArray), // [0, Bytes32]
@@ -203,7 +84,7 @@ export const FromCDDL = Schema.transformOrFail(CDDLSchema, Schema.typeSchema(Dat
     E.gen(function* () {
       if (tag === 0n) {
         // Decode as DatumHash
-        return yield* E.right(new DatumHash({ hash: value }, { disableValidation: true }))
+        return yield* E.right(new DatumHash.DatumHash({ hash: value }, { disableValidation: true }))
       } else if (tag === 1n) {
         // Decode as InlineDatum - value is now a CBOR tag 24 wrapper containing bytes
         const taggedValue = value as { _tag: "Tag"; tag: number; value: Uint8Array }
@@ -217,7 +98,7 @@ export const FromCDDL = Schema.transformOrFail(CDDLSchema, Schema.typeSchema(Dat
           )
         }
         return yield* E.right(
-          new InlineDatum(
+          new InlineDatum.InlineDatum(
             {
               data: PlutusData.fromCBORBytes(taggedValue.value)
             },

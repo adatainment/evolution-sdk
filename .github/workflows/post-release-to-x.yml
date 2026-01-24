@@ -1,20 +1,31 @@
 name: Post Release to X
 
 on:
-  release:
-    types: [published]
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
   workflow_dispatch:
 
 jobs:
   notify:
     runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
+      - name: Get latest release
+        id: release
+        run: |
+          RELEASE=$(gh api /repos/${{ github.repository }}/releases/latest)
+          echo "tag=$(echo $RELEASE | jq -r .tag_name)" >> $GITHUB_OUTPUT
+          echo "url=$(echo $RELEASE | jq -r .html_url)" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
       - name: Tweet new release
         uses: nearform-actions/github-action-notify-twitter@v1
         with:
           message: |
-            Evolution SDK ${{ github.event.release.tag_name }} out now
-            ${{ github.event.release.html_url }}
+            Evolution SDK ${{ steps.release.outputs.tag }} out now
+            ${{ steps.release.outputs.url }}
             Happy building! 🛠️
           twitter-app-key: ${{ secrets.TWITTER_API_KEY }}
           twitter-app-secret: ${{ secrets.TWITTER_API_SECRET }}

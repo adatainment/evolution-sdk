@@ -4,6 +4,7 @@ import { Cardano } from "@evolution-sdk/evolution"
 import * as CoreAddress from "@evolution-sdk/evolution/Address"
 import * as Bytes from "@evolution-sdk/evolution/Bytes"
 import * as Data from "@evolution-sdk/evolution/Data"
+import * as InlineDatum from "@evolution-sdk/evolution/InlineDatum"
 import * as PlutusV2 from "@evolution-sdk/evolution/PlutusV2"
 import * as ScriptHash from "@evolution-sdk/evolution/ScriptHash"
 import type { TxBuilderConfig } from "@evolution-sdk/evolution/sdk/builders/TransactionBuilder"
@@ -144,14 +145,14 @@ describe("TxBuilder Script Handling", () => {
 
     // Create script UTxO with inline datum
     const ownerPubKeyHash = "00000000000000000000000000000000000000000000000000000000"
-    const datum = Data.toCBORHex(Data.constr(0n, [Data.bytearray(ownerPubKeyHash)]))
+    const datum = Data.constr(0n, [Data.bytearray(ownerPubKeyHash)])
 
     const scriptUtxo = createCoreTestUtxo({
       transactionId: "a".repeat(64),
       index: 0,
       address: scriptAddress,
       lovelace: 5_000_000n,
-      datumOption: { type: "inlineDatum", inline: datum }
+      datumOption: new InlineDatum.InlineDatum({ data: datum })
     })
 
     // Create funding UTxO
@@ -209,14 +210,14 @@ describe("TxBuilder Script Handling", () => {
 
     // Create script UTxO with inline datum
     const ownerPubKeyHash = "00000000000000000000000000000000000000000000000000000000"
-    const datum = Data.toCBORHex(Data.constr(0n, [Data.bytearray(ownerPubKeyHash)]))
+    const datum = Data.constr(0n, [Data.bytearray(ownerPubKeyHash)])
 
     const scriptUtxo = createCoreTestUtxo({
       transactionId: "a".repeat(64),
       index: 0,
       address: scriptAddress,
       lovelace: 5_000_000n,
-      datumOption: { type: "inlineDatum", inline: datum }
+      datumOption: new InlineDatum.InlineDatum({ data: datum })
     })
 
     // Create funding UTxO
@@ -275,14 +276,14 @@ describe("TxBuilder Script Handling", () => {
 
     // Create script UTxO with inline datum
     const ownerPubKeyHash = "00000000000000000000000000000000000000000000000000000000"
-    const datum = Data.toCBORHex(Data.constr(0n, [Data.bytearray(ownerPubKeyHash)]))
+    const datum = Data.constr(0n, [Data.bytearray(ownerPubKeyHash)])
 
     const scriptUtxo = createCoreTestUtxo({
       transactionId: "a".repeat(64),
       index: 0,
       address: scriptAddress,
       lovelace: 5_000_000n,
-      datumOption: { type: "inlineDatum", inline: datum }
+      datumOption: new InlineDatum.InlineDatum({ data: datum })
     })
 
     // Create funding UTxO
@@ -342,14 +343,14 @@ describe("TxBuilder Script Handling", () => {
 
     // Create script UTxO with inline datum
     const ownerPubKeyHash = "00000000000000000000000000000000000000000000000000000000"
-    const datum = Data.toCBORHex(Data.constr(0n, [Data.bytearray(ownerPubKeyHash)]))
+    const datum = Data.constr(0n, [Data.bytearray(ownerPubKeyHash)])
 
     const scriptUtxo = createCoreTestUtxo({
       transactionId: "a".repeat(64),
       index: 0,
       address: scriptAddress,
       lovelace: 5_000_000n,
-      datumOption: { type: "inlineDatum", inline: datum }
+      datumOption: new InlineDatum.InlineDatum({ data: datum })
     })
 
     const multiAssetUtxo = createCoreTestUtxo({
@@ -435,14 +436,14 @@ describe("TxBuilder Script Handling", () => {
 
     // Create script UTxO with inline datum
     const ownerPubKeyHash = "00000000000000000000000000000000000000000000000000000000"
-    const datum = Data.toCBORHex(Data.constr(0n, [Data.bytearray(ownerPubKeyHash)]))
+    const datum = Data.constr(0n, [Data.bytearray(ownerPubKeyHash)])
 
     const scriptUtxo = createCoreTestUtxo({
       transactionId: "a".repeat(64),
       index: 0,
       address: scriptAddress,
       lovelace: 5_000_000n,
-      datumOption: { type: "inlineDatum", inline: datum }
+      datumOption: new InlineDatum.InlineDatum({ data: datum })
     })
 
     // Create a collateral UTxO with tokens
@@ -498,14 +499,14 @@ describe("TxBuilder Script Handling", () => {
 
     // Create script UTxO with inline datum
     const ownerPubKeyHash = "00000000000000000000000000000000000000000000000000000000"
-    const datum = Data.toCBORHex(Data.constr(0n, [Data.bytearray(ownerPubKeyHash)]))
+    const datum = Data.constr(0n, [Data.bytearray(ownerPubKeyHash)])
 
     const scriptUtxo = createCoreTestUtxo({
       transactionId: "a".repeat(64),
       index: 0,
       address: scriptAddress,
       lovelace: 5_000_000n,
-      datumOption: { type: "inlineDatum", inline: datum }
+      datumOption: new InlineDatum.InlineDatum({ data: datum })
     })
 
     // Create collateral UTxOs that are too small (total < 5 ADA default target)
@@ -557,14 +558,14 @@ describe("TxBuilder Script Handling", () => {
 
     // Create script UTxO with inline datum
     const ownerPubKeyHash = "00000000000000000000000000000000000000000000000000000000"
-    const datum = Data.toCBORHex(Data.constr(0n, [Data.bytearray(ownerPubKeyHash)]))
+    const datum = Data.constr(0n, [Data.bytearray(ownerPubKeyHash)])
 
     const scriptUtxo = createCoreTestUtxo({
       transactionId: "a".repeat(64),
       index: 0,
       address: scriptAddress,
       lovelace: 5_000_000n,
-      datumOption: { type: "inlineDatum", inline: datum }
+      datumOption: new InlineDatum.InlineDatum({ data: datum })
     })
 
     // Create UTxO WITH reference script (should be excluded from collateral)
@@ -629,14 +630,14 @@ describe("TxBuilder Script Handling", () => {
 
     // Create script UTxO with inline datum
     const ownerPubKeyHash = "00000000000000000000000000000000000000000000000000000000"
-    const datum = Data.toCBORHex(Data.constr(0n, [Data.bytearray(ownerPubKeyHash)]))
+    const datum = Data.constr(0n, [Data.bytearray(ownerPubKeyHash)])
 
     const scriptUtxo = createCoreTestUtxo({
       transactionId: "a".repeat(64),
       index: 0,
       address: scriptAddress,
       lovelace: 5_000_000n,
-      datumOption: { type: "inlineDatum", inline: datum }
+      datumOption: new InlineDatum.InlineDatum({ data: datum })
     })
 
     // Create funding UTxO (smaller amount to test largest-first selection)
@@ -720,14 +721,14 @@ describe("TxBuilder Script Handling", () => {
 
     // Create script UTxO with inline datum
     const ownerPubKeyHash = "00000000000000000000000000000000000000000000000000000000"
-    const datum = Data.toCBORHex(Data.constr(0n, [Data.bytearray(ownerPubKeyHash)]))
+    const datum = Data.constr(0n, [Data.bytearray(ownerPubKeyHash)])
 
     const scriptUtxo = createCoreTestUtxo({
       transactionId: "a".repeat(64),
       index: 0,
       address: scriptAddress,
       lovelace: 5_000_000n,
-      datumOption: { type: "inlineDatum", inline: datum }
+      datumOption: new InlineDatum.InlineDatum({ data: datum })
     })
 
     // Create collateral UTxO with MORE than 5 ADA (should create return)
@@ -1075,10 +1076,7 @@ describe("TxBuilder Script Handling", () => {
     const scriptUtxo = createCoreTestUtxo({
       address: scriptAddress,
       lovelace: 5_000_000n,
-      datumOption: {
-        type: "inlineDatum",
-        inline: Data.toCBORHex(Data.constr(0n, []))
-      }
+      datumOption: new InlineDatum.InlineDatum({ data: Data.constr(0n, []) })
     })
 
     // Create 4 collateral candidates:
@@ -1161,10 +1159,7 @@ describe("TxBuilder Script Handling", () => {
     const scriptUtxo = createCoreTestUtxo({
       address: scriptAddress,
       lovelace: 5_000_000n,
-      datumOption: {
-        type: "inlineDatum",
-        inline: Data.toCBORHex(Data.constr(0n, []))
-      }
+      datumOption: new InlineDatum.InlineDatum({ data: Data.constr(0n, []) })
     })
 
     // Create 3 collateral candidates (each with 2 ADA, total 6 ADA > 5 ADA target)
@@ -1234,10 +1229,7 @@ describe("TxBuilder Script Handling", () => {
     const scriptUtxo = createCoreTestUtxo({
       address: scriptAddress,
       lovelace: 5_000_000n,
-      datumOption: {
-        type: "inlineDatum",
-        inline: Data.toCBORHex(Data.constr(0n, []))
-      }
+      datumOption: new InlineDatum.InlineDatum({ data: Data.constr(0n, []) })
     })
 
     // Create 5 small collateral UTxOs (1.5 ADA each)

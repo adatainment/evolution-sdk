@@ -21,7 +21,7 @@ import { Cardano } from "@evolution-sdk/evolution"
 import * as CoreAddress from "@evolution-sdk/evolution/Address"
 import * as Bytes from "@evolution-sdk/evolution/Bytes"
 import * as Data from "@evolution-sdk/evolution/Data"
-import * as DatumOption from "@evolution-sdk/evolution/DatumOption"
+import * as InlineDatum from "@evolution-sdk/evolution/InlineDatum"
 import * as PlutusV3 from "@evolution-sdk/evolution/PlutusV3"
 import * as ScriptHash from "@evolution-sdk/evolution/ScriptHash"
 import { createClient } from "@evolution-sdk/evolution/sdk/client/ClientImpl"
@@ -177,7 +177,7 @@ describe("TxBuilder Script Stake Operations", () => {
     }
 
     // Step 2: Fund UTxOs at the script address
-    const unitDatum = new DatumOption.InlineDatum({ data: Data.constr(0n, []) })
+    const unitDatum = new InlineDatum.InlineDatum({ data: Data.constr(0n, []) })
 
     const fundSignBuilder = await client
       .newTx()
@@ -283,7 +283,7 @@ describe("TxBuilder Script Stake Operations", () => {
     }
 
     // Fund a UTxO at script address
-    const unitDatum = new DatumOption.InlineDatum({ data: Data.constr(0n, []) })
+    const unitDatum = new InlineDatum.InlineDatum({ data: Data.constr(0n, []) })
     const fundSignBuilder = await client
       .newTx()
       .payToAddress({ address: scriptPaymentAddress, assets: Cardano.Assets.fromLovelace(10_000_000n), datum: unitDatum })

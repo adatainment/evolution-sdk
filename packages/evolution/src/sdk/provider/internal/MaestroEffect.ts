@@ -9,7 +9,7 @@ import * as CoreAddress from "../../../Address.js"
 import * as Bytes from "../../../Bytes.js"
 import type * as Credential from "../../../Credential.js"
 import * as PlutusData from "../../../Data.js"
-import type * as DatumOption from "../../../DatumOption.js"
+import type * as DatumHash from "../../../DatumHash.js"
 import * as Transaction from "../../../Transaction.js"
 import * as TransactionHash from "../../../TransactionHash.js"
 import type * as TransactionInput from "../../../TransactionInput.js"
@@ -258,7 +258,7 @@ export const getUtxoByUnit = (baseUrl: string, apiKey: string) => (unit: string)
 /**
  * Get datum by datum hash
  */
-export const getDatum = (baseUrl: string, apiKey: string) => (datumHash: DatumOption.DatumHash) =>
+export const getDatum = (baseUrl: string, apiKey: string) => (datumHash: DatumHash.DatumHash) =>
   Effect.gen(function* () {
     const datumHashHex = Bytes.toHex(datumHash.hash)
     const response = yield* HttpUtils.get(

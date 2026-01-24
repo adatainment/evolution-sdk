@@ -1,6 +1,6 @@
 ---
 title: sdk/builders/TransactionBuilder.ts
-nav_order: 149
+nav_order: 151
 parent: Modules
 ---
 
@@ -1235,7 +1235,7 @@ Added in v2.0.0
 ## TxContext (class)
 
 Context service providing transaction building state to programs.
-Directly holds the mutable state Ref - config is passed as a regular parameter.
+Holds the mutable state Ref - config is passed as a regular parameter.
 
 **Signature**
 
@@ -1438,8 +1438,15 @@ Added in v2.0.0
 
 ## TxBuilderState (interface)
 
-Mutable state for transaction building.
+Mutable state created FRESH on each build() call.
 Contains all state needed during transaction construction.
+
+State lifecycle:
+
+1. Created fresh when build() is called
+2. Modified by ProgramSteps during execution
+3. Used to construct final transaction
+4. Discarded after build completes
 
 **Signature**
 
@@ -1708,6 +1715,37 @@ export interface BuildOptions {
   readonly evaluator?: Evaluator
 
   /**
+   * Pass additional UTxOs to provider-based evaluators.
+   *
+   * By default, provider evaluators (Ogmios, Blockfrost) don't receive additionalUtxos
+   * because they can resolve UTxOs from the chain, and passing them causes
+   * "OverlappingAdditionalUtxo" errors.
+   *
+   * Set to `true` for edge cases where you need to evaluate with UTxOs that
+   * are not yet on chain (e.g., chained transactions, emulator scenarios).
+   *
+   * Note: This option has no effect on custom evaluators (Aiken, Scalus) which
+   * always receive additionalUtxos since they cannot resolve from chain.
+   *
+   * @default false
+   * @since 2.0.0
+   */
+  readonly passAdditionalUtxos?: boolean
+
+  /**
+   * Format for encoding redeemers in the script data hash.
+   *
+   * - `"array"` (DEFAULT): Conway-era format, redeemers encoded as array
+   * - `"map"`: Babbage-era format, redeemers encoded as map
+   *
+   * Use `"map"` for Babbage compatibility or debugging.
+   *
+   * @default "array"
+   * @since 2.0.0
+   */
+  readonly scriptDataFormat?: "array" | "map"
+
+  /**
    * Custom slot configuration for script evaluation.
    *
    * By default, slot config is determined from the network (mainnet/preview/preprod).
@@ -1762,19 +1800,6 @@ export interface BuildOptions {
    * Named in respect to the Unfrack.It open source community
    */
   readonly unfrack?: UnfrackOptions
-
-  /**
-   * **EXPERIMENTAL**: Use state machine implementation instead of monolithic buildEffectCore
-   *
-   * When true, uses the experimental 6-phase state machine:
-   * - initialSelection → changeCreation → feeCalculation → balanceVerification → reselection → complete
-   *
-   * WARNING: Has known Context.Tag type inference issues. Use for testing only.
-   *
-   * @experimental
-   * @default false
-   */
-  readonly useStateMachine?: boolean
 
   /**
    * Enable debug logging during transaction build.
@@ -1832,7 +1857,8 @@ export interface UnfrackAdaOptions {
   readonly subdividePercentages?: ReadonlyArray<number>
 
   /**
-   * Maximum ADA-only UTxOs to consolidate in one transaction
+   * Maximum ADA-only UTxOs to consolidate in one transaction.
+   * NOTE: Not yet implemented. Will hook into coin selection to merge dust UTxOs.
    * @default 20
    */
   readonly maxUtxosToConsolidate?: number

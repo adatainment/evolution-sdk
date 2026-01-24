@@ -1,6 +1,6 @@
 ---
 title: sdk/Type.ts
-nav_order: 161
+nav_order: 163
 parent: Modules
 ---
 

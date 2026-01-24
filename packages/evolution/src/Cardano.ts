@@ -78,7 +78,9 @@ export * as ScriptRef from "./ScriptRef.js"
 
 // Plutus Data
 export * as Data from "./Data.js"
+export * as DatumHash from "./DatumHash.js"
 export * as DatumOption from "./DatumOption.js"
+export * as InlineDatum from "./InlineDatum.js"
 export * as Plutus from "./plutus/index.js"
 export * as TSchema from "./TSchema.js"
 

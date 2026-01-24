@@ -10,7 +10,9 @@ import * as CoreAddress from "../../../Address.js"
 import * as Bytes from "../../../Bytes.js"
 import type * as Credential from "../../../Credential.js"
 import * as PlutusData from "../../../Data.js"
-import * as DatumOption from "../../../DatumOption.js"
+import * as DatumHash from "../../../DatumHash.js"
+import type * as DatumOption from "../../../DatumOption.js"
+import * as InlineDatum from "../../../InlineDatum.js"
 import * as PlutusV1 from "../../../PlutusV1.js"
 import * as PlutusV2 from "../../../PlutusV2.js"
 import * as PlutusV3 from "../../../PlutusV3.js"
@@ -166,7 +168,7 @@ const getDatumByHash = (baseUrl: string, projectId?: string) =>
     ).pipe(
       Effect.map((datum) => {
         const data = PlutusData.fromCBORHex(datum.cbor)
-        return new DatumOption.InlineDatum({ data })
+        return new InlineDatum.InlineDatum({ data })
       }),
       Effect.mapError(wrapError("getDatumByHash"))
     )
@@ -239,6 +241,9 @@ export const getUtxos = (baseUrl: string, projectId?: string) =>
     
     // Transform UTxOs with full script and datum resolution
     const transformWithResolution = (utxo: Blockfrost.BlockfrostUTxO) => {
+      const transactionId = TransactionHash.fromHex(utxo.tx_hash)
+      const address = CoreAddress.fromBech32(utxo.address)
+      
       const scriptEffect = utxo.reference_script_hash
         ? fetchScript(utxo.reference_script_hash).pipe(
             Effect.map((s) => s as Script.Script | undefined),
@@ -249,15 +254,14 @@ export const getUtxos = (baseUrl: string, projectId?: string) =>
       const dataHash = utxo.data_hash
       const datumEffect = utxo.inline_datum
         ? Effect.succeed(
-            new DatumOption.InlineDatum({ 
+            new InlineDatum.InlineDatum({ 
               data: PlutusData.fromCBORHex(utxo.inline_datum) 
-            }) as DatumOption.DatumOption | undefined
+            })
           )
         : dataHash
           ? fetchDatum(dataHash).pipe(
-              Effect.map((d) => d as DatumOption.DatumOption | undefined),
               Effect.catchAll(() => Effect.succeed(
-                new DatumOption.DatumHash({ hash: Bytes.fromHex(dataHash) }) as DatumOption.DatumOption | undefined
+                DatumHash.fromHex(dataHash)
               ))
             )
           : Effect.succeed(undefined)
@@ -265,9 +269,6 @@ export const getUtxos = (baseUrl: string, projectId?: string) =>
       return Effect.all([scriptEffect, datumEffect]).pipe(
         Effect.map(([scriptRef, datumOption]) => {
           const assets = Blockfrost.transformAmounts(utxo.amount)
-          const address = CoreAddress.fromBech32(addressPath)
-          const transactionId = TransactionHash.fromHex(utxo.tx_hash)
-          
           return new CoreUTxO.UTxO({
             transactionId,
             index: BigInt(utxo.output_index),
@@ -345,15 +346,14 @@ export const getUtxosWithUnit = (baseUrl: string, projectId?: string) =>
       const dataHash = utxo.data_hash
       const datumEffect = utxo.inline_datum
         ? Effect.succeed(
-            new DatumOption.InlineDatum({ 
+            new InlineDatum.InlineDatum({ 
               data: PlutusData.fromCBORHex(utxo.inline_datum) 
-            }) as DatumOption.DatumOption | undefined
+            })
           )
         : dataHash
           ? fetchDatum(dataHash).pipe(
-              Effect.map((d) => d as DatumOption.DatumOption | undefined),
               Effect.catchAll(() => Effect.succeed(
-                new DatumOption.DatumHash({ hash: Bytes.fromHex(dataHash) }) as DatumOption.DatumOption | undefined
+                DatumHash.fromHex(dataHash)
               ))
             )
           : Effect.succeed(undefined)
@@ -439,15 +439,14 @@ export const getUtxoByUnit = (baseUrl: string, projectId?: string) =>
             const dataHash = utxo.data_hash
             const datumEffect = utxo.inline_datum
               ? Effect.succeed(
-                  new DatumOption.InlineDatum({ 
+                  new InlineDatum.InlineDatum({ 
                     data: PlutusData.fromCBORHex(utxo.inline_datum) 
-                  }) as DatumOption.DatumOption | undefined
+                  })
                 )
               : dataHash
                 ? fetchDatum(dataHash).pipe(
-                    Effect.map((d) => d as DatumOption.DatumOption | undefined),
                     Effect.catchAll(() => Effect.succeed(
-                      new DatumOption.DatumHash({ hash: Bytes.fromHex(dataHash) }) as DatumOption.DatumOption | undefined
+                      DatumHash.fromHex(dataHash)
                     ))
                   )
                 : Effect.succeed(undefined)
@@ -512,15 +511,14 @@ export const getUtxosByOutRef = (baseUrl: string, projectId?: string) =>
               const dataHash = output.data_hash
               const datumEffect = output.inline_datum
                 ? Effect.succeed(
-                    new DatumOption.InlineDatum({ 
+                    new InlineDatum.InlineDatum({ 
                       data: PlutusData.fromCBORHex(output.inline_datum) 
-                    }) as DatumOption.DatumOption | undefined
+                    })
                   )
                 : dataHash
                   ? fetchDatum(dataHash).pipe(
-                      Effect.map((d) => d as DatumOption.DatumOption | undefined),
                       Effect.catchAll(() => Effect.succeed(
-                        new DatumOption.DatumHash({ hash: Bytes.fromHex(dataHash) }) as DatumOption.DatumOption | undefined
+                        DatumHash.fromHex(dataHash)
                       ))
                     )
                   : Effect.succeed(undefined)
@@ -582,7 +580,7 @@ export const getDelegation = (baseUrl: string, projectId?: string) =>
  * Returns: (baseUrl, projectId?) => (datumHash) => Effect<PlutusData, ProviderError>
  */
 export const getDatum = (baseUrl: string, projectId?: string) =>
-  (datumHash: DatumOption.DatumHash) => {
+  (datumHash: DatumHash.DatumHash) => {
     const datumHashHex = Bytes.toHex(datumHash.hash)
     return withRateLimit(
       HttpUtils.get(

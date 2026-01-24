@@ -16,9 +16,9 @@ import * as Anchor from "@evolution-sdk/evolution/Anchor"
 import * as Bytes from "@evolution-sdk/evolution/Bytes"
 import * as Bytes32 from "@evolution-sdk/evolution/Bytes32"
 import * as Data from "@evolution-sdk/evolution/Data"
-import * as DatumOption from "@evolution-sdk/evolution/DatumOption"
 import * as DRep from "@evolution-sdk/evolution/DRep"
 import * as GovernanceAction from "@evolution-sdk/evolution/GovernanceAction"
+import * as InlineDatum from "@evolution-sdk/evolution/InlineDatum"
 import * as PlutusV3 from "@evolution-sdk/evolution/PlutusV3"
 import * as RewardAccount from "@evolution-sdk/evolution/RewardAccount"
 import * as ScriptHash from "@evolution-sdk/evolution/ScriptHash"
@@ -289,7 +289,7 @@ describe("TxBuilder Vote Validator (script DRep)", () => {
       .payToAddress({
         address: address0,
         assets: Cardano.Assets.fromLovelace(5_000_000n),
-        datum: new DatumOption.InlineDatum({ data: configDatum })
+        datum: new InlineDatum.InlineDatum({ data: configDatum })
       })
       .build()
       .then(b => b.sign())
@@ -423,7 +423,7 @@ describe("TxBuilder Vote Validator (script DRep)", () => {
       .payToAddress({
         address: address0,
         assets: Cardano.Assets.fromLovelace(5_000_000n),
-        datum: new DatumOption.InlineDatum({ data: configDatum })
+        datum: new InlineDatum.InlineDatum({ data: configDatum })
       })
       .build()
       .then(b => b.sign())

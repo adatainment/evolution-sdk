@@ -7,7 +7,9 @@ import * as AssetsUnit from "../../../Assets/Unit.js"
 import * as Bytes from "../../../Bytes.js"
 import type * as Credential from "../../../Credential.js"
 import * as PlutusData from "../../../Data.js"
-import * as DatumOption from "../../../DatumOption.js"
+import * as DatumHash from "../../../DatumHash.js"
+import type * as DatumOption from "../../../DatumOption.js"
+import * as InlineDatum from "../../../InlineDatum.js"
 import * as NativeScripts from "../../../NativeScripts.js"
 import * as PlutusV1 from "../../../PlutusV1.js"
 import * as PlutusV2 from "../../../PlutusV2.js"
@@ -87,7 +89,7 @@ const retrieveDatumEffect =
             (result) => {
               // Parse the datum hex string to PlutusData
               const data = PlutusData.fromCBORHex(result.datum)
-              return new DatumOption.InlineDatum({ data })
+              return new InlineDatum.InlineDatum({ data })
             }
           ),
           Effect.retry(Schedule.compose(Schedule.exponential(50), Schedule.recurs(5))),
@@ -96,7 +98,7 @@ const retrieveDatumEffect =
         )
       } else if (datum_type === "hash" && datum_hash) {
         const hashBytes = Bytes.fromHex(datum_hash)
-        return new DatumOption.DatumHash({ hash: hashBytes })
+        return new DatumHash.DatumHash({ hash: hashBytes })
       }
 
       return undefined
@@ -440,7 +442,7 @@ export const getDelegationEffect = (ogmiosUrl: string, headers?: { ogmiosHeader?
   })
 
 export const getDatumEffect = (kupoUrl: string, headers?: { kupoHeader?: Record<string, string> }) =>
-  Effect.fn("getDatum")(function* (datumHash: DatumOption.DatumHash) {
+  Effect.fn("getDatum")(function* (datumHash: DatumHash.DatumHash) {
     const datumHashHex = Bytes.toHex(datumHash.hash)
     const pattern = `${kupoUrl}/datums/${datumHashHex}`
     const schema = Kupo.DatumSchema

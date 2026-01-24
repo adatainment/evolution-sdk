@@ -1,6 +1,6 @@
 ---
 title: sdk/provider/Provider.ts
-nav_order: 160
+nav_order: 162
 parent: Modules
 ---
 
@@ -161,7 +161,7 @@ export interface ProviderEffect {
    * Query a datum by its hash.
    * Returns the parsed PlutusData structure.
    */
-  readonly getDatum: (datumHash: DatumOption.DatumHash) => Effect.Effect<PlutusData.Data, ProviderError>
+  readonly getDatum: (datumHash: DatumHash.DatumHash) => Effect.Effect<PlutusData.Data, ProviderError>
   /**
    * Wait for a transaction to be confirmed on the blockchain.
    */

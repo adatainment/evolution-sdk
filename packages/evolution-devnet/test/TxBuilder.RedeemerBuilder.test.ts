@@ -14,7 +14,7 @@ import * as CoreAddress from "@evolution-sdk/evolution/Address"
 import * as AssetName from "@evolution-sdk/evolution/AssetName"
 import * as Bytes from "@evolution-sdk/evolution/Bytes"
 import * as Data from "@evolution-sdk/evolution/Data"
-import * as DatumOption from "@evolution-sdk/evolution/DatumOption"
+import * as InlineDatum from "@evolution-sdk/evolution/InlineDatum"
 import * as PlutusV3 from "@evolution-sdk/evolution/PlutusV3"
 import * as PolicyId from "@evolution-sdk/evolution/PolicyId"
 import * as ScriptHash from "@evolution-sdk/evolution/ScriptHash"
@@ -184,17 +184,17 @@ describe("TxBuilder RedeemerBuilder", () => {
       .payToAddress({
         address: CoreAddress.fromBech32(scriptAddress),
         assets: CoreAssets.fromRecord({ lovelace: 3_000_000n, [unit]: 100n }),
-        datum: new DatumOption.InlineDatum({ data: datum1 })
+        datum: new InlineDatum.InlineDatum({ data: datum1 })
       })
       .payToAddress({
         address: CoreAddress.fromBech32(scriptAddress),
         assets: CoreAssets.fromRecord({ lovelace: 3_000_000n, [unit]: 100n }),
-        datum: new DatumOption.InlineDatum({ data: datum2 })
+        datum: new InlineDatum.InlineDatum({ data: datum2 })
       })
       .payToAddress({
         address: CoreAddress.fromBech32(scriptAddress),
         assets: CoreAssets.fromRecord({ lovelace: 3_000_000n, [unit]: 100n }),
-        datum: new DatumOption.InlineDatum({ data: datum3 })
+        datum: new InlineDatum.InlineDatum({ data: datum3 })
       })
       .build({ availableUtxos: [genesisUtxo] })
 

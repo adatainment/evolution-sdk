@@ -1,9 +1,7 @@
 import { Cardano } from "@evolution-sdk/evolution"
 import * as CoreAddress from "@evolution-sdk/evolution/Address"
-import * as CoreData from "@evolution-sdk/evolution/Data"
-import * as CoreDatumOption from "@evolution-sdk/evolution/DatumOption"
+import type * as CoreDatumOption from "@evolution-sdk/evolution/DatumOption"
 import type * as CoreScript from "@evolution-sdk/evolution/Script"
-import type * as Datum from "@evolution-sdk/evolution/sdk/Datum"
 import * as CoreTransactionHash from "@evolution-sdk/evolution/TransactionHash"
 import * as CoreUTxO from "@evolution-sdk/evolution/UTxO"
 
@@ -42,9 +40,9 @@ export type CreateCoreTestUtxoOptions = {
    */
   transactionId?: string
   /**
-   * Optional datum option for the UTxO.
+   * Optional datum option for the UTxO (Core DatumOption type: DatumHash | InlineDatum).
    */
-  datumOption?: Datum.Datum
+  datumOption?: CoreDatumOption.DatumOption
   /**
    * Optional reference script (Core Script type).
    */
@@ -88,26 +86,12 @@ export const createCoreTestUtxo = (options: CreateCoreTestUtxoOptions): CoreUTxO
     }
   }
 
-  // Convert SDK datumOption to Core DatumOption
-  let coreDatumOption: CoreDatumOption.DatumHash | CoreDatumOption.InlineDatum | undefined
-  if (datumOption) {
-    if (datumOption.type === "inlineDatum" && datumOption.inline) {
-      // Parse CBOR hex to Core PlutusData
-      const plutusData = CoreData.fromCBORHex(datumOption.inline)
-      coreDatumOption = new CoreDatumOption.InlineDatum({ data: plutusData })
-    } else if (datumOption.type === "datumHash" && datumOption.hash) {
-      coreDatumOption = new CoreDatumOption.DatumHash({ 
-        hash: new Uint8Array(datumOption.hash.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)))
-      })
-    }
-  }
-
   return new CoreUTxO.UTxO({
     transactionId: CoreTransactionHash.fromHex(paddedTxId),
     index: BigInt(index),
     address: CoreAddress.fromBech32(address),
     assets,
     scriptRef,
-    datumOption: coreDatumOption
+    datumOption
   })
 }

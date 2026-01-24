@@ -7,7 +7,7 @@ import * as AssetsUnit from "../../../Assets/Unit.js"
 import * as Bytes from "../../../Bytes.js"
 import type * as Credential from "../../../Credential.js"
 import * as PlutusData from "../../../Data.js"
-import type * as DatumOption from "../../../DatumOption.js"
+import type * as DatumHash from "../../../DatumHash.js"
 import * as PolicyId from "../../../PolicyId.js"
 import * as PoolKeyHash from "../../../PoolKeyHash.js"
 import * as Redeemer from "../../../Redeemer.js"
@@ -231,7 +231,7 @@ export const getDelegation = (baseUrl: string, token?: string) => (rewardAddress
     } satisfies Provider.Delegation
   })
 
-export const getDatum = (baseUrl: string, token?: string) => (datumHash: DatumOption.DatumHash) =>
+export const getDatum = (baseUrl: string, token?: string) => (datumHash: DatumHash.DatumHash) =>
   Effect.gen(function* () {
     const datumHashHex = Bytes.toHex(datumHash.hash)
     const body = {

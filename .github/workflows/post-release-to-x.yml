@@ -64,12 +64,12 @@ jobs:
           
           # Prioritize evolution package, fall back to other packages
           if [ -n "$EVOLUTION_TAG" ]; then
-            CLEAN_TAG=$(echo $EVOLUTION_TAG | sed 's/@//g')
+            CLEAN_TAG=$(echo $EVOLUTION_TAG | sed 's/^@//; s/@/ /')
             echo "tag=$CLEAN_TAG" >> $GITHUB_OUTPUT
             echo "url=$EVOLUTION_URL" >> $GITHUB_OUTPUT
             echo "found=true" >> $GITHUB_OUTPUT
           elif [ -n "$FALLBACK_TAG" ]; then
-            CLEAN_TAG=$(echo $FALLBACK_TAG | sed 's/@//g')
+            CLEAN_TAG=$(echo $FALLBACK_TAG | sed 's/^@//; s/@/ /')
             echo "tag=$CLEAN_TAG" >> $GITHUB_OUTPUT
             echo "url=$FALLBACK_URL" >> $GITHUB_OUTPUT
             echo "found=true" >> $GITHUB_OUTPUT
@@ -84,9 +84,12 @@ jobs:
         uses: nearform-actions/github-action-notify-twitter@v1
         with:
           message: |
-            Evolution SDK ${{ steps.release.outputs.tag }} out now
+            📦 New Release: ${{ steps.release.outputs.tag }}
+
+            Check out what's new 👇
             ${{ steps.release.outputs.url }}
-            Happy building! 🛠️
+
+            Happy building!
           twitter-app-key: ${{ secrets.TWITTER_API_KEY }}
           twitter-app-secret: ${{ secrets.TWITTER_API_SECRET }}
           twitter-access-token: ${{ secrets.TWITTER_ACCESS_TOKEN }}

@@ -1,5 +1,5 @@
 /**
- * @since 1.0.0
+ * @since 2.0.0
  */
 
 import { bech32 } from "@scure/base"
@@ -13,7 +13,7 @@ import * as NetworkId from "./NetworkId.js"
 import * as ScriptHash from "./ScriptHash.js"
 
 /**
- * @since 1.0.0
+ * @since 2.0.0
  * @category Schema
  */
 export class Address extends Schema.Class<Address>("AddressStructure")({
@@ -63,7 +63,7 @@ export class Address extends Schema.Class<Address>("AddressStructure")({
  * Transform from bytes to AddressStructure
  * Handles both BaseAddress (57 bytes) and EnterpriseAddress (29 bytes)
  *
- * @since 1.0.0
+ * @since 2.0.0
  * @category Transformations
  */
 export const FromBytes = Schema.transformOrFail(
@@ -143,7 +143,7 @@ export const FromBytes = Schema.transformOrFail(
 /**
  * Transform from hex string to AddressStructure
  *
- * @since 1.0.0
+ * @since 2.0.0
  * @category Transformations
  */
 export const FromHex = Schema.compose(Schema.Uint8ArrayFromHex, FromBytes).annotations({
@@ -153,7 +153,7 @@ export const FromHex = Schema.compose(Schema.Uint8ArrayFromHex, FromBytes).annot
 /**
  * Transform from Bech32 string to AddressStructure
  *
- * @since 1.0.0
+ * @since 2.0.0
  * @category Transformations
  */
 export const FromBech32 = Schema.transformOrFail(Schema.String, Schema.typeSchema(Address), {
@@ -187,7 +187,7 @@ export const FromBech32 = Schema.transformOrFail(Schema.String, Schema.typeSchem
 /**
  * Check if AddressStructure has staking credential (BaseAddress-like)
  *
- * @since 1.0.0
+ * @since 2.0.0
  * @category Utils
  */
 export const hasStakingCredential = (address: Address): boolean => address.stakingCredential !== undefined
@@ -195,7 +195,7 @@ export const hasStakingCredential = (address: Address): boolean => address.staki
 /**
  * Check if AddressStructure is enterprise-like (no staking credential)
  *
- * @since 1.0.0
+ * @since 2.0.0
  * @category Utils
  */
 export const isEnterprise = (address: Address): boolean => address.stakingCredential === undefined
@@ -203,7 +203,7 @@ export const isEnterprise = (address: Address): boolean => address.stakingCreden
 /**
  * Get network ID from AddressStructure
  *
- * @since 1.0.0
+ * @since 2.0.0
  * @category Utils
  */
 export const getNetworkId = (address: Address): NetworkId.NetworkId => address.networkId
@@ -211,7 +211,7 @@ export const getNetworkId = (address: Address): NetworkId.NetworkId => address.n
 /**
  * Sync functions using Schema utilities
  *
- * @since 1.0.0
+ * @since 2.0.0
  * @category Functions
  */
 export const fromBech32 = Schema.decodeSync(FromBech32)
@@ -224,7 +224,7 @@ export const toBytes = Schema.encodeSync(FromBytes)
 /**
  * FastCheck arbitrary generator for testing
  *
- * @since 1.0.0
+ * @since 2.0.0
  * @category Arbitrary
  */
 export const arbitrary = FastCheck.record({
@@ -242,7 +242,7 @@ export const arbitrary = FastCheck.record({
 /**
  * Address details with both structured and serialized formats
  *
- * @since 1.0.0
+ * @since 2.0.0
  * @category Model
  */
 export interface AddressDetails {
@@ -264,7 +264,7 @@ export interface AddressDetails {
  * - Base addresses (payment + staking credentials)
  * - Enterprise addresses (payment credential only)
  *
- * @since 1.0.0
+ * @since 2.0.0
  * @category Utils
  * @example
  * ```typescript
@@ -319,7 +319,7 @@ export const getAddressDetails = (address: string): AddressDetails | undefined =
  * Extract payment credential from address string
  * Returns undefined if the address cannot be parsed
  *
- * @since 1.0.0
+ * @since 2.0.0
  * @category Utils
  */
 export const getPaymentCredential = (address: string): Credential.Credential | undefined => {
@@ -331,7 +331,7 @@ export const getPaymentCredential = (address: string): Credential.Credential | u
  * Extract staking credential from address string
  * Returns undefined if the address has no staking credential or cannot be parsed
  *
- * @since 1.0.0
+ * @since 2.0.0
  * @category Utils
  */
 export const getStakingCredential = (address: string): Credential.Credential | undefined => {

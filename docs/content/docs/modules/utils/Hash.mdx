@@ -14,7 +14,7 @@ parent: Modules
   - [RedeemersFormat (type alias)](#redeemersformat-type-alias)
   - [computeTotalExUnits](#computetotalexunits)
   - [hashAuxiliaryData](#hashauxiliarydata)
-  - [hashPlutusData](#hashplutusdata)
+  - [~~hashPlutusData~~](#hashplutusdata)
   - [hashScriptData](#hashscriptdata)
   - [hashTransaction](#hashtransaction)
 
@@ -55,17 +55,15 @@ Compute hash of auxiliary data (tag 259) per ledger rules.
 export declare const hashAuxiliaryData: (aux: AuxiliaryData.AuxiliaryData) => AuxiliaryDataHash.AuxiliaryDataHash
 ```
 
-## hashPlutusData
+## ~~hashPlutusData~~
 
 Compute hash of plutus data using specified CBOR encoding options.
 Defaults to CML_DATA_DEFAULT_OPTIONS (indefinite-length arrays/maps).
 
-TODO: Consider moving this to the Data module as Data.hash() for better organization
-
 **Signature**
 
 ```ts
-export declare const hashPlutusData: (pd: Data.Data, options?: CBOR.CodecOptions) => DatumHash.DatumHash
+export declare const hashPlutusData: (data: Data.Data, options?: CBOR.CodecOptions) => DatumHash
 ```
 
 ## hashScriptData

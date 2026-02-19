@@ -76,6 +76,19 @@ export interface Integer extends Schema.SchemaClass<bigint, bigint, never> {}
  */
 export const Integer: Integer = Schema.typeSchema(Data.IntSchema)
 
+export interface PlutusData extends Schema.Schema<Data.Data, Data.Data, never> {}
+
+/**
+ * Opaque PlutusData schema for use inside TSchema combinators.
+ * Represents an arbitrary PlutusData value that passes through encoding unchanged.
+ *
+ * Use this when a field can hold any PlutusData without a specific schema.
+ *
+ * @since 2.0.0
+ * @category schemas
+ */
+export const PlutusData: PlutusData = Schema.typeSchema(Data.DataSchema)
+
 export interface Literal<Literals extends NonEmptyReadonlyArray<SchemaAST.LiteralValue>>
   extends Schema.transform<Schema.SchemaClass<Data.Constr, Data.Constr, never>, Schema.Literal<[...Literals]>> {}
 

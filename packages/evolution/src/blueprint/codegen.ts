@@ -662,7 +662,7 @@ export function generateTypeScript(
   lines.push("// ============================================================================")
   lines.push("")
   lines.push("// PlutusData schema (referenced by Data type)")
-  lines.push("export const PlutusData = Data.DataSchema")
+  lines.push("export const PlutusData = TSchema.PlutusData")
   lines.push("")
 
   // Topologically sort definitions to ensure dependencies come first

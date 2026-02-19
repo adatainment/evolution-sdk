@@ -1,6 +1,8 @@
 import { Schema } from "effect"
 import { describe, expect, it } from "vitest"
 
+import { generateTypeScript } from "../src/blueprint/codegen.js"
+import { createCodegenConfig } from "../src/blueprint/codegen-config.js"
 import { PlutusBlueprint } from "../src/blueprint/types.js"
 import blueprintJson from "./spec/plutus.json"
 
@@ -106,6 +108,27 @@ describe("Blueprint", () => {
       expect(Object.keys(reDecoded.definitions).length).toBe(
         Object.keys(decoded.definitions).length
       )
+    })
+  })
+
+  describe("Codegen - Constructor Index", () => {
+    it("should emit { index } for single-variant Literal with non-zero index (Never)", () => {
+      const blueprint = Schema.decodeUnknownSync(PlutusBlueprint)(blueprintJson)
+      const config = createCodegenConfig()
+      const code = generateTypeScript(blueprint, config)
+
+      // Never has index: 1 in plutus.json — codegen must pass { index: 1 }
+      expect(code).toContain('TSchema.Literal("Never" as const, { index: 1 })')
+    })
+
+    it("should NOT emit { index } for index 0 (default)", () => {
+      const blueprint = Schema.decodeUnknownSync(PlutusBlueprint)(blueprintJson)
+      const config = createCodegenConfig()
+      const code = generateTypeScript(blueprint, config)
+
+      // Void definition key is "Void" — codegen uses definition key, not Plutus title "Unit"
+      expect(code).toContain('TSchema.Literal("Void" as const)')
+      expect(code).not.toContain('TSchema.Literal("Void" as const, { index: 0 })')
     })
   })
 })

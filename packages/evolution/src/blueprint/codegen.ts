@@ -138,7 +138,8 @@ function generateTSchema(
   definitions: Record<string, BlueprintTypes.SchemaDefinitionType>,
   config: CodegenConfig,
   currentNamespace: string = "",
-  indent: string = config.indent
+  indent: string = config.indent,
+  definitionKey?: string
 ): string {
   // Handle schema references
   if ("$ref" in def) {
@@ -170,9 +171,12 @@ function generateTSchema(
 
         if (!constructorDef.fields || constructorDef.fields.length === 0) {
           // Empty constructor - use configured style
-          return config.emptyConstructorStyle === "Literal"
-            ? 'TSchema.Literal("Unit" as const)'
-            : "TSchema.Struct({})"
+          if (config.emptyConstructorStyle === "Literal") {
+            const tag = constructorDef.title || definitionKey || "Unit"
+            const indexOpt = constructorDef.index && constructorDef.index !== 0 ? `, { index: ${constructorDef.index} }` : ""
+            return `TSchema.Literal("${tag}" as const${indexOpt})`
+          }
+          return "TSchema.Struct({})"
         }
 
         // Build struct fields
@@ -329,9 +333,10 @@ function generateTSchema(
         
         // Special case: single constructor with no fields (Void/Unit pattern)
         if (fields.length === 0) {
-          // Use literal for the constructor tag
-          const tag = constructorMember.title || "Unit"
-          return `TSchema.Literal("${tag}" as const)`
+          // Use constructor title, then definition key, then fallback to "Unit"
+          const tag = constructorMember.title || definitionKey || "Unit"
+          const indexOpt = constructorMember.index && constructorMember.index !== 0 ? `, { index: ${constructorMember.index} }` : ""
+          return `TSchema.Literal("${tag}" as const${indexOpt})`
         }
         
         // Build the fields object
@@ -695,7 +700,7 @@ export function generateTypeScript(
       // Use flattened name for primitives (handles $ and / characters)
       const primitiveName = getTypeName(fullName)
       
-      const schemaDefinition = generateTSchema(def, blueprint.definitions, config, "", "")
+      const schemaDefinition = generateTSchema(def, blueprint.definitions, config, "", "", primitiveName)
       
       // Add JSDoc comment
       if ("title" in def && def.title) {
@@ -757,7 +762,8 @@ export function generateTypeScript(
         blueprint.definitions,
         config,
         namespacePath, // current namespace for relative refs
-        currentIndent
+        currentIndent,
+        typeName
       )
       
       // Add JSDoc comment
@@ -790,7 +796,7 @@ export function generateTypeScript(
       }
       
       const schemaName = toIdentifier(name)
-      const schemaDefinition = generateTSchema(def, blueprint.definitions, config, "", "")
+      const schemaDefinition = generateTSchema(def, blueprint.definitions, config, "", "", schemaName)
 
       // Add JSDoc comment
       if ("title" in def && def.title) {

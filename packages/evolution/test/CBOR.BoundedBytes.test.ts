@@ -20,98 +20,74 @@ describe("CBOR Bounded Bytes Chunked Encoding", () => {
   const DATA_OPTIONS = CBOR.CML_DATA_DEFAULT_OPTIONS
   const AIKEN_OPTIONS = CBOR.AIKEN_DEFAULT_OPTIONS
 
-  // --- Low-level CBOR encoder tests ---
+  // --- BoundedBytes node encoding tests ---
 
-  describe("encodeBytesSync chunking", () => {
-    it("should NOT chunk byte strings <= 64 bytes", () => {
+  describe("BoundedBytes.make encoding", () => {
+    it("should encode <= 64 bytes as definite-length", () => {
       const value = new Uint8Array(64).fill(0xab)
-      const encoded = CBOR.toCBORBytes(value, DATA_OPTIONS)
+      const encoded = CBOR.toCBORBytes(CBOR.BoundedBytes.make(value))
       // Definite-length: 0x58 0x40 (2-byte header for 64 bytes) + 64 bytes = 66 bytes
       expect(encoded[0]).toBe(0x58)
       expect(encoded[1]).toBe(0x40)
       expect(encoded.length).toBe(2 + 64)
     })
 
-    it("should chunk byte strings > 64 bytes into indefinite-length encoding", () => {
+    it("should encode > 64 bytes as indefinite-length chunked", () => {
       const value = new Uint8Array(65).fill(0xcd)
-      const encoded = CBOR.toCBORBytes(value, DATA_OPTIONS)
-      // Should start with 0x5f (indefinite byte string)
+      const encoded = CBOR.toCBORBytes(CBOR.BoundedBytes.make(value))
       expect(encoded[0]).toBe(0x5f)
-      // Should end with 0xff (break)
       expect(encoded[encoded.length - 1]).toBe(0xff)
     })
 
     it("should produce correct chunk structure for 65 bytes (64+1)", () => {
       const value = new Uint8Array(65)
       for (let i = 0; i < 65; i++) value[i] = i & 0xff
-      const encoded = CBOR.toCBORBytes(value, DATA_OPTIONS)
+      const encoded = CBOR.toCBORBytes(CBOR.BoundedBytes.make(value))
 
       // Structure: 0x5f | chunk1(64 bytes) | chunk2(1 byte) | 0xff
-      expect(encoded[0]).toBe(0x5f) // indefinite start
+      expect(encoded[0]).toBe(0x5f)
 
-      // Chunk 1: 0x58 0x40 + 64 bytes (definite 64-byte chunk)
+      // Chunk 1: 0x58 0x40 + 64 bytes
       expect(encoded[1]).toBe(0x58)
-      expect(encoded[2]).toBe(0x40) // 64
+      expect(encoded[2]).toBe(0x40)
       for (let i = 0; i < 64; i++) {
         expect(encoded[3 + i]).toBe(i)
       }
 
-      // Chunk 2: 0x41 + 1 byte (definite 1-byte chunk, inline length)
-      expect(encoded[67]).toBe(0x41) // 0x40 + 1
-      expect(encoded[68]).toBe(64) // value[64] = 64
+      // Chunk 2: 0x41 + 1 byte
+      expect(encoded[67]).toBe(0x41)
+      expect(encoded[68]).toBe(64)
 
-      // Break marker
       expect(encoded[69]).toBe(0xff)
       expect(encoded.length).toBe(70)
     })
 
     it("should produce correct chunk structure for 128 bytes (2x64)", () => {
       const value = new Uint8Array(128).fill(0xee)
-      const encoded = CBOR.toCBORBytes(value, DATA_OPTIONS)
+      const encoded = CBOR.toCBORBytes(CBOR.BoundedBytes.make(value))
 
       // Structure: 0x5f | chunk1(64) | chunk2(64) | 0xff
       expect(encoded[0]).toBe(0x5f)
-
-      // Chunk 1: 0x58 0x40 + 64 bytes
       expect(encoded[1]).toBe(0x58)
       expect(encoded[2]).toBe(64)
-
-      // Chunk 2: 0x58 0x40 + 64 bytes
       expect(encoded[67]).toBe(0x58)
       expect(encoded[68]).toBe(64)
-
-      // Break
       expect(encoded[133]).toBe(0xff)
       expect(encoded.length).toBe(134)
     })
 
-    it("should produce correct chunk structure for 200 bytes (~3 chunks)", () => {
+    it("should produce correct chunk structure for 200 bytes (3x64+8)", () => {
       const value = new Uint8Array(200).fill(0xaa)
-      const encoded = CBOR.toCBORBytes(value, DATA_OPTIONS)
+      const encoded = CBOR.toCBORBytes(CBOR.BoundedBytes.make(value))
 
-      // 200 = 64 + 64 + 64 + 8
-      // Structure: 0x5f | chunk1(64) | chunk2(64) | chunk3(64) | chunk4(8) | 0xff
       expect(encoded[0]).toBe(0x5f)
       expect(encoded[encoded.length - 1]).toBe(0xff)
-
-      // Final chunk is 8 bytes: header 0x48 (0x40 + 8) + 8 bytes
-      // offset: 1 + (2+64)*3 = 1 + 198 = 199
+      // Final chunk header at offset 1 + (2+64)*3 = 199
       expect(encoded[199]).toBe(0x48) // 0x40 + 8
     })
 
-    it("should NOT chunk when options have no chunkBytesAt", () => {
-      const value = new Uint8Array(100).fill(0xbb)
-      const noChunkOptions = CBOR.CML_DEFAULT_OPTIONS // No chunkBytesAt
-      const encoded = CBOR.toCBORBytes(value, noChunkOptions)
-      // Should be definite-length: 0x58 0x64 + 100 bytes
-      expect(encoded[0]).toBe(0x58)
-      expect(encoded[1]).toBe(100)
-      expect(encoded.length).toBe(2 + 100)
-    })
-
-    it("should handle empty byte string regardless of chunkBytesAt", () => {
-      const value = new Uint8Array(0)
-      const encoded = CBOR.toCBORBytes(value, DATA_OPTIONS)
+    it("should encode empty bytes as 0x40", () => {
+      const encoded = CBOR.toCBORBytes(CBOR.BoundedBytes.make(new Uint8Array(0)))
       expect(encoded).toEqual(new Uint8Array([0x40]))
     })
   })
@@ -119,33 +95,33 @@ describe("CBOR Bounded Bytes Chunked Encoding", () => {
   // --- Round-trip tests ---
 
   describe("round-trip: encode then decode", () => {
-    it("should round-trip a 65-byte value through chunked encoding", () => {
+    it("should round-trip a 65-byte BoundedBytes value", () => {
       const value = new Uint8Array(65)
       for (let i = 0; i < 65; i++) value[i] = i & 0xff
-      const encoded = CBOR.toCBORBytes(value, DATA_OPTIONS)
+      const encoded = CBOR.toCBORBytes(CBOR.BoundedBytes.make(value))
       const decoded = CBOR.fromCBORBytes(encoded, DATA_OPTIONS)
       expect(decoded).toEqual(value)
     })
 
-    it("should round-trip a 128-byte value through chunked encoding", () => {
+    it("should round-trip a 128-byte BoundedBytes value", () => {
       const value = new Uint8Array(128).fill(0xab)
-      const encoded = CBOR.toCBORBytes(value, DATA_OPTIONS)
+      const encoded = CBOR.toCBORBytes(CBOR.BoundedBytes.make(value))
       const decoded = CBOR.fromCBORBytes(encoded, DATA_OPTIONS)
       expect(decoded).toEqual(value)
     })
 
-    it("should round-trip a 256-byte value through chunked encoding", () => {
+    it("should round-trip a 256-byte BoundedBytes value", () => {
       const value = new Uint8Array(256)
       for (let i = 0; i < 256; i++) value[i] = i & 0xff
-      const encoded = CBOR.toCBORBytes(value, DATA_OPTIONS)
+      const encoded = CBOR.toCBORBytes(CBOR.BoundedBytes.make(value))
       const decoded = CBOR.fromCBORBytes(encoded, DATA_OPTIONS)
       expect(decoded).toEqual(value)
     })
 
-    it("should round-trip a 1024-byte value (simulating large message)", () => {
+    it("should round-trip a 1024-byte BoundedBytes value", () => {
       const value = new Uint8Array(1024)
       for (let i = 0; i < 1024; i++) value[i] = i & 0xff
-      const encoded = CBOR.toCBORBytes(value, DATA_OPTIONS)
+      const encoded = CBOR.toCBORBytes(CBOR.BoundedBytes.make(value))
       const decoded = CBOR.fromCBORBytes(encoded, DATA_OPTIONS)
       expect(decoded).toEqual(value)
     })
@@ -193,10 +169,10 @@ describe("CBOR Bounded Bytes Chunked Encoding", () => {
   })
 
   describe("PlutusData byte arrays > 64 bytes (Aiken options)", () => {
-    it("should chunk large byte arrays with Aiken encoding options", () => {
+    it("should chunk large byte arrays when encoded as PlutusData with Aiken options", () => {
       const largeBytes = new Uint8Array(100).fill(0xfe)
+      // BoundedBytes encoding is unconditional — codec options don't affect it
       const encoded = Data.toCBORBytes(largeBytes, AIKEN_OPTIONS)
-      // Must be chunked
       expect(encoded[0]).toBe(0x5f)
       expect(encoded[encoded.length - 1]).toBe(0xff)
     })
@@ -218,7 +194,7 @@ describe("CBOR Bounded Bytes Chunked Encoding", () => {
         FastCheck.property(
           FastCheck.uint8Array({ minLength: 0, maxLength: 1024 }),
           (value) => {
-            const encoded = CBOR.toCBORBytes(value, DATA_OPTIONS)
+            const encoded = CBOR.toCBORBytes(CBOR.BoundedBytes.make(value))
             const decoded = CBOR.fromCBORBytes(encoded, DATA_OPTIONS) as Uint8Array
             expect(decoded).toEqual(value)
           }
@@ -255,17 +231,15 @@ describe("CBOR Bounded Bytes Chunked Encoding", () => {
       )
     })
 
-    it("should match: ≤ 64 bytes → definite, > 64 bytes → chunked", () => {
+    it("should match: <= 64 bytes -> definite, > 64 bytes -> chunked", () => {
       FastCheck.assert(
         FastCheck.property(
           FastCheck.uint8Array({ minLength: 1, maxLength: 256 }),
           (value) => {
-            const encoded = CBOR.toCBORBytes(value, DATA_OPTIONS)
+            const encoded = CBOR.toCBORBytes(CBOR.BoundedBytes.make(value))
             if (value.length <= 64) {
-              // Definite-length: first byte is NOT 0x5f
               expect(encoded[0]).not.toBe(0x5f)
             } else {
-              // Indefinite chunked: starts with 0x5f, ends with 0xff
               expect(encoded[0]).toBe(0x5f)
               expect(encoded[encoded.length - 1]).toBe(0xff)
             }

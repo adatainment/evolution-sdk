@@ -68,12 +68,6 @@ export type CodecOptions =
       readonly mode: "canonical"
       readonly mapsAsObjects?: boolean
       readonly encodeMapAsPairs?: boolean
-      /**
-       * When set, byte strings longer than this value are encoded as indefinite-length
-       * chunked byte strings (`0x5f` ... chunks ... `0xff`), with each chunk at most
-       * `chunkBytesAt` bytes. Used in Aiken-compatible encoding contexts.
-       */
-      readonly chunkBytesAt?: number
     }
   | {
       readonly mode: "custom"
@@ -84,12 +78,6 @@ export type CodecOptions =
       readonly useMinimalEncoding: boolean
       readonly mapsAsObjects?: boolean
       readonly encodeMapAsPairs?: boolean
-      /**
-       * When set, byte strings longer than this value are encoded as indefinite-length
-       * chunked byte strings (`0x5f` ... chunks ... `0xff`), with each chunk at most
-       * `chunkBytesAt` bytes. Used in Aiken-compatible encoding contexts.
-       */
-      readonly chunkBytesAt?: number
     }
 
 /**
@@ -123,7 +111,7 @@ export const CML_DEFAULT_OPTIONS: CodecOptions = {
  *
  * Uses indefinite-length arrays and maps. The `bounded_bytes` constraint
  * (Conway CDDL: byte strings ≤ 64 bytes) is enforced at the data-type layer
- * via the `BoundedBytes` CBOR node — not by `chunkBytesAt` here.
+ * via the `BoundedBytes` CBOR node, independent of these codec options.
  *
  * @since 1.0.0
  * @category constants
@@ -135,8 +123,7 @@ export const CML_DATA_DEFAULT_OPTIONS: CodecOptions = {
   useDefiniteForEmpty: true,
   sortMapKeys: false,
   useMinimalEncoding: true,
-  mapsAsObjects: false,
-  chunkBytesAt: 64
+  mapsAsObjects: false
 } as const
 
 /**
@@ -147,7 +134,9 @@ export const CML_DATA_DEFAULT_OPTIONS: CodecOptions = {
  * - Maps encoded as arrays of pairs (not CBOR maps)
  * - Strings as byte arrays (major type 2, not 3)
  * - Constructor tags: 121–127 for indices 0–6, then 1280+ for 7+
- * - Byte strings longer than 64 bytes are chunked as indefinite-length sequences
+ *
+ * PlutusData byte strings are chunked per the Conway `bounded_bytes` rule
+ * via the `BoundedBytes` CBOR node, independent of these codec options.
  *
  * @since 2.0.0
  * @category constants
@@ -160,8 +149,7 @@ export const AIKEN_DEFAULT_OPTIONS: CodecOptions = {
   sortMapKeys: false,
   useMinimalEncoding: true,
   mapsAsObjects: false,
-  encodeMapAsPairs: true,
-  chunkBytesAt: 64
+  encodeMapAsPairs: true
 } as const
 
 /**
@@ -937,34 +925,10 @@ const encodeBoundedBytesSync = (value: Uint8Array): Uint8Array => {
 const encodeBytesSync = (value: Uint8Array, options: CodecOptions): Uint8Array => {
   const length = value.length
   const useMinimal = options.mode === "canonical" || (options.mode === "custom" && options.useMinimalEncoding)
-  const chunkBytesAt = "chunkBytesAt" in options ? options.chunkBytesAt : undefined
 
   // Fast path for empty bytes
   if (length === 0) {
     return new Uint8Array([0x40])
-  }
-
-  // When chunkBytesAt is set and the byte string exceeds the limit,
-  // emit as an indefinite-length chunked byte string: 0x5f [chunk]* 0xff
-  if (chunkBytesAt !== undefined && length > chunkBytesAt) {
-    const chunkSize = chunkBytesAt
-    // Compute total output size: 0x5f (start) + chunks + 0xff (break)
-    let totalSize = 2
-    for (let offset = 0; offset < length; offset += chunkSize) {
-      const chunkLen = Math.min(chunkSize, length - offset)
-      totalSize += chunkHeaderSize(chunkLen) + chunkLen
-    }
-    const result = new Uint8Array(totalSize)
-    let pos = 0
-    result[pos++] = 0x5f // indefinite-length byte string
-    for (let offset = 0; offset < length; offset += chunkSize) {
-      const chunk = value.subarray(offset, offset + chunkSize)
-      pos = writeChunkHeader(result, pos, chunk.length)
-      result.set(chunk, pos)
-      pos += chunk.length
-    }
-    result[pos] = 0xff // break
-    return result
   }
 
   // Standard definite-length encoding

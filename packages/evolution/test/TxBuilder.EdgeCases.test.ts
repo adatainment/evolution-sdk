@@ -202,7 +202,7 @@ describe("TxBuilder P0 Edge Cases - MinUTxO Boundary Precision", () => {
         nativeAssets: { [unit]: 1n }
       }),
       // Second UTxO: for reselection to cover the shortfall
-      createCoreTestUtxo({ transactionId: "b".repeat(64), index: 0n, address: CHANGE_ADDRESS, lovelace: 500_000n })
+      createCoreTestUtxo({ transactionId: "b".repeat(64), index: 0n, address: CHANGE_ADDRESS, lovelace: 700_000n })
     ]
 
     const txBuilder = makeTxBuilder(baseConfig)
@@ -249,9 +249,9 @@ describe("TxBuilder P0 Edge Cases - MinUTxO Boundary Precision", () => {
       }
       expect(totalTokens).toBe(1n)
 
-      // Change ADA must be >= minUTxO (should be ~961k after adding 2nd UTxO)
+      // Change ADA must be >= minUTxO (corrected Babbage/Conway formula with 160-byte overhead)
       const changeAda = changeOutput.assets.lovelace
-      expect(changeAda).toBeGreaterThanOrEqual(461_170n) // Must meet minUTxO
+      expect(changeAda).toBeGreaterThanOrEqual(900_000n) // Must meet minUTxO
     }
 
     // Fee validation - should be reasonable for 2-input, 2-output tx
@@ -353,7 +353,7 @@ describe("TxBuilder P0 Edge Cases - MinUTxO Boundary Precision", () => {
     const testUnit = `${testPolicyId}${testAssetName}`
 
     const utxos: Array<CoreUTxO.UTxO> = [
-      // Initial selection: 2 UTxOs - covers payment but change is too small
+      // Initial selection: 2 UTxOs - covers payment but change is too small for minUTxO (~1.1M with native asset)
       createCoreTestUtxo({
         transactionId: "a".repeat(64),
         index: 0n,
@@ -363,13 +363,13 @@ describe("TxBuilder P0 Edge Cases - MinUTxO Boundary Precision", () => {
       }),
       createCoreTestUtxo({ transactionId: "b".repeat(64), index: 0n, address: CHANGE_ADDRESS, lovelace: 2_100_000n }),
 
-      // Attempt 2: Adds a small UTxO, but fee increase eats most of it
-      createCoreTestUtxo({ transactionId: "c".repeat(64), index: 0n, address: CHANGE_ADDRESS, lovelace: 250_000n }),
+      // Attempt 2: Adds a medium UTxO, but fee increase eats into it — still below minUTxO
+      createCoreTestUtxo({ transactionId: "c".repeat(64), index: 0n, address: CHANGE_ADDRESS, lovelace: 500_000n }),
 
-      // Attempt 3: Needs yet another small UTxO to finally converge
-      createCoreTestUtxo({ transactionId: "d".repeat(64), index: 0n, address: CHANGE_ADDRESS, lovelace: 250_000n }),
-      createCoreTestUtxo({ transactionId: "e".repeat(64), index: 0n, address: CHANGE_ADDRESS, lovelace: 200_000n }),
-      createCoreTestUtxo({ transactionId: "f".repeat(64), index: 0n, address: CHANGE_ADDRESS, lovelace: 200_000n })
+      // Attempt 3: Needs yet another UTxO to finally converge
+      createCoreTestUtxo({ transactionId: "d".repeat(64), index: 0n, address: CHANGE_ADDRESS, lovelace: 500_000n }),
+      createCoreTestUtxo({ transactionId: "e".repeat(64), index: 0n, address: CHANGE_ADDRESS, lovelace: 400_000n }),
+      createCoreTestUtxo({ transactionId: "f".repeat(64), index: 0n, address: CHANGE_ADDRESS, lovelace: 400_000n })
     ]
 
     const txBuilder = makeTxBuilder(baseConfig)
@@ -378,7 +378,7 @@ describe("TxBuilder P0 Edge Cases - MinUTxO Boundary Precision", () => {
     // Initial 2 UTxOs: 4.4M total
     // Payment: 4.0M
     // Fee: ~170K
-    // Change: 4.4M - 4.0M - 170K = 230K (< 457K minUTxO with asset)
+    // Change: 4.4M - 4.0M - 170K = 230K (< ~1.1M minUTxO with asset)
     // Triggers reselection!
     const signBuilder = await txBuilder
       .payToAddress({
@@ -415,9 +415,9 @@ describe("TxBuilder P0 Edge Cases - MinUTxO Boundary Precision", () => {
     const changeOutput = tx.body.outputs[1]
     expect(Address.toBech32(changeOutput.address)).toBe(CHANGE_ADDRESS)
 
-    // Change must be >= minUTxO (with 1 native asset ~457K)
+    // Change must be >= minUTxO (corrected Babbage/Conway: ~1.1M with 1 native asset)
     const changeAda = changeOutput.assets.lovelace
-    expect(changeAda).toBeGreaterThanOrEqual(456_000n)
+    expect(changeAda).toBeGreaterThanOrEqual(1_000_000n)
 
     // Change should have the native asset token
     expect(changeOutput.assets.multiAsset).toBeDefined()
@@ -444,7 +444,7 @@ describe("TxBuilder P0 Edge Cases - MinUTxO Boundary Precision", () => {
 
     // Balance equation must hold after reselection attempts
     const totalInput =
-      inputCount === 3 ? 2_300_000n + 2_100_000n + 250_000n : 2_300_000n + 2_100_000n + 250_000n + 250_000n
+      inputCount === 3 ? 2_300_000n + 2_100_000n + 500_000n : 2_300_000n + 2_100_000n + 500_000n + 500_000n
     const totalOutput = paymentOutput.assets.lovelace + changeAda
     const balanceCheck = totalInput - totalOutput - fee
 

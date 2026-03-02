@@ -269,9 +269,6 @@ importers:
       bip39:
         specifier: ^3.1.0
         version: 3.1.0
-      dockerode:
-        specifier: ^4.0.7
-        version: 4.0.7
       effect:
         specifier: ^3.19.3
         version: 3.19.3
@@ -282,9 +279,6 @@ importers:
       '@emurgo/cardano-message-signing-nodejs':
         specifier: ^1.1.0
         version: 1.1.0
-      '@types/dockerode':
-        specifier: ^3.3.43
-        version: 3.3.43
       tinybench:
         specifier: ^5.0.0
         version: 5.0.0

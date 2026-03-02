@@ -91,10 +91,10 @@ describe("TxBuilder: Unfrack Change Handling Integration", () => {
 
       // Verify all change outputs meet minUTxO (corrected Babbage/Conway formula)
       const changeOutputs = tx.body.outputs.slice(1)
-      for (const output of changeOutputs) {
-        // Each output should have at least ~900k lovelace (minUTxO for ADA-only or with tokens)
-        expect(output.assets.lovelace).toBeGreaterThanOrEqual(900_000n)
-      }
+      expect(changeOutputs[0].assets.lovelace).toBe(1_150_770n)
+      expect(changeOutputs[1].assets.lovelace).toBe(1_150_770n)
+      expect(changeOutputs[2].assets.lovelace).toBe(1_155_080n)
+      expect(changeOutputs[3].assets.lovelace).toBe(2_259_487n)
 
       // Verify token distribution: all 3 tokens should be preserved in change outputs
       let totalTokenTypes = 0
@@ -164,14 +164,13 @@ describe("TxBuilder: Unfrack Change Handling Integration", () => {
       expect(paymentOutput.assets.lovelace).toBe(100_000n)
 
       // Verify change output has correct amount after fee convergence
-      // Input: 2,500,000, Payment: 100,000, Fee: ~175K
+      // Input: 2,500,000, Payment: 100,000, Fee: exact
       // Expected change: 2,500,000 - 100,000 - fee
       const changeOutput = tx.body.outputs[1]
-      expect(changeOutput.assets.lovelace).toBeGreaterThan(2_000_000n)
+      expect(changeOutput.assets.lovelace).toBe(2_226_447n)
 
-      // Verify fee is reasonable for single-output transaction
-      expect(tx.body.fee).toBeGreaterThan(155_381n)
-      expect(tx.body.fee).toBeLessThan(200_000n)
+      // Verify fee is exact for single-output transaction
+      expect(tx.body.fee).toBe(173_553n)
 
       // Balance equation must hold
       expect(changeOutput.assets.lovelace + paymentOutput.assets.lovelace + tx.body.fee).toBe(2_500_000n)

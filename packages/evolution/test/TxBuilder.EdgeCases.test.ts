@@ -249,15 +249,14 @@ describe("TxBuilder P0 Edge Cases - MinUTxO Boundary Precision", () => {
       }
       expect(totalTokens).toBe(1n)
 
-      // Change ADA must be >= minUTxO (corrected Babbage/Conway formula with 160-byte overhead)
+      // Change ADA must meet minUTxO (corrected Babbage/Conway formula with 160-byte overhead)
       const changeAda = changeOutput.assets.lovelace
-      expect(changeAda).toBeGreaterThanOrEqual(900_000n) // Must meet minUTxO
+      expect(changeAda).toBe(1_148_515n)
     }
 
-    // Fee validation - should be reasonable for 2-input, 2-output tx
+    // Fee validation
     const fee = tx.body.fee
-    expect(fee).toBeGreaterThan(155_381n) // > minFeeConstant
-    expect(fee).toBeLessThan(200_000n) // < reasonable upper bound
+    expect(fee).toBe(171_485n)
   })
 
   it("maximum asset name lengths at minUTxO boundary", async () => {
@@ -396,10 +395,9 @@ describe("TxBuilder P0 Edge Cases - MinUTxO Boundary Precision", () => {
     // Strict assertions
     expect(tx).toBeDefined()
 
-    // Should have selected 3-4 UTxOs through multiple reselection attempts
+    // Should have selected exact number of UTxOs through reselection
     const inputCount = tx.body.inputs.length
-    expect(inputCount).toBeGreaterThanOrEqual(3)
-    expect(inputCount).toBeLessThanOrEqual(4)
+    expect(inputCount).toBe(4)
 
     // Should have payment + change (change has native asset)
     expect(tx.body.outputs.length).toBe(2)
@@ -415,9 +413,9 @@ describe("TxBuilder P0 Edge Cases - MinUTxO Boundary Precision", () => {
     const changeOutput = tx.body.outputs[1]
     expect(Address.toBech32(changeOutput.address)).toBe(CHANGE_ADDRESS)
 
-    // Change must be >= minUTxO (corrected Babbage/Conway: ~1.1M with 1 native asset)
+    // Change must be >= minUTxO (corrected Babbage/Conway with native asset)
     const changeAda = changeOutput.assets.lovelace
-    expect(changeAda).toBeGreaterThanOrEqual(1_000_000n)
+    expect(changeAda).toBe(1_225_391n)
 
     // Change should have the native asset token
     expect(changeOutput.assets.multiAsset).toBeDefined()
@@ -439,12 +437,12 @@ describe("TxBuilder P0 Edge Cases - MinUTxO Boundary Precision", () => {
 
     // Fee validation
     const fee = tx.body.fee
-    expect(fee).toBeGreaterThan(165_000n)
-    expect(fee).toBeLessThan(250_000n)
+    expect(fee).toBe(174_609n)
 
     // Balance equation must hold after reselection attempts
-    const totalInput =
-      inputCount === 3 ? 2_300_000n + 2_100_000n + 500_000n : 2_300_000n + 2_100_000n + 500_000n + 500_000n
+    const utxoMap = new Map(utxos.map((u) => [u.transactionId, u.assets.lovelace]))
+    const totalInput = tx.body.inputs.reduce((sum, input) => sum + (utxoMap.get(input.transactionId) ?? 0n), 0n)
+    expect(totalInput).toBe(5_400_000n) // 2.3M + 2.1M + 500K + 500K
     const totalOutput = paymentOutput.assets.lovelace + changeAda
     const balanceCheck = totalInput - totalOutput - fee
 

@@ -637,8 +637,7 @@ describe("TxBuilder Re-selection Loop", () => {
 
       // Should have selected many inputs due to small UTxO sizes
       // With 350K per UTxO and 3M payment + ~198K fee needed, should need at least 10 inputs
-      expect(tx.body.inputs.length).toBeGreaterThanOrEqual(10)
-      expect(tx.body.inputs.length).toBeLessThanOrEqual(20) // Adjusted upper bound
+      expect(tx.body.inputs.length).toBe(12)
 
       // Verify outputs: payment + change
       expect(tx.body.outputs.length).toBe(2)
@@ -685,7 +684,7 @@ describe("TxBuilder Re-selection Loop", () => {
       expect(size).toBeLessThanOrEqual(PROTOCOL_PARAMS.maxTxSize)
 
       // Should need at least 2 inputs (1.5M + 0.8M + fee > 2.5M)
-      expect(tx.body.inputs.length).toBeGreaterThanOrEqual(2)
+      expect(tx.body.inputs.length).toBe(5)
 
       // Verify correct payment amount
       expect(tx.body.outputs[0].assets.lovelace).toBe(2_500_000n)
@@ -751,9 +750,8 @@ describe("TxBuilder Reselection After Change", () => {
     const totalOutput = tx.body.outputs[0].assets.lovelace + changeOutput.assets.lovelace
     expect(10_000_000n).toBe(totalOutput + tx.body.fee)
 
-    // Fee should be reasonable
-    expect(tx.body.fee).toBeGreaterThan(155_000n) // > minFeeConstant
-    expect(tx.body.fee).toBeLessThan(500_000n) // < 0.5 ADA
+    // Fee should be exact
+    expect(tx.body.fee).toBe(168_141n)
   })
 
   /**
@@ -801,8 +799,7 @@ describe("TxBuilder Reselection After Change", () => {
     const totalOutput = tx.body.outputs.reduce((sum, out) => sum + out.assets.lovelace, 0n)
     expect(totalInput).toBe(totalOutput + tx.body.fee)
 
-    expect(tx.body.fee).toBeGreaterThan(155_000n)
-    expect(tx.body.fee).toBeLessThan(400_000n)
+    expect(tx.body.fee).toBe(171_309n)
   })
 
   /**
@@ -842,7 +839,7 @@ describe("TxBuilder Reselection After Change", () => {
 
     // Verify native assets are in change (not burned)
     if (changeOutput.assets.multiAsset !== undefined) {
-      expect(changeOutput.assets.multiAsset.map.size).toBeGreaterThan(0)
+      expect(changeOutput.assets.multiAsset.map.size).toBe(1)
     } else {
       throw new Error("Expected change output to have native assets")
     }
@@ -851,8 +848,8 @@ describe("TxBuilder Reselection After Change", () => {
     const expectedChange = 10_000_000n - 3_000_000n - tx.body.fee
     expect(changeOutput.assets.lovelace).toBe(expectedChange)
 
-    // Fee should be higher due to larger change output
-    expect(tx.body.fee).toBeGreaterThan(PROTOCOL_PARAMS.minFeeConstant)
+    // Fee should be exact (larger than minFeeConstant due to change output with native assets)
+    expect(tx.body.fee).toBe(169_989n)
   })
 
   /**
@@ -897,9 +894,8 @@ describe("TxBuilder Reselection After Change", () => {
     const totalOutput = tx.body.outputs.reduce((sum, out) => sum + out.assets.lovelace, 0n)
     expect(totalInput).toBe(totalOutput + tx.body.fee)
 
-    // Change output should exist
+    // Change output should exist with exact value
     const changeOutput = tx.body.outputs[1]
-    expect(changeOutput.assets.lovelace).toBeGreaterThan(0n)
-    expect(changeOutput.assets.lovelace).toBeLessThan(1_500_000n) // Reasonable change amount
+    expect(changeOutput.assets.lovelace).toBe(1_230_275n)
   })
 })

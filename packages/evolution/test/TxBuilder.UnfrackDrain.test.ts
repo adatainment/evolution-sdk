@@ -630,10 +630,9 @@ describe("TxBuilder Unfrack + DrainTo Integration", () => {
       const changeOutput = tx.body.outputs[1]
       expect(changeOutput.assets.lovelace).toBe(1_831_859n) // 3_000_000 - 1_000_000 - 168_141
 
-      // All outputs should meet minimum UTxO (~965K lovelace for ADA-only)
-      tx.body.outputs.forEach((output) => {
-        expect(output.assets.lovelace).toBeGreaterThanOrEqual(900_000n)
-      })
+      // Payment and change already verified with exact values above
+      expect(tx.body.outputs[0].assets.lovelace).toBe(1_000_000n)
+      expect(tx.body.outputs[1].assets.lovelace).toBe(1_831_859n)
     })
   })
 

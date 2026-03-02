@@ -29,9 +29,9 @@ describe.concurrent("calculateMinimumUtxoLovelace", () => {
     )
 
     // With coinsPerUtxoByte=1, result = 160 + cborSize
-    // An ADA-only output CBOR is roughly 50-70 bytes, so result should be > 200
+    // An ADA-only output is 62 CBOR bytes, so result = 160 + 62 = 222
     // Without the 160-byte overhead, it would be < 100
-    expect(result).toBeGreaterThan(200n)
+    expect(result).toBe(222n)
   })
 
   it("produces stable results regardless of input lovelace", async () => {
@@ -67,10 +67,9 @@ describe.concurrent("calculateMinimumUtxoLovelace", () => {
       })
     )
 
-    // A ~400 byte script + address CBOR (~50-70 bytes) + 160 overhead
-    // should require well over 2 ADA at 4310 coins/byte
-    // Approximate: (160 + 460) * 4310 ≈ 2,672,000
-    expect(result).toBeGreaterThan(2_000_000n)
+    // A ~400 byte script + address CBOR + 160 overhead
+    // Exact: (160 + ~478) * 4310 = 2,749,780
+    expect(result).toBe(2_749_780n)
 
     // The result must be self-consistent: the output with this lovelace
     // should use no more CBOR bytes than estimated
@@ -83,8 +82,8 @@ describe.concurrent("calculateMinimumUtxoLovelace", () => {
       })
     )
 
-    // Plugging the result back should give <= the original (self-consistent)
-    expect(result).toBeGreaterThanOrEqual(verification)
+    // Plugging the result back should give the same value (fixed-point)
+    expect(result).toBe(verification)
   })
 
   it("uses fixed-point minUTxO and avoids under-estimation from raw-size scaling", async () => {
@@ -107,9 +106,8 @@ describe.concurrent("calculateMinimumUtxoLovelace", () => {
       })
     )
 
-    // Fixed-point scaling can be slightly larger than rawSize*cpb because
-    // lovelace CBOR width may expand at higher coin values.
-    expect(actualMinLovelace).toBeGreaterThanOrEqual(rawSize * COINS_PER_UTXO_BYTE)
-    expect(actualMinLovelace).toBeLessThanOrEqual((rawSize + 8n) * COINS_PER_UTXO_BYTE)
+    // Fixed-point result must equal exact computed values
+    expect(rawSize).toBe(636n)
+    expect(actualMinLovelace).toBe(2_749_780n)
   })
 })

@@ -6,6 +6,10 @@ on:
     types: [completed]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  models: read
+
 jobs:
   notify:
     runs-on: ubuntu-latest
@@ -20,9 +24,9 @@ jobs:
         id: releases
         run: |
           # Fetch @evolution-sdk releases created in the last hour with real changes
-          NOTES=""
           URL=""
           FOUND="false"
+          : > /tmp/release-notes.md
 
           RELEASES=$(gh api /repos/${{ github.repository }}/releases \
             --jq '[.[] | select(.tag_name | startswith("@evolution-sdk/"))]')
@@ -55,7 +59,9 @@ jobs:
 
             if [ -n "$REAL" ]; then
               FOUND="true"
-              NOTES="${NOTES}### ${TAG}\n${BODY}\n\n"
+              echo "### ${TAG}" >> /tmp/release-notes.md
+              echo "$BODY" >> /tmp/release-notes.md
+              echo "" >> /tmp/release-notes.md
               # Prefer the evolution package URL
               if [[ "$TAG" == "@evolution-sdk/evolution@"* ]] || [ -z "$URL" ]; then
                 URL="$RELEASE_URL"
@@ -64,9 +70,6 @@ jobs:
           done
 
           echo "found=$FOUND" >> $GITHUB_OUTPUT
-
-          # Write multi-line notes to file (avoids shell escaping issues)
-          printf '%b' "$NOTES" > /tmp/release-notes.md
           echo "url=$URL" >> $GITHUB_OUTPUT
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -85,7 +88,11 @@ jobs:
             RELEASE_URL="${{ steps.releases.outputs.url }}" \
             GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}" \
             node .github/scripts/generate-release-tweet.mjs)
-          echo "tweets=$RESULT" >> $GITHUB_OUTPUT
+          {
+            echo 'tweets<<EOF'
+            echo "$RESULT"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
 
       - name: Post thread to X
         if: steps.releases.outputs.found == 'true'
@@ -93,7 +100,6 @@ jobs:
           npm install twitter-api-v2@1
           node -e "
             const { TwitterApi } = require('twitter-api-v2');
-            const fs = require('fs');
 
             const client = new TwitterApi({
               appKey: process.env.TWITTER_API_KEY,

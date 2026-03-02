@@ -94,19 +94,41 @@ const generateTweets = async (releaseNotes, releaseUrl, token, model) => {
     parsed.tweets = parsed.tweets.slice(0, MAX_THREAD_LENGTH);
   }
 
-  // Ensure the last tweet contains the release URL
+  // Strip emojis and hashtags the model may have included despite instructions
+  const EMOJI_RE =
+    /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]/gu;
+  const HASHTAG_RE = /#\w+/g;
+  for (const [i, tweet] of parsed.tweets.entries()) {
+    parsed.tweets[i] = tweet
+      .replace(EMOJI_RE, "")
+      .replace(HASHTAG_RE, "")
+      .replace(/  +/g, " ")
+      .trim();
+  }
+
+  // Ensure the last tweet ends with the release URL
   if (releaseUrl && parsed.tweets.length > 0) {
-    const last = parsed.tweets[parsed.tweets.length - 1];
-    if (!last.includes(releaseUrl)) {
-      const appended = `${last}\n\n${releaseUrl}`;
+    const lastIndex = parsed.tweets.length - 1;
+    const trimmedLast = parsed.tweets[lastIndex].trimEnd();
+
+    if (!trimmedLast.endsWith(releaseUrl)) {
+      // Remove any existing occurrences of the URL to avoid duplicates
+      const withoutUrl = trimmedLast.split(releaseUrl).join("").trimEnd();
+      const separator = withoutUrl.length > 0 ? "\n\n" : "";
+      const appended = `${withoutUrl}${separator}${releaseUrl}`;
+
       if (appended.length <= MAX_TWEET_LENGTH) {
-        parsed.tweets[parsed.tweets.length - 1] = appended;
+        parsed.tweets[lastIndex] = appended;
       } else {
-        // Trim last tweet to make room for URL
-        const maxText = MAX_TWEET_LENGTH - releaseUrl.length - 3; // 3 for \n\n + …
-        parsed.tweets[parsed.tweets.length - 1] =
-          last.slice(0, maxText) + "…\n\n" + releaseUrl;
+        // Trim last tweet text to make room for URL
+        const maxText =
+          MAX_TWEET_LENGTH - releaseUrl.length - separator.length - 1;
+        const truncatedText =
+          maxText > 0 ? withoutUrl.slice(0, maxText) + "…" : "…";
+        parsed.tweets[lastIndex] = `${truncatedText}${separator}${releaseUrl}`;
       }
+    } else {
+      parsed.tweets[lastIndex] = trimmedLast;
     }
   }
 

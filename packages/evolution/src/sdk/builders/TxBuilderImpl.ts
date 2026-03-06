@@ -18,6 +18,7 @@ import type * as PlutusV2 from "../../PlutusV2.js"
 import type * as PlutusV3 from "../../PlutusV3.js"
 import * as PolicyId from "../../PolicyId.js"
 import * as Redeemer from "../../Redeemer.js"
+import * as Redeemers from "../../Redeemers.js"
 import type * as RewardAccount from "../../RewardAccount.js"
 import * as CoreScript from "../../Script.js"
 import * as ScriptDataHash from "../../ScriptDataHash.js"
@@ -845,7 +846,7 @@ export const assembleTransaction = (
       bootstrapWitnesses: [],
       plutusV1Scripts,
       plutusData: plutusDataArray,
-      redeemers,
+      redeemers: redeemers.length > 0 ? Redeemers.makeRedeemerMap(redeemers) : undefined,
       plutusV2Scripts,
       plutusV3Scripts
     })
@@ -1174,7 +1175,7 @@ export const buildFakeWitnessSet = (
       bootstrapWitnesses: [],
       plutusV1Scripts,
       plutusData: [],
-      redeemers: fakeRedeemers,
+      redeemers: fakeRedeemers.length > 0 ? Redeemers.makeRedeemerMap(fakeRedeemers) : undefined,
       plutusV2Scripts,
       plutusV3Scripts
     })

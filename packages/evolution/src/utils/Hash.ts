@@ -143,7 +143,7 @@ export const hashScriptData = (
   costModels: CostModel.CostModels,
   datums?: ReadonlyArray<Data.Data>,
   format: RedeemersFormat = "array",
-  options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTIONS
+  options: CBOR.CodecOptions = CBOR.PRESERVE_OPTIONS
 ): ScriptDataHash.ScriptDataHash => {
   const hasDatums = Array.isArray(datums) && datums.length > 0
 
@@ -162,11 +162,10 @@ export const hashScriptData = (
     )
   } else {
     // Normal case: [ redeemers | datums | language_views ]
-    const redeemersCollection = new Redeemers.Redeemers({ values: [...redeemers] })
     const redeemersBytes =
       format === "map"
-        ? Redeemers.toCBORBytesMap(redeemersCollection, options)
-        : Redeemers.toCBORBytes(redeemersCollection, options)
+        ? Redeemers.toCBORBytesMap(Redeemers.makeRedeemerMap(redeemers), options)
+        : Redeemers.toCBORBytes(new Redeemers.RedeemerArray({ value: [...redeemers] }), options)
     const datumsBytes = hasDatums ? encodeDatumsTaggedSet(datums) : undefined
 
     payload = datumsBytes

@@ -199,10 +199,9 @@ const decodeInputs = ParseResult.decodeUnknownEither(CBOR.tag(258, Schema.Array(
  * @since 2.0.0
  * @category schemas
  */
-export const CDDLSchema = Schema.MapFromSelf({
-  key: CBOR.Integer,
-  value: CBOR.CBORSchema
-})
+export const CDDLSchema = Schema.declare(
+  (input: unknown): input is Map<bigint, CBOR.CBOR> => input instanceof Map
+).annotations({ identifier: "TransactionBody.CDDLSchema" })
 
 type CDDLSchema = typeof CDDLSchema.Type
 
@@ -310,6 +309,32 @@ export const FromCDDL = Schema.transformOrFail(CDDLSchema, Schema.typeSchema(Tra
       if (toA.currentTreasuryValue !== undefined) record.set(21n, toA.currentTreasuryValue)
 
       if (toA.donation !== undefined) record.set(22n, toA.donation)
+
+      // Thread encoding metadata from domain object to CBOR AST with key order guard
+      const enc = CBOR.getEncoding(toA)
+      if (enc !== undefined) {
+        if (enc.keyOrder && enc.keyOrder.length !== record.size) {
+          // Key set changed — rebuild keyOrder and entries to match new map
+          const newKeyOrder: Array<CBOR.CBOR> = []
+          const newEntries: Array<readonly [CBOR.CBOREncoding | undefined, CBOR.CBOREncoding | undefined]> = []
+          for (let i = 0; i < enc.keyOrder.length; i++) {
+            const oldKey = enc.keyOrder[i]
+            if (record.has(oldKey as bigint)) {
+              newKeyOrder.push(oldKey)
+              newEntries.push(enc.entries?.[i] ?? [undefined, undefined])
+            }
+          }
+          for (const [key] of record) {
+            if (!enc.keyOrder.some((k) => CBOR.equals(k, key))) {
+              newKeyOrder.push(key)
+              newEntries.push([undefined, undefined])
+            }
+          }
+          CBOR.setEncoding(record, { ...enc, keyOrder: newKeyOrder, entries: newEntries })
+        } else {
+          CBOR.setEncoding(record, enc)
+        }
+      }
 
       return record as CDDLSchema
     }),
@@ -449,7 +474,7 @@ export const FromCDDL = Schema.transformOrFail(CDDLSchema, Schema.typeSchema(Tra
       const currentTreasuryValue = fromA.get(21n) as Coin.Coin | undefined
       const donation = fromA.get(22n) as Coin.Coin | undefined
 
-      return new TransactionBody(
+      const result = new TransactionBody(
         {
           inputs,
           outputs,
@@ -474,6 +499,10 @@ export const FromCDDL = Schema.transformOrFail(CDDLSchema, Schema.typeSchema(Tra
         },
         { disableValidation: true }
       )
+      // Thread encoding metadata from CBOR AST to domain object
+      const enc = CBOR.getEncoding(fromA)
+      if (enc !== undefined) CBOR.setEncoding(result, enc)
+      return result
     })
 })
 
@@ -484,7 +513,7 @@ export const FromCDDL = Schema.transformOrFail(CDDLSchema, Schema.typeSchema(Tra
  * @since 2.0.0
  * @category schemas
  */
-export const FromCBORBytes = (options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTIONS) =>
+export const FromCBORBytes = (options: CBOR.CodecOptions = CBOR.PRESERVE_OPTIONS) =>
   Schema.compose(CBOR.FromBytes(options), FromCDDL).annotations({
     identifier: "TransactionBody.FromCBORBytes",
     title: "TransactionBody from CBOR bytes",
@@ -498,7 +527,7 @@ export const FromCBORBytes = (options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTI
  * @since 2.0.0
  * @category schemas
  */
-export const FromCBORHex = (options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTIONS) =>
+export const FromCBORHex = (options: CBOR.CodecOptions = CBOR.PRESERVE_OPTIONS) =>
   Schema.compose(CBOR.FromHex(options), FromCDDL).annotations({
     identifier: "TransactionBody.FromCBORHex",
     title: "TransactionBody from CBOR hex",
@@ -513,7 +542,7 @@ export const isTransactionBody = Schema.is(TransactionBody)
  * @since 2.0.0
  * @category conversion
  */
-export const fromCBORBytes = (bytes: Uint8Array, options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTIONS) =>
+export const fromCBORBytes = (bytes: Uint8Array, options: CBOR.CodecOptions = CBOR.PRESERVE_OPTIONS) =>
   Schema.decodeSync(FromCBORBytes(options))(bytes)
 
 /**
@@ -522,7 +551,7 @@ export const fromCBORBytes = (bytes: Uint8Array, options: CBOR.CodecOptions = CB
  * @since 2.0.0
  * @category conversion
  */
-export const fromCBORHex = (hex: string, options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTIONS) =>
+export const fromCBORHex = (hex: string, options: CBOR.CodecOptions = CBOR.PRESERVE_OPTIONS) =>
   Schema.decodeSync(FromCBORHex(options))(hex)
 
 /**
@@ -531,7 +560,7 @@ export const fromCBORHex = (hex: string, options: CBOR.CodecOptions = CBOR.CML_D
  * @since 2.0.0
  * @category conversion
  */
-export const toCBORBytes = (data: TransactionBody, options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTIONS) =>
+export const toCBORBytes = (data: TransactionBody, options: CBOR.CodecOptions = CBOR.PRESERVE_OPTIONS) =>
   Schema.encodeSync(FromCBORBytes(options))(data)
 
 /**
@@ -540,7 +569,7 @@ export const toCBORBytes = (data: TransactionBody, options: CBOR.CodecOptions = 
  * @since 2.0.0
  * @category conversion
  */
-export const toCBORHex = (data: TransactionBody, options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTIONS) =>
+export const toCBORHex = (data: TransactionBody, options: CBOR.CodecOptions = CBOR.PRESERVE_OPTIONS) =>
   Schema.encodeSync(FromCBORHex(options))(data)
 
 // ============================================================================

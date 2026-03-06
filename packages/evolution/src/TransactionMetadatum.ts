@@ -175,7 +175,7 @@ export const TransactionMetadatumSchema = Schema.Union(
  * @since 2.0.0
  * @category schemas
  */
-export const FromCBORBytes = (options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTIONS) =>
+export const FromCBORBytes = (options: CBOR.CodecOptions = CBOR.PRESERVE_OPTIONS) =>
   Schema.compose(CBOR.FromBytes(options), Schema.typeSchema(TransactionMetadatumSchema)).annotations({
     identifier: "TransactionMetadatum.FromCBORBytes",
     description: "Transforms CBOR bytes to TransactionMetadatum"
@@ -187,7 +187,7 @@ export const FromCBORBytes = (options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTI
  * @since 2.0.0
  * @category schemas
  */
-export const FromCBORHex = (options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTIONS) =>
+export const FromCBORHex = (options: CBOR.CodecOptions = CBOR.PRESERVE_OPTIONS) =>
   Schema.compose(Schema.Uint8ArrayFromHex, FromCBORBytes(options)).annotations({
     identifier: "TransactionMetadatum.FromCBORHex",
     description: "Transforms CBOR hex string to TransactionMetadatum"
@@ -198,51 +198,16 @@ export const FromCBORHex = (options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTION
 // ============================================================================
 
 /**
- * Check if two TransactionMetadatum instances are equal.
+ * Schema-derived structural equality for TransactionMetadatum values.
+ * Handles maps, lists, ints, bytes, and text via the
+ * recursive TransactionMetadatumSchema definition — no hand-rolled comparison needed.
  *
  * @since 2.0.0
- * @category utilities
+ * @category equality
  */
-export const equals = (a: TransactionMetadatum, b: TransactionMetadatum): boolean => {
-  // String comparison
-  if (typeof a === "string" && typeof b === "string") {
-    return a === b
-  }
-
-  // BigInt comparison
-  if (typeof a === "bigint" && typeof b === "bigint") {
-    return a === b
-  }
-
-  // Uint8Array comparison
-  if (a instanceof Uint8Array && b instanceof Uint8Array) {
-    return a.length === b.length && a.every((byte, i) => byte === b[i])
-  }
-
-  // Array comparison
-  if (Array.isArray(a) && Array.isArray(b)) {
-    return a.length === b.length && a.every((item, i) => equals(item, b[i]))
-  }
-
-  // Map comparison
-  if (a instanceof globalThis.Map && b instanceof globalThis.Map) {
-    if (a.size !== b.size) return false
-    for (const [key, value] of a.entries()) {
-      let found = false
-      for (const [bKey, bVal] of b.entries()) {
-        if (equals(key, bKey)) {
-          if (!equals(value, bVal)) return false
-          found = true
-          break
-        }
-      }
-      if (!found) return false
-    }
-    return true
-  }
-
-  return false
-}
+export const equals: (a: TransactionMetadatum, b: TransactionMetadatum) => boolean = Schema.equivalence(
+  TransactionMetadatumSchema
+)
 
 /**
  * FastCheck arbitrary for generating random TransactionMetadatum instances.
@@ -275,7 +240,7 @@ export const arbitrary: FastCheck.Arbitrary<TransactionMetadatum> = FastCheck.on
  * @since 2.0.0
  * @category parsing
  */
-export const fromCBORBytes = (bytes: Uint8Array, options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTIONS) =>
+export const fromCBORBytes = (bytes: Uint8Array, options: CBOR.CodecOptions = CBOR.PRESERVE_OPTIONS) =>
   Schema.decodeSync(FromCBORBytes(options))(bytes)
 
 /**
@@ -284,7 +249,7 @@ export const fromCBORBytes = (bytes: Uint8Array, options: CBOR.CodecOptions = CB
  * @since 2.0.0
  * @category parsing
  */
-export const fromCBORHex = (hex: string, options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTIONS) =>
+export const fromCBORHex = (hex: string, options: CBOR.CodecOptions = CBOR.PRESERVE_OPTIONS) =>
   Schema.decodeSync(FromCBORHex(options))(hex)
 
 // ============================================================================
@@ -297,7 +262,7 @@ export const fromCBORHex = (hex: string, options: CBOR.CodecOptions = CBOR.CML_D
  * @since 2.0.0
  * @category encoding
  */
-export const toCBORBytes = (data: TransactionMetadatum, options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTIONS) =>
+export const toCBORBytes = (data: TransactionMetadatum, options: CBOR.CodecOptions = CBOR.PRESERVE_OPTIONS) =>
   Schema.encodeSync(FromCBORBytes(options))(data)
 
 /**
@@ -306,7 +271,7 @@ export const toCBORBytes = (data: TransactionMetadatum, options: CBOR.CodecOptio
  * @since 2.0.0
  * @category encoding
  */
-export const toCBORHex = (data: TransactionMetadatum, options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTIONS) =>
+export const toCBORHex = (data: TransactionMetadatum, options: CBOR.CodecOptions = CBOR.PRESERVE_OPTIONS) =>
   Schema.encodeSync(FromCBORHex(options))(data)
 
 // ============================================================================

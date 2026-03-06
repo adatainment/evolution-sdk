@@ -183,7 +183,7 @@ export class TransactionWitnessSet extends Schema.Class<TransactionWitnessSet>("
   bootstrapWitnesses: Schema.optional(Schema.Array(Bootstrap.BootstrapWitness)),
   plutusV1Scripts: Schema.optional(Schema.Array(PlutusV1.PlutusV1)),
   plutusData: Schema.optional(Schema.Array(PlutusData.DataSchema)),
-  redeemers: Schema.optional(Schema.Array(Redeemer.Redeemer)),
+  redeemers: Schema.optional(Schema.typeSchema(Redeemers.Redeemers)),
   plutusV2Scripts: Schema.optional(Schema.Array(PlutusV2.PlutusV2)),
   plutusV3Scripts: Schema.optional(Schema.Array(PlutusV3.PlutusV3))
 }) {
@@ -199,7 +199,7 @@ export class TransactionWitnessSet extends Schema.Class<TransactionWitnessSet>("
       bootstrapWitnesses: this.bootstrapWitnesses?.map((b) => b.toJSON()),
       plutusV1Scripts: this.plutusV1Scripts,
       plutusData: this.plutusData,
-      redeemers: this.redeemers?.map((r) => r.toJSON()),
+      redeemers: this.redeemers?.toJSON(),
       plutusV2Scripts: this.plutusV2Scripts,
       plutusV3Scripts: this.plutusV3Scripts
     }
@@ -233,7 +233,7 @@ export class TransactionWitnessSet extends Schema.Class<TransactionWitnessSet>("
       arrayEquals(this.bootstrapWitnesses, that.bootstrapWitnesses) &&
       arrayEquals(this.plutusV1Scripts, that.plutusV1Scripts) &&
       plutusDataArrayEquals(this.plutusData, that.plutusData) &&
-      arrayEquals(this.redeemers, that.redeemers) &&
+      Equal.equals(this.redeemers, that.redeemers) &&
       arrayEquals(this.plutusV2Scripts, that.plutusV2Scripts) &&
       arrayEquals(this.plutusV3Scripts, that.plutusV3Scripts)
     )
@@ -256,7 +256,7 @@ export class TransactionWitnessSet extends Schema.Class<TransactionWitnessSet>("
                 )
               )(arrayHash(this.plutusV1Scripts))
             )(plutusDataArrayHash(this.plutusData))
-          )(arrayHash(this.redeemers))
+          )(Hash.hash(this.redeemers))
         )(arrayHash(this.plutusV2Scripts))
       )(arrayHash(this.plutusV3Scripts))
     )
@@ -292,10 +292,9 @@ export class TransactionWitnessSet extends Schema.Class<TransactionWitnessSet>("
  * @since 2.0.0
  * @category schemas
  */
-export const CDDLSchema = Schema.MapFromSelf({
-  key: CBOR.Integer,
-  value: CBOR.CBORSchema
-})
+export const CDDLSchema = Schema.declare(
+  (input: unknown): input is Map<bigint, CBOR.CBOR> => input instanceof Map
+).annotations({ identifier: "TransactionWitnessSet.CDDLSchema" })
 
 /**
  * CDDL transformation schema for TransactionWitnessSet.
@@ -358,19 +357,19 @@ export const FromCDDL = Schema.transformOrFail(CDDLSchema, Schema.typeSchema(Tra
         record.set(4n, CBOR.Tag.make({ tag: 258, value: plutusDataCBOR }))
       }
 
-      // 5: redeemers — respect the format that was decoded (map or array)
-      if (toA.redeemers && toA.redeemers.length > 0) {
-        const redeemersCollection = new Redeemers.Redeemers({ values: [...toA.redeemers] })
-        const format = (toA as any)._redeemersFormat as Redeemers.Format | undefined
-        if (format === "map") {
-          // FromMapCDDL.encode produces array-of-pairs (Schema.Map encoded form);
-          // convert to JS Map so the CBOR encoder writes a major-type-5 map.
-          const redeemersEncoded = yield* ParseResult.encode(Redeemers.FromMapCDDL)(redeemersCollection)
-          const redeemersMap = new Map(redeemersEncoded as Iterable<readonly [CBOR.CBOR, CBOR.CBOR]>)
-          record.set(5n, redeemersMap)
-        } else {
-          const redeemersEncoded = yield* ParseResult.encode(Redeemers.FromArrayCDDL)(redeemersCollection)
-          record.set(5n, redeemersEncoded)
+      // 5: redeemers — format determined by the discriminated union _tag
+      if (toA.redeemers && toA.redeemers.size > 0) {
+        switch (toA.redeemers._tag) {
+          case "RedeemerMap": {
+            const encoded = yield* ParseResult.encode(Redeemers.FromMapCDDL)(toA.redeemers)
+            record.set(5n, new Map(encoded as Iterable<readonly [CBOR.CBOR, CBOR.CBOR]>))
+            break
+          }
+          case "RedeemerArray": {
+            const encoded = yield* ParseResult.encode(Redeemers.FromArrayCDDL)(toA.redeemers)
+            record.set(5n, encoded)
+            break
+          }
         }
       }
 
@@ -388,6 +387,35 @@ export const FromCDDL = Schema.transformOrFail(CDDLSchema, Schema.typeSchema(Tra
         record.set(7n, CBOR.Tag.make({ tag: 258, value: plutusV3Scripts }))
       }
 
+      // Thread encoding metadata from domain object to CBOR AST
+      // with key order + entries rebuild guard for when keys change
+      const enc = CBOR.getEncoding(toA)
+      if (enc !== undefined) {
+        if (enc.keyOrder && enc.keyOrder.length !== record.size) {
+          // Key set changed — rebuild keyOrder and entries to match new map
+          const newKeyOrder: Array<CBOR.CBOR> = []
+          const newEntries: Array<readonly [CBOR.CBOREncoding | undefined, CBOR.CBOREncoding | undefined]> = []
+          // Preserve original entries for keys that still exist (in original order)
+          for (let i = 0; i < enc.keyOrder.length; i++) {
+            const oldKey = enc.keyOrder[i]
+            if (record.has(oldKey as bigint)) {
+              newKeyOrder.push(oldKey)
+              newEntries.push(enc.entries?.[i] ?? [undefined, undefined])
+            }
+          }
+          // Append new keys (those not in original keyOrder)
+          for (const [key] of record) {
+            if (!enc.keyOrder.some((k) => CBOR.equals(k, key))) {
+              newKeyOrder.push(key)
+              newEntries.push([undefined, undefined])
+            }
+          }
+          CBOR.setEncoding(record, { ...enc, keyOrder: newKeyOrder, entries: newEntries })
+        } else {
+          CBOR.setEncoding(record, enc)
+        }
+      }
+
       return record
     }),
   decode: (fromA) =>
@@ -398,7 +426,7 @@ export const FromCDDL = Schema.transformOrFail(CDDLSchema, Schema.typeSchema(Tra
         bootstrapWitnesses?: Array<Bootstrap.BootstrapWitness>
         plutusV1Scripts?: Array<PlutusV1.PlutusV1>
         plutusData?: Array<PlutusData.Data>
-        redeemers?: Array<Redeemer.Redeemer>
+        redeemers?: Redeemers.Redeemers
         plutusV2Scripts?: Array<PlutusV2.PlutusV2>
         plutusV3Scripts?: Array<PlutusV3.PlutusV3>
       } = {}
@@ -473,7 +501,6 @@ export const FromCDDL = Schema.transformOrFail(CDDLSchema, Schema.typeSchema(Tra
 
       // 5: redeemers — Conway CDDL supports both array and map formats:
       //   redeemers = [ + redeemer ] / { + [tag, index] => [data, ex_units] }
-      let redeemersFormat: Redeemers.Format | undefined
       const redeemersRaw = fromA.get(5n)
       if (redeemersRaw !== undefined) {
         if (redeemersRaw instanceof Map) {
@@ -483,8 +510,7 @@ export const FromCDDL = Schema.transformOrFail(CDDLSchema, Schema.typeSchema(Tra
           const redeemersCollection = yield* ParseResult.decode(Redeemers.FromMapCDDL)(
             entries as unknown as Schema.Schema.Encoded<typeof Redeemers.FromMapCDDL>
           )
-          witnessSet.redeemers = [...redeemersCollection.values]
-          redeemersFormat = "map"
+          witnessSet.redeemers = redeemersCollection
         } else {
           // Array format (legacy, or tag-258 wrapped)
           const asRedeemersArray = (
@@ -504,8 +530,7 @@ export const FromCDDL = Schema.transformOrFail(CDDLSchema, Schema.typeSchema(Tra
           const redeemersArray = asRedeemersArray(redeemersRaw)
           if (redeemersArray !== undefined) {
             const redeemersCollection = yield* ParseResult.decode(Redeemers.FromArrayCDDL)(redeemersArray)
-            witnessSet.redeemers = [...redeemersCollection.values]
-            redeemersFormat = "array"
+            witnessSet.redeemers = redeemersCollection
           }
         }
       }
@@ -526,20 +551,20 @@ export const FromCDDL = Schema.transformOrFail(CDDLSchema, Schema.typeSchema(Tra
 
       // Build the class instance directly to allow fully empty witness sets
       const result = new TransactionWitnessSet(witnessSet, { disableValidation: true })
-      if (redeemersFormat !== undefined) {
-        ;(result as any)._redeemersFormat = redeemersFormat
-      }
+      // Thread encoding metadata from CBOR AST to domain object
+      const enc = CBOR.getEncoding(fromA)
+      if (enc !== undefined) CBOR.setEncoding(result, enc)
       return result
     })
 })
 
-export const FromCBORBytes = (options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTIONS) =>
+export const FromCBORBytes = (options: CBOR.CodecOptions = CBOR.PRESERVE_OPTIONS) =>
   Schema.compose(CBOR.FromBytes(options), FromCDDL).annotations({
     identifier: "TransactionWitnessSet.FromCBORBytes",
     description: "Transforms CBOR bytes to TransactionWitnessSet"
   })
 
-export const FromCBORHex = (options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTIONS) =>
+export const FromCBORHex = (options: CBOR.CodecOptions = CBOR.PRESERVE_OPTIONS) =>
   Schema.compose(CBOR.FromHex(options), FromCDDL).annotations({
     identifier: "TransactionWitnessSet.FromCBORHex",
     description: "Transforms CBOR hex string to TransactionWitnessSet"
@@ -570,7 +595,7 @@ export const arbitrary: FastCheck.Arbitrary<TransactionWitnessSet> = FastCheck.r
   ),
   plutusData: FastCheck.option(FastCheck.array(PlutusData.arbitrary)),
   redeemers: FastCheck.option(
-    FastCheck.array(
+    FastCheck.uniqueArray(
       FastCheck.record({
         data: PlutusData.arbitrary,
         exUnits: FastCheck.tuple(
@@ -579,7 +604,17 @@ export const arbitrary: FastCheck.Arbitrary<TransactionWitnessSet> = FastCheck.r
         ).map(([mem, steps]) => new Redeemer.ExUnits({ mem, steps })),
         index: FastCheck.bigInt({ min: 0n, max: 1000n }),
         tag: FastCheck.constantFrom("spend" as const, "mint" as const, "cert" as const, "reward" as const)
-      }).map(({ data, exUnits, index, tag }) => new Redeemer.Redeemer({ tag, index, data, exUnits }))
+      }).map(({ data, exUnits, index, tag }) => new Redeemer.Redeemer({ tag, index, data, exUnits })),
+      {
+        minLength: 1,
+        maxLength: 5,
+        selector: (r) => `${r.tag}:${r.index}`
+      }
+    ).chain((redeemers) =>
+      FastCheck.constantFrom<Redeemers.Redeemers>(
+        Redeemers.makeRedeemerMap(redeemers),
+        new Redeemers.RedeemerArray({ value: redeemers })
+      )
     )
   ),
   plutusV2Scripts: FastCheck.option(
@@ -608,7 +643,7 @@ export const arbitrary: FastCheck.Arbitrary<TransactionWitnessSet> = FastCheck.r
  * @since 2.0.0
  * @category parsing
  */
-export const fromCBORBytes = (bytes: Uint8Array, options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTIONS) =>
+export const fromCBORBytes = (bytes: Uint8Array, options: CBOR.CodecOptions = CBOR.PRESERVE_OPTIONS) =>
   Schema.decodeSync(FromCBORBytes(options))(bytes)
 
 /**
@@ -617,7 +652,7 @@ export const fromCBORBytes = (bytes: Uint8Array, options: CBOR.CodecOptions = CB
  * @since 2.0.0
  * @category parsing
  */
-export const fromCBORHex = (hex: string, options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTIONS) =>
+export const fromCBORHex = (hex: string, options: CBOR.CodecOptions = CBOR.PRESERVE_OPTIONS) =>
   Schema.decodeSync(FromCBORHex(options))(hex)
 
 // ============================================================================
@@ -630,7 +665,7 @@ export const fromCBORHex = (hex: string, options: CBOR.CodecOptions = CBOR.CML_D
  * @since 2.0.0
  * @category encoding
  */
-export const toCBORBytes = (data: TransactionWitnessSet, options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTIONS) =>
+export const toCBORBytes = (data: TransactionWitnessSet, options: CBOR.CodecOptions = CBOR.PRESERVE_OPTIONS) =>
   Schema.encodeSync(FromCBORBytes(options))(data)
 
 /**
@@ -639,7 +674,7 @@ export const toCBORBytes = (data: TransactionWitnessSet, options: CBOR.CodecOpti
  * @since 2.0.0
  * @category encoding
  */
-export const toCBORHex = (data: TransactionWitnessSet, options: CBOR.CodecOptions = CBOR.CML_DEFAULT_OPTIONS) =>
+export const toCBORHex = (data: TransactionWitnessSet, options: CBOR.CodecOptions = CBOR.PRESERVE_OPTIONS) =>
   Schema.encodeSync(FromCBORHex(options))(data)
 
 // ============================================================================

@@ -1,5 +1,14 @@
 # @evolution-sdk/aiken-uplc
 
+## 0.0.15
+
+### Patch Changes
+
+- [#182](https://github.com/IntersectMBO/evolution-sdk/pull/182) [`64b1383`](https://github.com/IntersectMBO/evolution-sdk/commit/64b1383aa34f23df0a776438f870ef57fb9d290e) Thanks [@solidsnakedev](https://github.com/solidsnakedev)! - Fix Node.js ESM compatibility by switching WASM loading from CJS `--target nodejs` to ESM `--target web` with `initSync`.
+
+- Updated dependencies [[`2a0c360`](https://github.com/IntersectMBO/evolution-sdk/commit/2a0c3603fbb3405c3b1e0d6e51935f28ed035611)]:
+  - @evolution-sdk/evolution@0.3.23
+
 ## 0.0.14
 
 ### Patch Changes

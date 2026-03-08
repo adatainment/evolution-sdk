@@ -1,5 +1,11 @@
 # @evolution-sdk/evolution
 
+## 0.3.23
+
+### Patch Changes
+
+- [#191](https://github.com/IntersectMBO/evolution-sdk/pull/191) [`2a0c360`](https://github.com/IntersectMBO/evolution-sdk/commit/2a0c3603fbb3405c3b1e0d6e51935f28ed035611) Thanks [@solidsnakedev](https://github.com/solidsnakedev)! - Add CBOR encoding preservation for bit-perfect round-trip fidelity and redesign Redeemers as a discriminated union (RedeemerMap + RedeemerArray)
+
 ## 0.3.22
 
 ### Patch Changes

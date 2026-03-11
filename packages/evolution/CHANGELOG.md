@@ -1,5 +1,15 @@
 # @evolution-sdk/evolution
 
+## 0.3.25
+
+### Patch Changes
+
+- [#198](https://github.com/IntersectMBO/evolution-sdk/pull/198) [`24f1d59`](https://github.com/IntersectMBO/evolution-sdk/commit/24f1d59ee64dfb9ca0d2f73f8c5afe9b41a09816) Thanks [@solidsnakedev](https://github.com/solidsnakedev)! - Filter out UTxOs with an empty `tx_hash` in Blockfrost `getUtxos` and `getUtxosWithUnit` to prevent a `ParseError` crash when providers like Dolos return malformed entries
+
+- [#183](https://github.com/IntersectMBO/evolution-sdk/pull/183) [`277df7b`](https://github.com/IntersectMBO/evolution-sdk/commit/277df7be130609c16a4e44c023de0bce637a4fd4) Thanks [@solidsnakedev](https://github.com/solidsnakedev)! - Handle plain-text responses in `postUint8Array` for compatibility with backends that return unquoted strings from `POST /tx/submit`
+
+- [#192](https://github.com/IntersectMBO/evolution-sdk/pull/192) [`536eeb3`](https://github.com/IntersectMBO/evolution-sdk/commit/536eeb37ec734db2547da4fc597f5466dd94c12a) Thanks [@solidsnakedev](https://github.com/solidsnakedev)! - `addVKeyWitnessesBytes` now uses the WithFormat round-trip to merge witnesses, preserving original CBOR encoding rather than performing manual byte surgery.
+
 ## 0.3.24
 
 ### Patch Changes

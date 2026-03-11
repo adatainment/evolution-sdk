@@ -267,7 +267,13 @@ export const getUtxos =
     }
 
     return fetchAllPages.pipe(
-      Effect.flatMap((utxos) => Effect.forEach(utxos, transformWithResolution, { concurrency: 10 })),
+      Effect.flatMap((utxos) =>
+        Effect.forEach(
+          utxos.filter((u) => u.tx_hash !== ""),
+          transformWithResolution,
+          { concurrency: 10 }
+        )
+      ),
       Effect.mapError(wrapError("getUtxos"))
     )
   }
@@ -357,7 +363,13 @@ export const getUtxosWithUnit =
     }
 
     return fetchAllPages.pipe(
-      Effect.flatMap((utxos) => Effect.forEach(utxos, transformWithResolution, { concurrency: 10 })),
+      Effect.flatMap((utxos) =>
+        Effect.forEach(
+          utxos.filter((u) => u.tx_hash !== ""),
+          transformWithResolution,
+          { concurrency: 10 }
+        )
+      ),
       Effect.mapError(wrapError("getUtxosWithUnit"))
     )
   }

@@ -1,5 +1,23 @@
 # @evolution-sdk/evolution
 
+## 0.3.26
+
+### Patch Changes
+
+- [#201](https://github.com/IntersectMBO/evolution-sdk/pull/201) [`619c52b`](https://github.com/IntersectMBO/evolution-sdk/commit/619c52bd843d45e3062cfe3a7a49438c181e45d7) Thanks [@solidsnakedev](https://github.com/solidsnakedev)! - Script transactions with certificate or withdrawal redeemers evaluated via Blockfrost no longer spam warning logs or loop indefinitely. Blockfrost's Ogmios v5 JSONWSP format returns `"certificate:N"` and `"withdrawal:N"` as redeemer pointer keys; these are now normalized to the canonical `"cert"` and `"reward"` tags before evaluation matching. Unmatched redeemer tags from any evaluator now fail immediately instead of silently leaving ExUnits at zero.
+
+- [#200](https://github.com/IntersectMBO/evolution-sdk/pull/200) [`3685736`](https://github.com/IntersectMBO/evolution-sdk/commit/3685736ec8fb7b536d88d7ef4044846a8cebb52f) Thanks [@solidsnakedev](https://github.com/solidsnakedev)! - Fix several provider mapping bugs that caused incorrect or missing data in `getDelegation`, `getDatum`, and `getUtxos` responses.
+
+  **Koios**
+  - `getDelegation`: was decoding the pool ID with `PoolKeyHash.FromHex` but Koios returns a bech32 `pool1…` string — switched to `PoolKeyHash.FromBech32`
+  - `getUtxos`: `datumOption` and `scriptRef` fields were never populated — all UTxOs returned `datumOption: null, scriptRef: null` regardless of on-chain state. Now correctly maps inline datums, datum hashes, and native/Plutus script references.
+
+  **Kupmios (Ogmios)**
+  - `getDelegation`: the Ogmios v6 response is an array, but the code was using `Object.values(result)[0]` which silently produced wrong data on some responses. Switched to `result[0]`. Also corrected the field path from `delegate.id` to `stakePool.id` to match the v6 schema, and decoded the bech32 pool ID through `Schema.decode(PoolKeyHash.FromBech32)` so the return type satisfies `Provider.Delegation`.
+
+  **Blockfrost**
+  - `getDatum`: was calling `/scripts/datum/{hash}` which returns only the data hash — should be `/scripts/datum/{hash}/cbor` to get the actual CBOR-encoded datum value. Switched endpoint and response schema to `BlockfrostDatumCbor`.
+
 ## 0.3.25
 
 ### Patch Changes

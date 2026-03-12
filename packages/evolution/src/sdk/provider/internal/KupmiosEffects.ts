@@ -15,6 +15,7 @@ import * as PlutusV1 from "../../../PlutusV1.js"
 import * as PlutusV2 from "../../../PlutusV2.js"
 import * as PlutusV3 from "../../../PlutusV3.js"
 import * as PolicyId from "../../../PolicyId.js"
+import * as PoolKeyHash from "../../../PoolKeyHash.js"
 import * as Redeemer from "../../../Redeemer.js"
 import type * as CoreRewardAddress from "../../../RewardAddress.js"
 import type * as CoreScript from "../../../Script.js"
@@ -437,11 +438,15 @@ export const getDelegationEffect = (ogmiosUrl: string, headers?: { ogmiosHeader?
       Effect.timeout(TIMEOUT),
       Effect.catchAll((cause) => new Provider.ProviderError({ cause, message: "Failed to get delegation" }))
     )
-    const delegation = result ? (Object.values(result)[0] as any) : null
+    const delegation = result?.[0] ?? null
 
     return {
-      poolId: delegation?.delegate?.id || null,
-      rewards: BigInt(delegation?.rewards?.ada?.lovelace || 0)
+      poolId: delegation?.stakePool?.id
+        ? yield* Schema.decode(PoolKeyHash.FromBech32)(delegation.stakePool.id).pipe(
+            Effect.mapError((cause) => new Provider.ProviderError({ cause, message: "Failed to decode pool key hash" }))
+          )
+        : null,
+      rewards: BigInt(delegation?.rewards?.ada?.lovelace ?? 0)
     }
   })
 

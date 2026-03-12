@@ -557,8 +557,8 @@ export const getDatum = (baseUrl: string, projectId?: string) => (datumHash: Dat
   const datumHashHex = Bytes.toHex(datumHash.hash)
   return withRateLimit(
     HttpUtils.get(
-      `${baseUrl}/scripts/datum/${datumHashHex}`,
-      Blockfrost.BlockfrostDatum,
+      `${baseUrl}/scripts/datum/${datumHashHex}/cbor`,
+      BlockfrostDatumCbor,
       createHeaders(projectId)
     ).pipe(
       Effect.flatMap((datum) => {

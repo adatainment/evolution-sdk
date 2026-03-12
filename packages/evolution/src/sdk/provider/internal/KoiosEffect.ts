@@ -230,7 +230,7 @@ export const getDelegation = (baseUrl: string, token?: string) => (rewardAddress
     )
 
     return {
-      poolId: result.delegated_pool ? Schema.decodeSync(PoolKeyHash.FromHex)(result.delegated_pool) : null,
+      poolId: result.delegated_pool ? Schema.decodeSync(PoolKeyHash.FromBech32)(result.delegated_pool) : null,
       rewards: BigInt(result.rewards_available)
     } satisfies Provider.Delegation
   })

@@ -5,7 +5,17 @@ import type { ParseError } from "effect/ParseResult"
 
 import * as CoreAddress from "../../../Address.js"
 import * as CoreAssets from "../../../Assets/index.js"
+import * as Bytes from "../../../Bytes.js"
 import type * as Credential from "../../../Credential.js"
+import * as PlutusData from "../../../Data.js"
+import * as DatumHash from "../../../DatumHash.js"
+import type * as DatumOption from "../../../DatumOption.js"
+import * as InlineDatum from "../../../InlineDatum.js"
+import * as NativeScripts from "../../../NativeScripts.js"
+import * as PlutusV1 from "../../../PlutusV1.js"
+import * as PlutusV2 from "../../../PlutusV2.js"
+import * as PlutusV3 from "../../../PlutusV3.js"
+import type * as Script from "../../../Script.js"
 import * as TransactionHash from "../../../TransactionHash.js"
 import * as CoreUTxO from "../../../UTxO.js"
 import * as HttpUtils from "./HttpUtils.js"
@@ -52,7 +62,7 @@ export const ProtocolParametersSchema = Schema.Struct({
   protocol_minor: Schema.Number,
   min_utxo_value: Schema.String,
   min_pool_cost: Schema.String,
-  nonce: Schema.String,
+  nonce: Schema.NullOr(Schema.String),
   block_hash: Schema.NullOr(Schema.String),
   cost_models: Schema.Struct({
     PlutusV1: Schema.Array(Schema.Number),
@@ -87,7 +97,7 @@ const ReferenceScriptSchema = Schema.Struct({
   size: Schema.NullOr(Schema.Number),
   type: Schema.NullOr(Schema.String),
   bytes: Schema.NullOr(Schema.String),
-  value: Schema.NullOr(Schema.Object)
+  value: Schema.Unknown
 })
 
 export interface ReferenceScript extends Schema.Schema.Type<typeof ReferenceScriptSchema> {}
@@ -101,8 +111,8 @@ export const UTxOSchema = Schema.Struct({
   datum_hash: Schema.NullOr(Schema.String),
   inline_datum: Schema.NullOr(
     Schema.Struct({
-      bytes: Schema.String,
-      value: Schema.Object
+      bytes: Schema.NullOr(Schema.String),
+      value: Schema.Unknown
     })
   ),
   reference_script: Schema.NullOr(ReferenceScriptSchema),
@@ -137,8 +147,8 @@ export const InputOutputSchema = Schema.Struct({
   datum_hash: Schema.NullOr(Schema.String),
   inline_datum: Schema.NullOr(
     Schema.Struct({
-      bytes: Schema.String,
-      value: Schema.Object
+      bytes: Schema.NullOr(Schema.String),
+      value: Schema.Unknown
     })
   ),
   reference_script: Schema.NullOr(ReferenceScriptSchema),
@@ -235,7 +245,7 @@ export const TxInfoSchema = Schema.Struct({
   voting_procedures: Schema.Array(Schema.Object),
   //TODO: add Schema.Struct
   // https://preprod.koios.rest/#post-/tx_info
-  proposal_procedures: Schema.Object
+  proposal_procedures: Schema.Array(Schema.Object)
 })
 
 export interface TxInfo extends Schema.Schema.Type<typeof TxInfoSchema> {}
@@ -288,34 +298,42 @@ export const toUTxO = (koiosUTxO: UTxO, addressStr: string): CoreUTxO.UTxO => {
   const address = CoreAddress.fromBech32(addressStr)
   const transactionId = TransactionHash.fromHex(koiosUTxO.tx_hash)
 
-  // TODO: Handle datum and script ref when Core types support them
-  // datumOption: koiosUTxO.inline_datum ? { type: "inlineDatum", inline: koiosUTxO.inline_datum.bytes }
-  //   : koiosUTxO.datum_hash ? { type: "datumHash", hash: koiosUTxO.datum_hash } : undefined,
-  // scriptRef: toScriptRef(koiosUTxO.reference_script)
+  let datumOption: DatumOption.DatumOption | undefined
+  if (koiosUTxO.inline_datum?.bytes) {
+    datumOption = new InlineDatum.InlineDatum({ data: PlutusData.fromCBORHex(koiosUTxO.inline_datum.bytes) })
+  } else if (koiosUTxO.datum_hash) {
+    datumOption = DatumHash.fromHex(koiosUTxO.datum_hash)
+  }
+
+  let scriptRef: Script.Script | undefined
+  const rs = koiosUTxO.reference_script
+  if (rs?.bytes && rs.type) {
+    const scriptBytes = Bytes.fromHex(rs.bytes)
+    switch (rs.type) {
+      case "plutusV1":
+        scriptRef = new PlutusV1.PlutusV1({ bytes: scriptBytes })
+        break
+      case "plutusV2":
+        scriptRef = new PlutusV2.PlutusV2({ bytes: scriptBytes })
+        break
+      case "plutusV3":
+        scriptRef = new PlutusV3.PlutusV3({ bytes: scriptBytes })
+        break
+      case "timelock":
+        scriptRef = NativeScripts.fromCBORHex(rs.bytes)
+        break
+    }
+  }
 
   return new CoreUTxO.UTxO({
     transactionId,
     index: BigInt(koiosUTxO.tx_index),
     address,
-    assets
+    assets,
+    datumOption,
+    scriptRef
   })
 }
-
-// Keep for future reference when Core types support scripts
-// const toScriptRef = (reference_script: ReferenceScript | null): Script.Script | undefined => {
-//   if (reference_script && reference_script.bytes && reference_script.type) {
-//     switch (reference_script.type) {
-//       case "plutusV1":
-//         return { type: "PlutusV1" as const, script: Script.applyDoubleCborEncoding(reference_script.bytes) }
-//       case "plutusV2":
-//         return { type: "PlutusV2" as const, script: Script.applyDoubleCborEncoding(reference_script.bytes) }
-//       case "plutusV3":
-//         return { type: "PlutusV3" as const, script: Script.applyDoubleCborEncoding(reference_script.bytes) }
-//       default:
-//         return undefined
-//     }
-//   }
-// }
 
 export const getUtxosEffect = (
   baseUrl: string,

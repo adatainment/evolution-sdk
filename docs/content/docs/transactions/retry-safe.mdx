@@ -125,7 +125,6 @@ async function unlockFromScript() {
 When using Effect, compose the full pipeline as a single `Effect.gen` and apply `Effect.retry` directly. `Schedule` controls the timing and number of attempts.
 
 ```ts twoslash
-// @noErrors
 import { Address, createClient } from "@evolution-sdk/evolution";
 import { Effect, Schedule } from "effect";
 

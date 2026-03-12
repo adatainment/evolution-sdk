@@ -95,7 +95,7 @@ export function registerConformanceTests(factory: () => Provider) {
     expect(datum).toBeDefined()
   })
 
-  it("awaitTx", { timeout: 0 }, async () => {
+  it("awaitTx", { timeout: 120_000 }, async () => {
     const confirmed = await provider.awaitTx(preprodTxHash())
     expect(confirmed).toBe(true)
   })

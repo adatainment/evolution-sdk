@@ -1,7 +1,7 @@
 /**
  * Provider integration tests — all 4 providers in one place.
  *
- * Koios: always opt-in via `describe.skip` (public endpoint, no key needed).
+ * Koios: opt-in via `KOIOS_ENABLED` env var (public endpoint, no key needed).
  * Blockfrost / Maestro: auto-skipped unless the API key env var is set.
  * Kupmios: auto-skipped unless both KUPO + OGMIOS URLs are set.
  *
@@ -21,7 +21,11 @@ const isConfigured = (value: string | undefined, placeholder?: string) =>
 
 const parseHeaderJson = (value: string | undefined) => {
   if (!value || value.trim() === "") return undefined
-  return JSON.parse(value) as Record<string, string>
+  try {
+    return JSON.parse(value) as Record<string, string>
+  } catch {
+    return undefined
+  }
 }
 
 const KOIOS_URL = process.env.KOIOS_PREPROD_URL ?? "https://preprod.koios.rest/api/v1"

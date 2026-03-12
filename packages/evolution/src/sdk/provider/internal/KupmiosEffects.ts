@@ -442,7 +442,9 @@ export const getDelegationEffect = (ogmiosUrl: string, headers?: { ogmiosHeader?
 
     return {
       poolId: delegation?.stakePool?.id
-        ? yield* Schema.decode(PoolKeyHash.FromBech32)(delegation.stakePool.id)
+        ? yield* Schema.decode(PoolKeyHash.FromBech32)(delegation.stakePool.id).pipe(
+            Effect.mapError((cause) => new Provider.ProviderError({ cause, message: "Failed to decode pool key hash" }))
+          )
         : null,
       rewards: BigInt(delegation?.rewards?.ada?.lovelace ?? 0)
     }

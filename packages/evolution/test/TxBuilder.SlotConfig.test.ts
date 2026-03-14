@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest"
 
 import * as Address from "../src/Address.js"
 import * as CoreAssets from "../src/Assets/index.js"
+import { makeTxBuilder } from "../src/sdk/builders/TransactionBuilder.js"
 import * as Time from "../src/Time/index.js"
 import { SLOT_CONFIG_NETWORK } from "../src/Time/SlotConfig.js"
-import { makeTxBuilder } from "../src/sdk/builders/TransactionBuilder.js"
 import { createCoreTestUtxo } from "./utils/utxo-helpers.js"
 
 const PROTOCOL_PARAMS = {

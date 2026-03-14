@@ -4,7 +4,7 @@ import * as Address from "../../src/Address.js"
 import * as Assets from "../../src/Assets/index.js"
 import * as AssetsUnit from "../../src/Assets/Unit.js"
 import * as PoolKeyHash from "../../src/PoolKeyHash.js"
-import type { Provider } from "../../src/sdk/provider/Provider.js"
+import { type Provider,ProviderError } from "../../src/sdk/provider/Provider.js"
 import * as TransactionHash from "../../src/TransactionHash.js"
 import {
   PREPROD_SCRIPT_ADDRESS_BECH32,
@@ -15,6 +15,7 @@ import {
   preprodScriptAddress,
   preprodStakeAddress,
   preprodTxHash,
+  previewTxHash,
 } from "./fixtures/constants.js"
 
 /**
@@ -95,9 +96,13 @@ export function registerConformanceTests(factory: () => Provider) {
     expect(datum).toBeDefined()
   })
 
-  it("awaitTx", { timeout: 120_000 }, async () => {
+  it("awaitTx", { timeout: 200_000 }, async () => {
     const confirmed = await provider.awaitTx(preprodTxHash())
     expect(confirmed).toBe(true)
+  })
+
+  it("awaitTx rejects for preview-only tx on preprod", { timeout: 10_000 }, async () => {
+    await expect(provider.awaitTx(previewTxHash(), 1000, 5000)).rejects.toThrow(ProviderError)
   })
 
   // submitTx and evaluateTx require a valid signed CBOR tx — skipped until we have tx fixtures

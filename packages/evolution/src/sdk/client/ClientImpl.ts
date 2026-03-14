@@ -4,6 +4,7 @@ import * as CoreAddress from "../../Address.js"
 import * as Bytes from "../../Bytes.js"
 import * as KeyHash from "../../KeyHash.js"
 import type * as NativeScripts from "../../NativeScripts.js"
+import type * as Network from "../../Network.js"
 import * as PrivateKey from "../../PrivateKey.js"
 import * as CoreRewardAccount from "../../RewardAccount.js"
 import * as CoreRewardAddress from "../../RewardAddress.js"
@@ -108,6 +109,29 @@ const toWalletNetwork = (networkId: NetworkId): WalletNew.Network => {
 }
 
 /**
+ * Map NetworkId to Network type for slot configuration resolution.
+ * Returns the correct Network variant so resolveSlotConfig picks the right preset.
+ *
+ * @since 2.0.0
+ * @category transformation
+ */
+const toBuilderNetwork = (networkId: NetworkId): Network.Network => {
+  if (typeof networkId === "number") {
+    return networkId === 1 ? "Mainnet" : "Preview"
+  }
+  switch (networkId) {
+    case "mainnet":
+      return "Mainnet"
+    case "preprod":
+      return "Preprod"
+    case "preview":
+      return "Preview"
+    default:
+      return "Mainnet"
+  }
+}
+
+/**
  * Construct read-only wallet from network, payment address, and optional reward address.
  *
  * @since 2.0.0
@@ -192,6 +216,7 @@ const createReadOnlyClient = (
       return makeTxBuilder({
         wallet,
         provider,
+        network: toBuilderNetwork(network),
         slotConfig
       })
     },
@@ -756,6 +781,7 @@ const createSigningClient = (
       return makeTxBuilder({
         provider, // Pass provider for submission
         wallet, // Pass wallet for signing
+        network: toBuilderNetwork(network),
         slotConfig // Pass slot config for time conversion
       })
     },

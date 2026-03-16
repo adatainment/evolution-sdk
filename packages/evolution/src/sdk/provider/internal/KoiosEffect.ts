@@ -24,7 +24,7 @@ import * as _Ogmios from "./Ogmios.js"
 
 export const getProtocolParameters = (baseUrl: string, token?: string) =>
   Effect.gen(function* () {
-    const url = `${baseUrl}/epoch_params?limit=1`
+    const url = `${baseUrl}/epoch_params?limit=1&order=epoch_no.desc`
     const schema = Schema.Array(_Koios.ProtocolParametersSchema)
     const bearerToken = token ? { Authorization: `Bearer ${token}` } : undefined
     const [result] = yield* pipe(

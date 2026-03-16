@@ -1,5 +1,11 @@
 # @evolution-sdk/evolution
 
+## 0.3.28
+
+### Patch Changes
+
+- [#208](https://github.com/IntersectMBO/evolution-sdk/pull/208) [`76bbaa2`](https://github.com/IntersectMBO/evolution-sdk/commit/76bbaa2d1cebb40a52a037b23cd80f1fef20388d) Thanks [@solidsnakedev](https://github.com/solidsnakedev)! - Fix Koios `getProtocolParameters` returning stale epoch data on preview by explicitly ordering `epoch_params` descending
+
 ## 0.3.27
 
 ### Patch Changes

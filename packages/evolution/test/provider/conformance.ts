@@ -4,7 +4,8 @@ import * as Address from "../../src/Address.js"
 import * as Assets from "../../src/Assets/index.js"
 import * as AssetsUnit from "../../src/Assets/Unit.js"
 import * as PoolKeyHash from "../../src/PoolKeyHash.js"
-import { type Provider,ProviderError } from "../../src/sdk/provider/Provider.js"
+import { type Provider } from "../../src/sdk/provider/Provider.js"
+import * as Transaction from "../../src/Transaction.js"
 import * as TransactionHash from "../../src/TransactionHash.js"
 import {
   PREPROD_SCRIPT_ADDRESS_BECH32,
@@ -17,6 +18,7 @@ import {
   preprodTxHash,
   previewTxHash,
 } from "./fixtures/constants.js"
+import { evalSample1, evalSample2, evalSample3, evalSample4 } from "./fixtures/evaluateTx.js"
 
 /**
  * Registers conformance `it()` tests for the Provider interface.
@@ -102,10 +104,35 @@ export function registerConformanceTests(factory: () => Provider) {
   })
 
   it("awaitTx rejects for preview-only tx on preprod", { timeout: 10_000 }, async () => {
-    await expect(provider.awaitTx(previewTxHash(), 1000, 5000)).rejects.toThrow(ProviderError)
+    await expect(provider.awaitTx(previewTxHash(), 1000, 5000)).rejects.toThrow(
+      "awaitTx failed"
+    )
   })
 
   // submitTx and evaluateTx require a valid signed CBOR tx — skipped until we have tx fixtures
   it.skip("submitTx", async () => {})
-  it.skip("evaluateTx", async () => {})
+
+  it("evaluateTx with multiple spend redeemers", async () => {
+    const tx = Transaction.fromCBORHex(evalSample1.transaction)
+    const result = await provider.evaluateTx(tx, evalSample1.utxos)
+    expect(result).toEqual(evalSample1.redeemersExUnits)
+  })
+
+  it("evaluateTx with PlutusV2 reference script", async () => {
+    const tx = Transaction.fromCBORHex(evalSample2.transaction)
+    const result = await provider.evaluateTx(tx, evalSample2.utxos)
+    expect(result).toEqual(evalSample2.redeemersExUnits)
+  })
+
+  it("evaluateTx with spend, mint, and reward redeemers", async () => {
+    const tx = Transaction.fromCBORHex(evalSample3.transaction)
+    const result = await provider.evaluateTx(tx, evalSample3.utxos)
+    expect(result).toEqual(evalSample3.redeemersExUnits)
+  })
+
+  it("evaluateTx with cert redeemer (PlutusV3)", async () => {
+    const tx = Transaction.fromCBORHex(evalSample4.transaction)
+    const result = await provider.evaluateTx(tx, evalSample4.utxos)
+    expect(result).toEqual(evalSample4.redeemersExUnits)
+  })
 }

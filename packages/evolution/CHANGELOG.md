@@ -1,5 +1,11 @@
 # @evolution-sdk/evolution
 
+## 0.3.29
+
+### Patch Changes
+
+- [#210](https://github.com/IntersectMBO/evolution-sdk/pull/210) [`03e4dea`](https://github.com/IntersectMBO/evolution-sdk/commit/03e4deaace5a98a2def15ebb088262160c77cd2c) Thanks [@solidsnakedev](https://github.com/solidsnakedev)! - Fix Blockfrost evaluateTx failing on multi-asset UTxOs by correcting the value format sent to the Ogmios endpoint. Standardize error handling across all providers with consistent catchAll + wrapError pattern. Add JSONWSP fault detection to Blockfrost evaluation responses. Accept both CBOR tag-258 and plain array encodings in TransactionBody decoding.
+
 ## 0.3.28
 
 ### Patch Changes

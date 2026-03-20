@@ -900,7 +900,7 @@ export function generateTypeScript(
 
   // Topologically sort definitions to ensure dependencies come first
   // (must happen before imports so we know if cyclic types exist)
-  const { sorted: sortedDefinitions, cyclicNames } = topologicalSort(blueprint.definitions)
+  const { cyclicNames, sorted: sortedDefinitions } = topologicalSort(blueprint.definitions)
 
   // File header
   lines.push("/**")

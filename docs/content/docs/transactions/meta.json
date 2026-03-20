@@ -5,6 +5,7 @@
     "first-transaction",
     "simple-payment",
     "multi-output",
+    "chaining",
     "retry-safe"
   ]
 }

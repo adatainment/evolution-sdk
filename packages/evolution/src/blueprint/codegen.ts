@@ -170,13 +170,13 @@ function inferEncodedTypeString(
         return "bigint"
       case "list": {
         const listDef = def as BlueprintTypes.ListDefinitionType
-        if (!listDef.items) return "readonly Data.Data[]"
+        if (!listDef.items) return "ReadonlyArray<Data.Data>"
         const itemEnc = inferEncodedTypeString(
           listDef.items as BlueprintTypes.SchemaDefinitionType,
           definitions,
           depth + 1
         )
-        return `readonly ${itemEnc}[]`
+        return `ReadonlyArray<${itemEnc}>`
       }
       case "map":
         // TSchema.Map encodes from/to globalThis.Map<Data.Data, Data.Data> regardless of K/V

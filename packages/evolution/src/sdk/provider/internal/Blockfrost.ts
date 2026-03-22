@@ -24,7 +24,7 @@ export const BlockfrostProtocolParameters = Schema.Struct({
   min_fee_b: Schema.Number,
   pool_deposit: Schema.String,
   key_deposit: Schema.String,
-  min_utxo: Schema.String,
+  min_utxo: Schema.optional(Schema.String),
   max_tx_size: Schema.Number,
   max_val_size: Schema.optional(Schema.String),
   utxo_cost_per_word: Schema.optional(Schema.String),
